@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-neutral-50 text-neutral-900 transition-colors duration-200;
+  }
+  body.dark {
+    @apply bg-dark-bg text-dark-text;
+  }
+  
+  /* Customized inputs to feel highly polished and human */
+  input, textarea, select {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-150;
+  }
+}
+
+@layer utilities {
+  .bg-gradient-premium {
+    background: linear-gradient(135deg, #6C5CE7 0%, #a29bfe 100%);
+  }
+  
+  .glassmorphism {
+    @apply bg-white/70 backdrop-blur-md border border-white/20;
+  }
+  .dark .glassmorphism {
+    @apply bg-dark-surface/70 backdrop-blur-md border border-dark-border;
+  }
+}
+
+/* Custom fade-in classes for page loads */
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

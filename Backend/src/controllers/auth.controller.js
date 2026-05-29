@@ -1,0 +1,120 @@
+const authService = require('../services/auth.service');
+const asyncHandler = require('../utils/asyncHandler');
+const config = require('../config');
+
+// Cookie options helper
+const getCookieOptions = () => {
+  return {
+    httpOnly: true,
+    secure: config.NODE_ENV === 'production',
+    sameSite: config.NODE_ENV === 'production' ? 'none' : 'lax',
+    path: '/',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  };
+};
+
+/**
+ * Register User controller.
+ */
+const register = asyncHandler(async (req, res) => {
+  const { email, password, role } = req.body;
+
+  const result = await authService.register(email, password, role);
+
+  // Set httpOnly refresh token cookie
+  res.cookie(config.JWT.REFRESH_COOKIE_NAME, result.refreshToken, getCookieOptions());
+
+  res.status(201).json({
+    success: true,
+    data: {
+      user: result.user,
+      accessToken: result.accessToken,
+    },
+  });
+});
+
+/**
+ * Login User controller.
+ */
+const login = asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
+
+  const result = await authService.login(email, password);
+
+  // Set httpOnly refresh token cookie
+  res.cookie(config.JWT.REFRESH_COOKIE_NAME, result.refreshToken, getCookieOptions());
+
+  res.status(200).json({
+    success: true,
+    data: {
+      user: result.user,
+      accessToken: result.accessToken,
+    },
+  });
+});
+
+/**
+ * Refresh Tokens controller.
+ */
+const refresh = asyncHandler(async (req, res) => {
+  const oldRefreshToken = req.cookies[config.JWT.REFRESH_COOKIE_NAME];
+
+  const result = await authService.refreshToken(oldRefreshToken);
+
+  // Set rotated refresh token cookie
+  res.cookie(config.JWT.REFRESH_COOKIE_NAME, result.refreshToken, getCookieOptions());
+
+  res.status(200).json({
+    success: true,
+    data: {
+      user: result.user,
+      accessToken: result.accessToken,
+    },
+  });
+});
+
+/**
+ * Logout User controller.
+ */
+const logout = asyncHandler(async (req, res) => {
+  const oldRefreshToken = req.cookies[config.JWT.REFRESH_COOKIE_NAME];
+
+  await authService.logout(oldRefreshToken);
+
+  // Clear cookie
+  res.clearCookie(config.JWT.REFRESH_COOKIE_NAME, {
+    httpOnly: true,
+    secure: config.NODE_ENV === 'production',
+    sameSite: config.NODE_ENV === 'production' ? 'none' : 'lax',
+    path: '/',
+  });
+
+  res.status(200).json({
+    success: true,
+    data: {
+      message: 'Signed out successfully. See you soon! 👋',
+    },
+  });
+});
+
+/**
+ * Get Profile controller.
+ */
+const me = asyncHandler(async (req, res) => {
+  const userProfile = await authService.getMe(req.user.id);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      user: userProfile,
+    },
+  });
+});
+
+module.exports = {
+  register,
+  login,
+  refresh,
+  logout,
+  me,
+};

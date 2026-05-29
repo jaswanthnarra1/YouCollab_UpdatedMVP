@@ -1,0 +1,122 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  passwordHash  String
+  role          String
+  avatarUrl     String?
+  isOnboarded   Boolean        @default(false)
+  lastActiveAt  DateTime?      @default(now())
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  brand         Brand?
+  influencer    Influencer?
+  refreshTokens RefreshToken[]
+  notifications Notification[]
+}
+
+model Brand {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  businessName  String
+  category      String
+  location      String   @default("Pune")
+  bio           String
+  logoUrl       String?
+  website       String?
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gigs          Gig[]
+}
+
+model Influencer {
+  id               String        @id @default(uuid())
+  userId           String        @unique
+  name             String
+  instagramHandle  String
+  niche            String
+  bio              String
+  profileImageUrl  String?
+  followerCount    Int?          @default(0)
+
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applications     Application[]
+}
+
+model Gig {
+  id           String        @id @default(uuid())
+  brandId      String
+  title        String
+  description  String
+  budgetMin    Int
+  budgetMax    Int?
+  deliverables String
+  deadline     DateTime
+  status       String        @default("OPEN")
+  city         String        @default("Pune")
+  category     String
+  viewCount    Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  brand        Brand         @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  applications Application[]
+
+  @@index([city])
+  @@index([status])
+  @@index([category])
+  @@index([createdAt])
+}
+
+model Application {
+  id           String            @id @default(uuid())
+  gigId        String
+  influencerId String
+  coverNote    String
+  status       String            @default("PENDING")
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  gig          Gig               @relation(fields: [gigId], references: [id], onDelete: Cascade)
+  influencer   Influencer        @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+
+  @@unique([gigId, influencerId])
+}
+
+model RefreshToken {
+  id         String   @id @default(uuid())
+  userId     String
+  tokenHash  String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      String
+  title     String
+  message   String
+  metadata  String?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+}
