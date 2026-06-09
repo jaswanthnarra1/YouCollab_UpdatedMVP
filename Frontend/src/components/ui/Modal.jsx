@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { X } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn } from '../../utils';
 import { Button } from './Button';
 
 export const Modal = ({

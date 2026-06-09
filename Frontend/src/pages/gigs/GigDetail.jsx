@@ -4,7 +4,7 @@ import { MapPin, Clock, Eye, Briefcase, ChevronLeft, CalendarDays, CheckCircle, 
 import { useGigs } from '../../hooks/useGigs';
 import { useAuthStore } from '../../stores/authStore';
 import { useApplications } from '../../hooks/useApplications';
-import { formatDate, formatBudget, getRelativeTime } from '../../lib/utils';
+import { formatDate, formatBudget, getRelativeTime } from '../../utils';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';

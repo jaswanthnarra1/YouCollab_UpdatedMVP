@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PlusCircle, Search, Calendar, Users, Eye, MoreVertical, XCircle, LayoutTemplate } from 'lucide-react';
 import { useGigs } from '../../hooks/useGigs';
-import { formatDate } from '../../lib/utils';
+import { formatDate } from '../../utils';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';

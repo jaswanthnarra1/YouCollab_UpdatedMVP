@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Tag, IndianRupee, Users } from 'lucide-react';
-import { formatBudget, getRelativeTime } from '../../lib/utils';
+import { formatBudget, getRelativeTime } from '../../utils';
 import { Card } from '../ui/Card';
 import { Avatar } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';

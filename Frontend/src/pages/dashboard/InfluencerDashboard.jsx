@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Search, Send, CheckCircle, Clock, ArrowRight, FileText, LayoutTemplate } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useApplications } from '../../hooks/useApplications';
-import { formatDate } from '../../lib/utils';
+import { formatDate } from '../../utils';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';

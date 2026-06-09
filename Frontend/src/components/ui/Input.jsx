@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn } from '../../utils';
 
 export const Input = React.forwardRef(({
   className,

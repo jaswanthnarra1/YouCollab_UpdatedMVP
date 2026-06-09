@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import * as uploadApi from '../api/upload.api';
+import * as uploadApi from '../services/upload.service';
 import useUiStore from '../stores/uiStore';
 
 /**

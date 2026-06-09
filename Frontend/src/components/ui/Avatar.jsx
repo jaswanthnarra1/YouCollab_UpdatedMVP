@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { cn, getInitials } from '../../lib/utils';
+import { cn, getInitials } from '../../utils';
 
 export const Avatar = ({
   src,
@@ -40,7 +40,7 @@ export const Avatar = ({
   const initials = getInitials(name);
   const colorClass = bgColors[getColorIndex(name)];
 
-  const serverUrl = src && src.startsWith('/') ? `http://localhost:5000${src}` : src;
+  const serverUrl = src && src.startsWith('/') ? `http://127.0.0.1:5000${src}` : src;
 
   return (
     <div

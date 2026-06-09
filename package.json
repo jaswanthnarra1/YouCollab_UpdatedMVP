@@ -4,12 +4,12 @@
   "description": "YouCollab Root Workspace",
   "private": true,
   "scripts": {
-    "install:all": "npm install --prefix backend && npm install --prefix frontend",
-    "dev:backend": "npm run dev --prefix backend",
-    "dev:frontend": "npm run dev --prefix frontend",
+    "install:all": "npm install --prefix Backend && npm install --prefix Frontend",
+    "dev:backend": "npm run dev --prefix Backend",
+    "dev:frontend": "npm run dev --prefix Frontend",
     "dev": "npx concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "db:push": "npm run db:push --prefix backend",
-    "db:seed": "npm run db:seed --prefix backend"
+    "db:migrate": "node Backend/supabase/migrate.js",
+    "db:seed": "node Backend/supabase/seed.js"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

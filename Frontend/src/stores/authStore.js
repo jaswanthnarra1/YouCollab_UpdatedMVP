@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import axios from 'axios';
 
+const API_URL = import.meta.env.VITE_API_URL || '/api';
+
 const useAuthStore = create((set) => ({
   user: null,
   accessToken: null,
@@ -27,17 +29,21 @@ const useAuthStore = create((set) => ({
   initAuth: async () => {
     try {
       const response = await axios.post(
-        'http://localhost:5000/api/auth/refresh',
+        `${API_URL}/auth/refresh`,
         {},
         { withCredentials: true }
       );
-      const { user, accessToken } = response.data.data;
-      set({
-        user,
-        accessToken,
-        isAuthenticated: true,
-        isInitializing: false,
-      });
+      const data = response?.data?.data;
+      if (data?.user && data?.accessToken) {
+        set({
+          user: data.user,
+          accessToken: data.accessToken,
+          isAuthenticated: true,
+          isInitializing: false,
+        });
+      } else {
+        throw new Error('Invalid token refresh payload format');
+      }
     } catch (error) {
       set({
         user: null,

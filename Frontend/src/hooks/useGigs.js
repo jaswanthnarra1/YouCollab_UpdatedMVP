@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import * as gigsApi from '../api/gigs.api';
+import * as gigsApi from '../services/gigs.service';
 import useUiStore from '../stores/uiStore';
 
 /**

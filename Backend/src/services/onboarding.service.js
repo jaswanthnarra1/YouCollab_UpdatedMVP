@@ -1,13 +1,17 @@
-const prisma = require('../lib/prisma');
+const supabase = require('./supabase');
 const AppError = require('../utils/AppError');
 
 /**
  * Onboard a Brand profile.
  */
 const onboardBrand = async (userId, data) => {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
   
-  if (!user) {
+  if (userError || !user) {
     throw new AppError('User not found.', 404, 'NOT_FOUND');
   }
   
@@ -19,41 +23,49 @@ const onboardBrand = async (userId, data) => {
     throw new AppError('You have already completed onboarding!', 400, 'BAD_REQUEST');
   }
 
-  // Create brand record & update user
-  const result = await prisma.$transaction(async (tx) => {
-    const brand = await tx.brand.create({
-      data: {
-        userId,
-        businessName: data.businessName,
-        category: data.category,
-        location: data.location || 'Pune',
-        bio: data.bio,
-        logoUrl: data.logoUrl || null,
-        website: data.website || null,
-      },
-    });
+  // Create brand record
+  const { data: brand, error: brandError } = await supabase
+    .from('brands')
+    .insert({
+      userId,
+      businessName: data.businessName,
+      category: data.category,
+      location: data.location || 'Pune',
+      bio: data.bio,
+      logoUrl: data.logoUrl || null,
+      website: data.website || null,
+    })
+    .select('*')
+    .single();
 
-    const updatedUser = await tx.user.update({
-      where: { id: userId },
-      data: {
-        isOnboarded: true,
-        avatarUrl: data.logoUrl || null,
-      },
-      include: {
-        brand: true,
-      },
-    });
+  if (brandError) {
+    throw new AppError('Failed to create brand profile.', 500, 'DATABASE_ERROR');
+  }
 
-    return updatedUser;
-  });
+  // Update user status
+  const { data: updatedUser, error: updateError } = await supabase
+    .from('users')
+    .update({
+      isOnboarded: true,
+      avatarUrl: data.logoUrl || null,
+    })
+    .eq('id', userId)
+    .select('*')
+    .single();
+
+  if (updateError) {
+    // Manual rollback: Delete brand if user update failed
+    await supabase.from('brands').delete().eq('id', brand.id);
+    throw new AppError('Failed to complete brand onboarding.', 500, 'DATABASE_ERROR');
+  }
 
   return {
-    id: result.id,
-    email: result.email,
-    role: result.role,
-    avatarUrl: result.avatarUrl,
-    isOnboarded: result.isOnboarded,
-    brand: result.brand,
+    id: updatedUser.id,
+    email: updatedUser.email,
+    role: updatedUser.role,
+    avatarUrl: updatedUser.avatarUrl,
+    isOnboarded: updatedUser.isOnboarded,
+    brand,
   };
 };
 
@@ -61,9 +73,13 @@ const onboardBrand = async (userId, data) => {
  * Onboard an Influencer profile.
  */
 const onboardInfluencer = async (userId, data) => {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
 
-  if (!user) {
+  if (userError || !user) {
     throw new AppError('User not found.', 404, 'NOT_FOUND');
   }
 
@@ -75,41 +91,49 @@ const onboardInfluencer = async (userId, data) => {
     throw new AppError('You have already completed onboarding!', 400, 'BAD_REQUEST');
   }
 
-  // Create influencer record & update user
-  const result = await prisma.$transaction(async (tx) => {
-    const influencer = await tx.influencer.create({
-      data: {
-        userId,
-        name: data.name,
-        instagramHandle: data.instagramHandle,
-        niche: data.niche,
-        bio: data.bio,
-        profileImageUrl: data.profileImageUrl || null,
-        followerCount: data.followerCount || 0,
-      },
-    });
+  // Create influencer record
+  const { data: influencer, error: influencerError } = await supabase
+    .from('influencers')
+    .insert({
+      userId,
+      name: data.name,
+      instagramHandle: data.instagramHandle,
+      niche: data.niche,
+      bio: data.bio,
+      profileImageUrl: data.profileImageUrl || null,
+      followerCount: data.followerCount || 0,
+    })
+    .select('*')
+    .single();
 
-    const updatedUser = await tx.user.update({
-      where: { id: userId },
-      data: {
-        isOnboarded: true,
-        avatarUrl: data.profileImageUrl || null,
-      },
-      include: {
-        influencer: true,
-      },
-    });
+  if (influencerError) {
+    throw new AppError('Failed to create creator profile.', 500, 'DATABASE_ERROR');
+  }
 
-    return updatedUser;
-  });
+  // Update user status
+  const { data: updatedUser, error: updateError } = await supabase
+    .from('users')
+    .update({
+      isOnboarded: true,
+      avatarUrl: data.profileImageUrl || null,
+    })
+    .eq('id', userId)
+    .select('*')
+    .single();
+
+  if (updateError) {
+    // Manual rollback: Delete influencer if user update failed
+    await supabase.from('influencers').delete().eq('id', influencer.id);
+    throw new AppError('Failed to complete creator onboarding.', 500, 'DATABASE_ERROR');
+  }
 
   return {
-    id: result.id,
-    email: result.email,
-    role: result.role,
-    avatarUrl: result.avatarUrl,
-    isOnboarded: result.isOnboarded,
-    influencer: result.influencer,
+    id: updatedUser.id,
+    email: updatedUser.email,
+    role: updatedUser.role,
+    avatarUrl: updatedUser.avatarUrl,
+    isOnboarded: updatedUser.isOnboarded,
+    influencer,
   };
 };
 

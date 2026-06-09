@@ -2,7 +2,7 @@ import React from 'react';
 import { PlusCircle, Activity, Users, Eye, ArrowRight, FileText } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useGigs } from '../../hooks/useGigs';
-import { formatDate } from '../../lib/utils';
+import { formatDate } from '../../utils';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';

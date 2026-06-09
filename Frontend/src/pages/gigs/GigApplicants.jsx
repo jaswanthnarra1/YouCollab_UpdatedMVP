@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { ChevronLeft, Check, X, Instagram, Users, User, ExternalLink, Calendar } from 'lucide-react';
 import { useApplications } from '../../hooks/useApplications';
 import { useGigs } from '../../hooks/useGigs';
-import { formatDate } from '../../lib/utils';
+import { formatDate } from '../../utils';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
@@ -124,13 +124,13 @@ export const GigApplicants = () => {
                     <h3 className="font-bold text-lg leading-tight dark:text-dark-text">{app.influencer?.name}</h3>
                     
                     <a 
-                      href={`https://instagram.com/${app.influencer?.instagramHandle.replace('@', '')}`}
+                      href={`https://instagram.com/${(app.influencer?.instagramHandle || '').replace('@', '')}`}
                       target="_blank"
                       rel="noreferrer"
                       className="text-primary hover:underline text-sm font-semibold flex items-center gap-1 mt-1 mb-3"
                     >
                       <Instagram size={14} />
-                      {app.influencer?.instagramHandle}
+                      {app.influencer?.instagramHandle || '@creator'}
                     </a>
                     
                     <div className="flex flex-wrap justify-center gap-2 mt-auto w-full">

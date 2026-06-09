@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const fs = require('fs');
 const config = require('./config');
 const logger = require('./utils/logger');
 const routes = require('./routes');
@@ -53,6 +54,23 @@ app.use('/uploads', express.static(config.UPLOAD.DIR));
 
 // Mount main routing
 app.use('/api', routes);
+
+// Serve Frontend static files
+const frontendDistPath = path.join(__dirname, '../../Frontend/dist');
+app.use(express.static(frontendDistPath));
+
+// Fallback all non-API requests to index.html for React Router SPA
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+    return next();
+  }
+  const indexPath = path.join(frontendDistPath, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(200).send('Frontend is compiling... Please refresh in a moment! 🚀');
+  }
+});
 
 // 404 Route handler
 app.use((req, res, next) => {

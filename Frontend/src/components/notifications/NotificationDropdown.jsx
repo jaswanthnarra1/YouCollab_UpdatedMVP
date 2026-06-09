@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, BellOff } from 'lucide-react';
 import { useNotifications } from '../../hooks/useNotifications';
-import { formatDate } from '../../lib/utils';
+import { formatDate } from '../../utils';
 import { Button } from '../ui/Button';
 import Skeleton from '../ui/Skeleton';
 

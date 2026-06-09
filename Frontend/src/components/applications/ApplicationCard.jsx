@@ -1,6 +1,6 @@
 import React from 'react';
 import { Instagram, Users, Calendar, ArrowUpRight } from 'lucide-react';
-import { formatDate } from '../../lib/utils';
+import { formatDate } from '../../utils';
 import { Card } from '../ui/Card';
 import { Avatar } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
@@ -12,7 +12,7 @@ export const ApplicationCard = ({
   onDecline,
   isProcessing = false,
 }) => {
-  const influencer = application.influencer || {};
+  const influencer = application?.influencer || {};
   const name = influencer.name || 'Anonymous Creator';
   const handle = influencer.instagramHandle || '@creator';
   const niche = influencer.niche || 'Lifestyle';
@@ -79,10 +79,10 @@ export const ApplicationCard = ({
           <div className="flex items-center justify-between gap-3">
             <span className="flex items-center gap-1 text-[10px] font-bold text-neutral-400 dark:text-dark-muted uppercase tracking-widest">
               <Calendar size={12} />
-              Applied {formatDate(application.createdAt)}
+              Applied {formatDate(application?.createdAt)}
             </span>
-            <Badge variant={statusColors[application.status]} className="text-[10px] font-semibold leading-tight">
-              {statusLabel[application.status]}
+            <Badge variant={statusColors[application?.status || 'PENDING']} className="text-[10px] font-semibold leading-tight">
+              {statusLabel[application?.status || 'PENDING']}
             </Badge>
           </div>
           
@@ -91,19 +91,19 @@ export const ApplicationCard = ({
               Creator's Pitch ✨
             </h5>
             <p className="text-xs text-neutral-600 dark:text-dark-text leading-relaxed whitespace-pre-line">
-              {application.coverNote}
+              {application?.coverNote}
             </p>
           </div>
         </div>
 
         {/* Brand Action Buttons Row */}
-        {application.status === 'PENDING' && (
+        {application?.status === 'PENDING' && (
           <div className="flex gap-2.5 justify-end mt-4">
             <Button
               size="sm"
               variant="secondary"
               isLoading={isProcessing}
-              onClick={() => onDecline(application.id)}
+              onClick={() => onDecline(application?.id)}
               className="border-neutral-300 hover:bg-neutral-50 hover:text-neutral-900 border"
             >
               Decline ✗
@@ -111,7 +111,7 @@ export const ApplicationCard = ({
             <Button
               size="sm"
               isLoading={isProcessing}
-              onClick={() => onAccept(application.id)}
+              onClick={() => onAccept(application?.id)}
             >
               Accept ✓
             </Button>

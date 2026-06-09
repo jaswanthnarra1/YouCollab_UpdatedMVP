@@ -1,14 +1,18 @@
-const prisma = require('../lib/prisma');
+const supabase = require('./supabase');
 const AppError = require('../utils/AppError');
 const { parsePagination, paginateResults } = require('../utils/pagination');
-const notificationService = require('./notification.service');
 
 /**
  * Helper to retrieve influencer associated with userId.
  */
 const getInfluencerByUserId = async (userId) => {
-  const influencer = await prisma.influencer.findUnique({ where: { userId } });
-  if (!influencer) {
+  const { data: influencer, error } = await supabase
+    .from('influencers')
+    .select('*')
+    .eq('userId', userId)
+    .maybeSingle();
+
+  if (error || !influencer) {
     throw new AppError('Complete your creator onboarding to apply for collabs.', 400, 'ONBOARDING_REQUIRED');
   }
   return influencer;
@@ -20,20 +24,13 @@ const getInfluencerByUserId = async (userId) => {
 const apply = async (userId, gigId, coverNote) => {
   const influencer = await getInfluencerByUserId(userId);
 
-  const gig = await prisma.gig.findUnique({
-    where: { id: gigId },
-    include: {
-      brand: {
-        select: {
-          id: true,
-          userId: true,
-          businessName: true,
-        },
-      },
-    },
-  });
+  const { data: gig, error: gigError } = await supabase
+    .from('gigs')
+    .select('*, brand:brands(id, userId, businessName)')
+    .eq('id', gigId)
+    .maybeSingle();
 
-  if (!gig) {
+  if (gigError || !gig) {
     throw new AppError('This collab does not exist or has been deleted.', 404, 'NOT_FOUND');
   }
 
@@ -42,61 +39,73 @@ const apply = async (userId, gigId, coverNote) => {
   }
 
   // Check for duplicate application
-  const existingApplication = await prisma.application.findUnique({
-    where: {
-      gigId_influencerId: {
-        gigId,
-        influencerId: influencer.id,
-      },
-    },
-  });
+  const { data: existingApplication } = await supabase
+    .from('applications')
+    .select('id')
+    .eq('gigId', gigId)
+    .eq('influencerId', influencer.id)
+    .maybeSingle();
 
   if (existingApplication) {
     throw new AppError("You've already applied to this collab! Sit tight.", 409, 'CONFLICT');
   }
 
-  // Create application and in-app notification in a transaction
-  const application = await prisma.$transaction(async (tx) => {
-    const appRecord = await tx.application.create({
-      data: {
+  // Create application
+  const { data: appRecord, error: appError } = await supabase
+    .from('applications')
+    .insert({
+      gigId,
+      influencerId: influencer.id,
+      coverNote,
+      status: 'PENDING',
+    })
+    .select('*')
+    .single();
+
+  if (appError) {
+    throw new AppError('Failed to apply for this collab.', 500, 'DATABASE_ERROR');
+  }
+
+  // Notify brand owner
+  try {
+    await supabase.from('notifications').insert({
+      userId: gig.brand.userId,
+      type: 'APPLICATION_RECEIVED',
+      title: 'New application! 🎉',
+      message: `${influencer.name} applied to your collab "${gig.title}"`,
+      metadata: JSON.stringify({
         gigId,
+        applicationId: appRecord.id,
         influencerId: influencer.id,
-        coverNote,
-        status: 'PENDING',
-      },
+      }),
     });
+  } catch (notifErr) {
+    console.error('Failed to create notification for brand owner:', notifErr);
+  }
 
-    // Notify brand owner
-    await tx.notification.create({
-      data: {
-        userId: gig.brand.userId,
-        type: 'APPLICATION_RECEIVED',
-        title: 'New application! 🎉',
-        message: `${influencer.name} applied to your collab "${gig.title}"`,
-        metadata: JSON.stringify({
-          gigId,
-          applicationId: appRecord.id,
-          influencerId: influencer.id,
-        }),
-      },
-    });
-
-    return appRecord;
-  });
-
-  return application;
+  return appRecord;
 };
 
 /**
  * Get all applications for a specific Gig (Brand Owner only).
  */
 const getGigApplications = async (gigId, userId, filters) => {
-  const brand = await prisma.brand.findUnique({ where: { userId } });
+  const { data: brand } = await supabase
+    .from('brands')
+    .select('id')
+    .eq('userId', userId)
+    .maybeSingle();
+
   if (!brand) {
     throw new AppError('Brand onboarding is required.', 400, 'ONBOARDING_REQUIRED');
   }
 
-  const gig = await prisma.gig.findUnique({ where: { id: gigId } });
+  const { data: gig } = await supabase
+    .from('gigs')
+    .select('brandId')
+    .eq('id', gigId)
+    .maybeSingle();
+
   if (!gig) {
     throw new AppError('Collab not found.', 404, 'NOT_FOUND');
   }
@@ -107,34 +116,32 @@ const getGigApplications = async (gigId, userId, filters) => {
 
   const { cursor, limit } = parsePagination(filters, 10);
 
-  const applications = await prisma.application.findMany({
-    take: limit + 1,
-    ...(cursor && { cursor: { id: cursor }, skip: 1 }),
-    where: { gigId },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      influencer: {
-        select: {
-          id: true,
-          name: true,
-          instagramHandle: true,
-          niche: true,
-          bio: true,
-          profileImageUrl: true,
-          followerCount: true,
-          user: {
-            select: {
-              lastActiveAt: true,
-            },
-          },
-        },
-      },
-    },
-  });
+  let query = supabase
+    .from('applications')
+    .select('*, influencer:influencers(id, name, instagramHandle, niche, bio, profileImageUrl, followerCount, user:users(lastActiveAt))', { count: 'exact' })
+    .eq('gigId', gigId);
 
-  const total = await prisma.application.count({ where: { gigId } });
-  const paginated = paginateResults(applications, limit);
-  paginated.pagination.total = total;
+  if (cursor) {
+    const { data: cursorItem } = await supabase
+      .from('applications')
+      .select('createdAt, id')
+      .eq('id', cursor)
+      .maybeSingle();
+    if (cursorItem) {
+      query = query.or(`createdAt.lt.${cursorItem.createdAt},and(createdAt.eq.${cursorItem.createdAt},id.lt.${cursorItem.id})`);
+    }
+  }
+
+  query = query.order('createdAt', { ascending: false }).order('id', { ascending: false });
+
+  const { data: applications, error, count: total } = await query.limit(limit + 1);
+
+  if (error) {
+    throw new AppError('Failed to fetch applications.', 500, 'DATABASE_ERROR');
+  }
+
+  const paginated = paginateResults(applications || [], limit);
+  paginated.pagination.total = total || 0;
 
   return paginated;
 };
@@ -146,35 +153,32 @@ const getMyApplications = async (userId, filters) => {
   const influencer = await getInfluencerByUserId(userId);
   const { cursor, limit } = parsePagination(filters, 10);
 
-  const applications = await prisma.application.findMany({
-    take: limit + 1,
-    ...(cursor && { cursor: { id: cursor }, skip: 1 }),
-    where: { influencerId: influencer.id },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      gig: {
-        select: {
-          id: true,
-          title: true,
-          budgetMin: true,
-          budgetMax: true,
-          deadline: true,
-          category: true,
-          status: true,
-          brand: {
-            select: {
-              businessName: true,
-              logoUrl: true,
-            },
-          },
-        },
-      },
-    },
-  });
+  let query = supabase
+    .from('applications')
+    .select('*, gig:gigs(id, title, budgetMin, budgetMax, deadline, category, status, brand:brands(businessName, logoUrl))', { count: 'exact' })
+    .eq('influencerId', influencer.id);
 
-  const total = await prisma.application.count({ where: { influencerId: influencer.id } });
-  const paginated = paginateResults(applications, limit);
-  paginated.pagination.total = total;
+  if (cursor) {
+    const { data: cursorItem } = await supabase
+      .from('applications')
+      .select('createdAt, id')
+      .eq('id', cursor)
+      .maybeSingle();
+    if (cursorItem) {
+      query = query.or(`createdAt.lt.${cursorItem.createdAt},and(createdAt.eq.${cursorItem.createdAt},id.lt.${cursorItem.id})`);
+    }
+  }
+
+  query = query.order('createdAt', { ascending: false }).order('id', { ascending: false });
+
+  const { data: applications, error, count: total } = await query.limit(limit + 1);
+
+  if (error) {
+    throw new AppError('Failed to fetch your applications.', 500, 'DATABASE_ERROR');
+  }
+
+  const paginated = paginateResults(applications || [], limit);
+  paginated.pagination.total = total || 0;
 
   return paginated;
 };
@@ -183,28 +187,23 @@ const getMyApplications = async (userId, filters) => {
  * Update Application Status (Accept / Reject) - Brand Owner only.
  */
 const updateStatus = async (applicationId, userId, status) => {
-  const brand = await prisma.brand.findUnique({ where: { userId } });
+  const { data: brand } = await supabase
+    .from('brands')
+    .select('id, businessName')
+    .eq('userId', userId)
+    .maybeSingle();
+
   if (!brand) {
     throw new AppError('Brand onboarding is required.', 400, 'ONBOARDING_REQUIRED');
   }
 
-  const application = await prisma.application.findUnique({
-    where: { id: applicationId },
-    include: {
-      gig: {
-        include: {
-          brand: true,
-        },
-      },
-      influencer: {
-        include: {
-          user: true,
-        },
-      },
-    },
-  });
+  const { data: application, error: findError } = await supabase
+    .from('applications')
+    .select('*, gig:gigs(*, brand:brands(*)), influencer:influencers(*, user:users(*))')
+    .eq('id', applicationId)
+    .maybeSingle();
 
-  if (!application) {
+  if (findError || !application) {
     throw new AppError('Application not found.', 404, 'NOT_FOUND');
   }
 
@@ -216,12 +215,20 @@ const updateStatus = async (applicationId, userId, status) => {
     throw new AppError('This application has already been processed.', 400, 'BAD_REQUEST');
   }
 
-  const updatedApplication = await prisma.$transaction(async (tx) => {
-    const updated = await tx.application.update({
-      where: { id: applicationId },
-      data: { status },
-    });
+  // Update status
+  const { data: updatedApplication, error: updateError } = await supabase
+    .from('applications')
+    .update({ status })
+    .eq('id', applicationId)
+    .select('*')
+    .single();
 
+  if (updateError) {
+    throw new AppError('Failed to update application status.', 500, 'DATABASE_ERROR');
+  }
+
+  // Notify the Influencer
+  try {
     const isAccepted = status === 'ACCEPTED';
     const notifType = isAccepted ? 'APPLICATION_ACCEPTED' : 'APPLICATION_REJECTED';
     const notifTitle = isAccepted ? "You're in! 🎊" : 'Update on your application';
@@ -229,23 +236,20 @@ const updateStatus = async (applicationId, userId, status) => {
       ? `Congratulations! ${brand.businessName} accepted your application for "${application.gig.title}"`
       : `Bummer! ${brand.businessName} reviewed your application for "${application.gig.title}"`;
 
-    // Create Notification for the Influencer
-    await tx.notification.create({
-      data: {
-        userId: application.influencer.user.id,
-        type: notifType,
-        title: notifTitle,
-        message: notifMessage,
-        metadata: JSON.stringify({
-          gigId: application.gigId,
-          applicationId,
-          brandId: brand.id,
-        }),
-      },
+    await supabase.from('notifications').insert({
+      userId: application.influencer.user.id,
+      type: notifType,
+      title: notifTitle,
+      message: notifMessage,
+      metadata: JSON.stringify({
+        gigId: application.gigId,
+        applicationId,
+        brandId: brand.id,
+      }),
     });
-
-    return updated;
-  });
+  } catch (notifErr) {
+    console.error('Failed to notify influencer about application status change:', notifErr);
+  }
 
   return updatedApplication;
 };

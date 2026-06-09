@@ -2,8 +2,10 @@ import axios from 'axios';
 import { useAuthStore } from '../stores/authStore';
 import { useUiStore } from '../stores/uiStore';
 
+const API_URL = import.meta.env.VITE_API_URL || '/api';
+
 const apiClient = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL: API_URL,
   withCredentials: true, // critical for receiving and sending httpOnly refresh cookies
   headers: {
     'Content-Type': 'application/json',
@@ -69,7 +71,7 @@ apiClient.interceptors.response.use(
       try {
         // Run refresh POST request (browser will send httpOnly refresh cookie automatically)
         const refreshResponse = await axios.post(
-          'http://localhost:5000/api/auth/refresh',
+          `${API_URL}/auth/refresh`,
           {},
           { withCredentials: true }
         );

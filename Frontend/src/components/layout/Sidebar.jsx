@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Briefcase, PlusCircle, Search, FileText } from 'lucide-react';
 import useAuthStore from '../../stores/authStore';
 import useUiStore from '../../stores/uiStore';
-import { cn } from '../../lib/utils';
+import { cn } from '../../utils';
 
 export const Sidebar = () => {
   const { user } = useAuthStore();

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import * as notifApi from '../api/notifications.api';
+import * as notifApi from '../services/notifications.service';
 import useUiStore from '../stores/uiStore';
 
 /**

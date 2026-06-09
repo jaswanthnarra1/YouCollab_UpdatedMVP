@@ -1,4 +1,4 @@
-const prisma = require('../lib/prisma');
+const supabase = require('./supabase');
 const AppError = require('../utils/AppError');
 const { parsePagination, paginateResults } = require('../utils/pagination');
 
@@ -6,8 +6,13 @@ const { parsePagination, paginateResults } = require('../utils/pagination');
  * Helper to retrieve brand associated with userId.
  */
 const getBrandByUserId = async (userId) => {
-  const brand = await prisma.brand.findUnique({ where: { userId } });
-  if (!brand) {
+  const { data: brand, error } = await supabase
+    .from('brands')
+    .select('*')
+    .eq('userId', userId)
+    .maybeSingle();
+
+  if (error || !brand) {
     throw new AppError('Complete your brand onboarding to perform this action.', 400, 'ONBOARDING_REQUIRED');
   }
   return brand;
@@ -19,8 +24,9 @@ const getBrandByUserId = async (userId) => {
 const createGig = async (userId, data) => {
   const brand = await getBrandByUserId(userId);
 
-  return prisma.gig.create({
-    data: {
+  const { data: newGig, error } = await supabase
+    .from('gigs')
+    .insert({
       brandId: brand.id,
       title: data.title,
       description: data.description,
@@ -31,11 +37,15 @@ const createGig = async (userId, data) => {
       category: data.category,
       city: 'Pune', // MVP constraint
       status: 'OPEN',
-    },
-    include: {
-      brand: true,
-    },
-  });
+    })
+    .select('*, brand:brands(*)')
+    .single();
+
+  if (error) {
+    throw new AppError('Failed to create collab.', 500, 'DATABASE_ERROR');
+  }
+
+  return newGig;
 };
 
 /**
@@ -45,60 +55,80 @@ const getGigs = async (filters) => {
   const { cursor, limit } = parsePagination(filters, 12);
   const { search, category, sort } = filters;
 
-  const where = {
-    status: 'OPEN',
-    city: 'Pune',
-  };
+  let query = supabase
+    .from('gigs')
+    .select('*, brand:brands(id, businessName, category, logoUrl, user:users(lastActiveAt)), applications(count)', { count: 'exact' })
+    .eq('status', 'OPEN')
+    .eq('city', 'Pune');
 
   if (category) {
-    where.category = category;
+    query = query.eq('category', category);
   }
 
   if (search) {
-    where.OR = [
-      { title: { contains: search, mode: 'insensitive' } },
-      { description: { contains: search, mode: 'insensitive' } },
-    ];
+    query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
   }
 
-  let orderBy = { createdAt: 'desc' };
+  // Handle ordering and cursor-based filtering
   if (sort === 'budget_high') {
-    orderBy = { budgetMin: 'desc' };
+    if (cursor) {
+      const { data: cursorItem } = await supabase
+        .from('gigs')
+        .select('budgetMin, id')
+        .eq('id', cursor)
+        .maybeSingle();
+      if (cursorItem) {
+        query = query.or(`budgetMin.lt.${cursorItem.budgetMin},and(budgetMin.eq.${cursorItem.budgetMin},id.lt.${cursorItem.id})`);
+      }
+    }
+    query = query.order('budgetMin', { ascending: false }).order('id', { ascending: false });
   } else if (sort === 'budget_low') {
-    orderBy = { budgetMin: 'asc' };
+    if (cursor) {
+      const { data: cursorItem } = await supabase
+        .from('gigs')
+        .select('budgetMin, id')
+        .eq('id', cursor)
+        .maybeSingle();
+      if (cursorItem) {
+        query = query.or(`budgetMin.gt.${cursorItem.budgetMin},and(budgetMin.eq.${cursorItem.budgetMin},id.gt.${cursorItem.id})`);
+      }
+    }
+    query = query.order('budgetMin', { ascending: true }).order('id', { ascending: true });
+  } else {
+    // Default: Sort by createdAt desc
+    if (cursor) {
+      const { data: cursorItem } = await supabase
+        .from('gigs')
+        .select('createdAt, id')
+        .eq('id', cursor)
+        .maybeSingle();
+      if (cursorItem) {
+        query = query.or(`createdAt.lt.${cursorItem.createdAt},and(createdAt.eq.${cursorItem.createdAt},id.lt.${cursorItem.id})`);
+      }
+    }
+    query = query.order('createdAt', { ascending: false }).order('id', { ascending: false });
   }
 
-  // To implement cursor pagination: fetch limit + 1 items
-  const gigs = await prisma.gig.findMany({
-    take: limit + 1,
-    ...(cursor && { cursor: { id: cursor }, skip: 1 }),
-    where,
-    orderBy,
-    include: {
-      brand: {
-        select: {
-          id: true,
-          businessName: true,
-          category: true,
-          logoUrl: true,
-          user: {
-            select: {
-              lastActiveAt: true,
-            },
-          },
-        },
-      },
+  // Fetch limit + 1 items to see if there is a next page
+  const { data: gigs, error, count: total } = await query.limit(limit + 1);
+
+  if (error) {
+    throw new AppError('Failed to fetch collabs.', 500, 'DATABASE_ERROR');
+  }
+
+  const formattedGigs = (gigs || []).map(gig => {
+    const appCount = gig.applications && gig.applications[0] ? gig.applications[0].count : 0;
+    const { applications, ...rest } = gig;
+    return {
+      ...rest,
       _count: {
-        select: {
-          applications: true,
-        },
-      },
-    },
+        applications: appCount
+      }
+    };
   });
 
-  const total = await prisma.gig.count({ where });
-  const paginated = paginateResults(gigs, limit);
-  paginated.pagination.total = total;
+  const paginated = paginateResults(formattedGigs, limit);
+  paginated.pagination.total = total || 0;
 
   return paginated;
 };
@@ -107,66 +137,54 @@ const getGigs = async (filters) => {
  * Fetch a single Gig by ID. Increments viewCount if visited by non-owner.
  */
 const getGigById = async (id, userId) => {
-  const gig = await prisma.gig.findUnique({
-    where: { id },
-    include: {
-      brand: {
-        select: {
-          id: true,
-          userId: true,
-          businessName: true,
-          category: true,
-          location: true,
-          bio: true,
-          logoUrl: true,
-          website: true,
-          user: {
-            select: {
-              lastActiveAt: true,
-            },
-          },
-        },
-      },
-      _count: {
-        select: {
-          applications: true,
-        },
-      },
-    },
-  });
+  const { data: gig, error } = await supabase
+    .from('gigs')
+    .select('*, brand:brands(id, userId, businessName, category, location, bio, logoUrl, website, user:users(lastActiveAt)), applications(count)')
+    .eq('id', id)
+    .maybeSingle();
 
-  if (!gig) {
+  if (error || !gig) {
     throw new AppError('This collab does not exist or has been deleted.', 404, 'NOT_FOUND');
   }
 
   // Increment viewCount if user is not the creator brand
   if (gig.brand.userId !== userId) {
-    await prisma.gig.update({
-      where: { id },
-      data: { viewCount: { increment: 1 } },
-    });
-    gig.viewCount += 1; // update local representation
+    await supabase.rpc('increment_view_count', { gig_id: id });
+    gig.viewCount += 1;
   }
 
   // Check if current user is an influencer and if they've applied
   let hasApplied = false;
   let application = null;
 
-  const influencer = await prisma.influencer.findUnique({ where: { userId } });
+  const { data: influencer } = await supabase
+    .from('influencers')
+    .select('id')
+    .eq('userId', userId)
+    .maybeSingle();
+
   if (influencer) {
-    application = await prisma.application.findUnique({
-      where: {
-        gigId_influencerId: {
-          gigId: id,
-          influencerId: influencer.id,
-        },
-      },
-    });
-    hasApplied = !!application;
+    const { data: appData } = await supabase
+      .from('applications')
+      .select('*')
+      .eq('gigId', id)
+      .eq('influencerId', influencer.id)
+      .maybeSingle();
+
+    if (appData) {
+      application = appData;
+      hasApplied = true;
+    }
   }
 
+  const appCount = gig.applications && gig.applications[0] ? gig.applications[0].count : 0;
+  const { applications, ...rest } = gig;
+
   return {
-    ...gig,
+    ...rest,
+    _count: {
+      applications: appCount,
+    },
     hasApplied,
     application,
   };
@@ -177,9 +195,14 @@ const getGigById = async (id, userId) => {
  */
 const updateGig = async (id, userId, data) => {
   const brand = await getBrandByUserId(userId);
-  const gig = await prisma.gig.findUnique({ where: { id } });
 
-  if (!gig) {
+  const { data: gig, error: findError } = await supabase
+    .from('gigs')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (findError || !gig) {
     throw new AppError('Collab not found.', 404, 'NOT_FOUND');
   }
 
@@ -187,22 +210,28 @@ const updateGig = async (id, userId, data) => {
     throw new AppError("You don't have permission to edit this collab.", 403, 'FORBIDDEN');
   }
 
-  return prisma.gig.update({
-    where: { id },
-    data: {
-      title: data.title,
-      description: data.description,
-      budgetMin: data.budgetMin,
-      budgetMax: data.budgetMax !== undefined ? data.budgetMax : undefined,
-      deliverables: data.deliverables,
-      deadline: data.deadline,
-      category: data.category,
-      status: data.status,
-    },
-    include: {
-      brand: true,
-    },
-  });
+  const updateData = {};
+  if (data.title !== undefined) updateData.title = data.title;
+  if (data.description !== undefined) updateData.description = data.description;
+  if (data.budgetMin !== undefined) updateData.budgetMin = data.budgetMin;
+  if (data.budgetMax !== undefined) updateData.budgetMax = data.budgetMax;
+  if (data.deliverables !== undefined) updateData.deliverables = data.deliverables;
+  if (data.deadline !== undefined) updateData.deadline = data.deadline;
+  if (data.category !== undefined) updateData.category = data.category;
+  if (data.status !== undefined) updateData.status = data.status;
+
+  const { data: updatedGig, error: updateError } = await supabase
+    .from('gigs')
+    .update(updateData)
+    .eq('id', id)
+    .select('*, brand:brands(*)')
+    .single();
+
+  if (updateError) {
+    throw new AppError('Failed to update collab.', 500, 'DATABASE_ERROR');
+  }
+
+  return updatedGig;
 };
 
 /**
@@ -210,9 +239,14 @@ const updateGig = async (id, userId, data) => {
  */
 const closeGig = async (id, userId) => {
   const brand = await getBrandByUserId(userId);
-  const gig = await prisma.gig.findUnique({ where: { id } });
 
-  if (!gig) {
+  const { data: gig, error: findError } = await supabase
+    .from('gigs')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (findError || !gig) {
     throw new AppError('Collab not found.', 404, 'NOT_FOUND');
   }
 
@@ -220,10 +254,18 @@ const closeGig = async (id, userId) => {
     throw new AppError("You don't have permission to close this collab.", 403, 'FORBIDDEN');
   }
 
-  return prisma.gig.update({
-    where: { id },
-    data: { status: 'CLOSED' },
-  });
+  const { data: updatedGig, error: updateError } = await supabase
+    .from('gigs')
+    .update({ status: 'CLOSED' })
+    .eq('id', id)
+    .select('*')
+    .single();
+
+  if (updateError) {
+    throw new AppError('Failed to close collab.', 500, 'DATABASE_ERROR');
+  }
+
+  return updatedGig;
 };
 
 /**
@@ -232,16 +274,25 @@ const closeGig = async (id, userId) => {
 const getMyGigs = async (userId) => {
   const brand = await getBrandByUserId(userId);
 
-  return prisma.gig.findMany({
-    where: { brandId: brand.id },
-    orderBy: { createdAt: 'desc' },
-    include: {
+  const { data: gigs, error } = await supabase
+    .from('gigs')
+    .select('*, applications(count)')
+    .eq('brandId', brand.id)
+    .order('createdAt', { ascending: false });
+
+  if (error) {
+    throw new AppError('Failed to fetch your collabs.', 500, 'DATABASE_ERROR');
+  }
+
+  return (gigs || []).map(gig => {
+    const appCount = gig.applications && gig.applications[0] ? gig.applications[0].count : 0;
+    const { applications, ...rest } = gig;
+    return {
+      ...rest,
       _count: {
-        select: {
-          applications: true,
-        },
-      },
-    },
+        applications: appCount
+      }
+    };
   });
 };
 

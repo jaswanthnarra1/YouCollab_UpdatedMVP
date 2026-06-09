@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FileText, MapPin, Search, Calendar, ChevronRight } from 'lucide-react';
 import { useApplications } from '../../hooks/useApplications';
-import { formatBudget, formatDate } from '../../lib/utils';
+import { formatBudget, formatDate } from '../../utils';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';

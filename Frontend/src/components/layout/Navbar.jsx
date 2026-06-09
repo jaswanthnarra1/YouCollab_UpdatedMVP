@@ -44,7 +44,7 @@ export const Navbar = () => {
                 onClick={() => setDropdownOpen(!dropdownOpen)}
                 className="flex items-center gap-1.5 focus:outline-none transition-all active:scale-[0.98]"
               >
-                <Avatar src={user.avatarUrl} name={displayName} size="sm" />
+                <Avatar src={user?.avatarUrl} name={displayName} size="sm" />
                 <span className="hidden md:inline-block text-sm font-semibold text-neutral-700 hover:text-neutral-900 dark:text-dark-text dark:hover:text-dark-muted">
                   {displayName}
                 </span>
@@ -59,15 +59,15 @@ export const Navbar = () => {
                   <div className="absolute right-0 mt-2.5 w-52 rounded-2xl border border-neutral-200 bg-white p-2 shadow-xl dark:border-dark-border dark:bg-dark-surface animate-fade-in z-20">
                     <div className="px-3 py-2 border-b border-neutral-100 dark:border-dark-border mb-1 text-left select-none">
                       <div className="text-xs font-semibold text-neutral-400 uppercase tracking-wider dark:text-dark-muted">
-                        Role: {user.role}
+                        Role: {user?.role}
                       </div>
                       <div className="text-[13px] font-bold text-neutral-900 truncate dark:text-dark-text">
-                        {user.email}
+                        {user?.email}
                       </div>
                     </div>
 
                     <Link
-                      to={user.role === 'BRAND' ? '/dashboard/brand' : '/dashboard/influencer'}
+                      to={user?.role === 'BRAND' ? '/dashboard/brand' : '/dashboard/influencer'}
                       onClick={() => setDropdownOpen(false)}
                       className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-sm text-neutral-600 hover:bg-neutral-50 dark:text-dark-text dark:hover:bg-dark-bg/60 transition-colors"
                     >
@@ -76,12 +76,12 @@ export const Navbar = () => {
                     </Link>
 
                     <Link
-                      to={user.role === 'BRAND' ? '/gigs/mine' : '/applications'}
+                      to={user?.role === 'BRAND' ? '/gigs/mine' : '/applications'}
                       onClick={() => setDropdownOpen(false)}
                       className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-sm text-neutral-600 hover:bg-neutral-50 dark:text-dark-text dark:hover:bg-dark-bg/60 transition-colors"
                     >
-                      {user.role === 'BRAND' ? <Briefcase size={16} /> : <FileText size={16} />}
-                      {user.role === 'BRAND' ? 'My Collabs' : 'My Applications'}
+                      {user?.role === 'BRAND' ? <Briefcase size={16} /> : <FileText size={16} />}
+                      {user?.role === 'BRAND' ? 'My Collabs' : 'My Applications'}
                     </Link>
 
                     <button

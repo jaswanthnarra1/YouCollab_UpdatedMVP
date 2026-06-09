@@ -4,7 +4,7 @@ import { useInView } from 'react-intersection-observer';
 import { Search, MapPin, Eye, Clock, Building, PlusCircle } from 'lucide-react';
 import { useGigs } from '../../hooks/useGigs';
 import { useAuthStore } from '../../stores/authStore';
-import { formatBudget, getRelativeTime } from '../../lib/utils';
+import { formatBudget, getRelativeTime } from '../../utils';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
@@ -52,7 +52,7 @@ export const GigFeed = () => {
   }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // Flatten the pages array of arrays into a single array of gigs
-  const gigs = data?.pages?.flatMap(page => page.data) || [];
+  const gigs = data?.pages?.flatMap(page => page?.data || []).filter(Boolean) || [];
 
   const categories = [
     { value: '', label: 'All Categories' },
@@ -141,32 +141,32 @@ export const GigFeed = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {gigs.map((gig) => (
               <Card 
-                key={gig.id} 
+                key={gig?.id} 
                 className="p-0 overflow-hidden flex flex-col h-full hover:shadow-premium-hover hover:border-primary/30 transition-all cursor-pointer group"
-                onClick={() => navigate(`/gigs/${gig.id}`)}
+                onClick={() => navigate(`/gigs/${gig?.id}`)}
               >
                 <div className="p-6 border-b border-neutral-100 dark:border-dark-border flex-1 flex flex-col">
                   <div className="flex justify-between items-start mb-4">
                     <Badge variant="default" className="bg-primary/10 text-primary dark:bg-primary/20 hover:bg-primary/20">
-                      {gig.category}
+                      {gig?.category}
                     </Badge>
                     <div className="flex items-center text-xs font-semibold text-neutral-500 bg-neutral-100 dark:bg-dark-bg px-2.5 py-1 rounded-md">
                       <Clock size={12} className="mr-1.5" />
-                      {getRelativeTime(gig.deadline)}
+                      {getRelativeTime(gig?.deadline)}
                     </div>
                   </div>
                   
                   <h3 className="text-xl font-bold mb-2 group-hover:text-primary transition-colors line-clamp-2 dark:text-dark-text">
-                    {gig.title}
+                    {gig?.title}
                   </h3>
                   
                   <p className="text-sm text-neutral-500 dark:text-dark-muted line-clamp-3 mb-6 flex-1">
-                    {gig.description}
+                    {gig?.description}
                   </p>
                   
                   <div className="mt-auto">
                     <div className="text-lg font-bold text-neutral-900 dark:text-dark-text">
-                      {formatBudget(gig.budgetMin, gig.budgetMax)}
+                      {formatBudget(gig?.budgetMin || 0, gig?.budgetMax)}
                     </div>
                   </div>
                 </div>
@@ -174,23 +174,23 @@ export const GigFeed = () => {
                 <div className="px-6 py-4 bg-neutral-50/50 dark:bg-dark-surface/50 flex items-center justify-between">
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     <Avatar 
-                      src={gig.brand?.logoUrl} 
-                      name={gig.brand?.businessName || 'B'} 
+                      src={gig?.brand?.logoUrl} 
+                      name={gig?.brand?.businessName || 'B'} 
                       size="sm" 
                     />
                     <div className="min-w-0">
                       <p className="text-sm font-semibold truncate dark:text-dark-text">
-                        {gig.brand?.businessName}
+                        {gig?.brand?.businessName}
                       </p>
                       <p className="text-xs text-neutral-500 dark:text-dark-muted flex items-center gap-1 truncate">
-                        <MapPin size={10} /> {gig.city}
+                        <MapPin size={10} /> {gig?.city}
                       </p>
                     </div>
                   </div>
                   
                   <div className="flex items-center gap-1.5 text-xs text-neutral-400 pl-2">
                     <Eye size={14} />
-                    {gig.viewCount || 0}
+                    {gig?.viewCount || 0}
                   </div>
                 </div>
               </Card>
