@@ -2,40 +2,34 @@ import { create } from 'zustand';
 
 // Sync theme with system settings or local preferences
 const getInitialTheme = () => {
-  const storedTheme = localStorage.getItem('theme');
-  if (storedTheme) return storedTheme;
-
-  const systemPreference = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  return systemPreference;
+  // Always force dark theme
+  if (typeof document !== 'undefined') {
+    document.documentElement.classList.add('dark');
+    document.body.classList.add('dark');
+  }
+  return 'dark';
 };
 
 const useUiStore = create((set, get) => ({
-  theme: getInitialTheme(),
+  theme: 'dark',
   sidebarOpen: true,
   toasts: [],
 
   toggleTheme: () => {
-    const nextTheme = get().theme === 'light' ? 'dark' : 'light';
-    localStorage.setItem('theme', nextTheme);
-    
-    // Toggle dark class on document element
-    if (nextTheme === 'dark') {
+    // Force dark mode
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.add('dark');
       document.body.classList.add('dark');
-    } else {
-      document.body.classList.remove('dark');
     }
-
-    set({ theme: nextTheme });
+    set({ theme: 'dark' });
   },
 
   setTheme: (theme) => {
-    localStorage.setItem('theme', theme);
-    if (theme === 'dark') {
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.add('dark');
       document.body.classList.add('dark');
-    } else {
-      document.body.classList.remove('dark');
     }
-    set({ theme });
+    set({ theme: 'dark' });
   },
 
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),

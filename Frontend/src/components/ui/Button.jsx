@@ -14,15 +14,15 @@ export const Button = React.forwardRef(({
   ...props
 }, ref) => {
   const isSpinning = isLoading || loading;
-  const baseStyles = 'inline-flex items-center justify-center font-medium rounded-xl transition-all duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 select-none';
+  const baseStyles = 'inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 select-none';
   
   const variants = {
-    primary: 'bg-primary text-white hover:bg-primary-hover shadow-sm shadow-primary/20',
-    secondary: 'border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-dark-border dark:bg-dark-surface dark:text-dark-text dark:hover:bg-dark-bg',
-    outline: 'border border-neutral-300 bg-transparent text-neutral-700 hover:bg-neutral-50 dark:border-dark-border dark:text-dark-text dark:hover:bg-dark-surface',
-    ghost: 'text-neutral-600 hover:bg-neutral-100 dark:text-dark-muted dark:hover:bg-dark-surface',
-    danger: 'bg-red-500 text-white hover:bg-red-600 shadow-sm shadow-red-500/10',
-    outlineDanger: 'border border-red-200 text-red-500 hover:bg-red-50 dark:border-red-500/30 dark:hover:bg-red-950/20',
+    primary: 'bg-primary text-dark-deeper hover:bg-primary-hover shadow-sm shadow-primary/20 hover:shadow-glow',
+    secondary: 'border border-dark-border bg-dark-surface text-dark-text hover:bg-dark-hover hover:border-primary/30',
+    outline: 'border border-dark-border bg-transparent text-dark-text hover:bg-dark-surface hover:border-primary/20',
+    ghost: 'text-dark-muted hover:bg-dark-surface hover:text-dark-text',
+    danger: 'bg-rose-500 text-white hover:bg-rose-600 shadow-sm shadow-rose-500/10',
+    outlineDanger: 'border border-rose-500/30 text-rose-400 hover:bg-rose-950/20',
   };
 
   const sizes = {

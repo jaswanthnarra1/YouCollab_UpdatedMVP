@@ -93,10 +93,10 @@ export const CreateGig = () => {
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8 animate-fade-in pb-12">
+    <div className="max-w-3xl mx-auto space-y-8 animate-fade-in pb-12 text-left">
       <div>
-        <h1 className="text-3xl font-bold dark:text-dark-text">Post a New Collab</h1>
-        <p className="text-neutral-500 dark:text-dark-muted mt-1">
+        <h1 className="text-3xl font-bold text-dark-text">Post a New Collab</h1>
+        <p className="text-dark-muted mt-1">
           Create a campaign gig to receive pitches from local creators.
         </p>
       </div>
@@ -106,7 +106,7 @@ export const CreateGig = () => {
           
           {/* Basics */}
           <div className="space-y-6">
-            <h3 className="text-lg font-bold border-b border-neutral-100 dark:border-dark-border pb-2 dark:text-dark-text">
+            <h3 className="text-lg font-bold border-b border-dark-border pb-2 text-dark-text">
               1. Campaign Basics
             </h3>
             
@@ -116,7 +116,7 @@ export const CreateGig = () => {
               value={formData.title}
               onChange={handleChange}
               error={errors.title}
-              icon={<PenTool size={18} className="text-neutral-400" />}
+              icon={<PenTool size={18} className="text-dark-muted" />}
               placeholder="e.g., Weekend Cafe Reel Promotion"
               required
             />
@@ -127,7 +127,7 @@ export const CreateGig = () => {
               value={formData.category}
               onChange={handleChange}
               options={categories}
-              icon={<Tag size={18} className="text-neutral-400" />}
+              icon={<Tag size={18} className="text-dark-muted" />}
             />
 
             <Textarea
@@ -144,7 +144,7 @@ export const CreateGig = () => {
 
           {/* Requirements & Compensation */}
           <div className="space-y-6">
-            <h3 className="text-lg font-bold border-b border-neutral-100 dark:border-dark-border pb-2 dark:text-dark-text">
+            <h3 className="text-lg font-bold border-b border-dark-border pb-2 text-dark-text">
               2. Requirements & Compensation
             </h3>
 
@@ -167,7 +167,7 @@ export const CreateGig = () => {
                 value={formData.budgetMin}
                 onChange={handleChange}
                 error={errors.budgetMin}
-                icon={<DollarSign size={18} className="text-neutral-400" />}
+                icon={<DollarSign size={18} className="text-dark-muted" />}
                 placeholder="e.g., 5000"
                 required
               />
@@ -178,7 +178,7 @@ export const CreateGig = () => {
                 value={formData.budgetMax}
                 onChange={handleChange}
                 error={errors.budgetMax}
-                icon={<DollarSign size={18} className="text-neutral-400" />}
+                icon={<DollarSign size={18} className="text-dark-muted" />}
                 placeholder="e.g., 10000"
               />
             </div>
@@ -186,7 +186,7 @@ export const CreateGig = () => {
 
           {/* Timeline */}
           <div className="space-y-6">
-            <h3 className="text-lg font-bold border-b border-neutral-100 dark:border-dark-border pb-2 dark:text-dark-text">
+            <h3 className="text-lg font-bold border-b border-dark-border pb-2 text-dark-text">
               3. Timeline
             </h3>
 
@@ -198,16 +198,16 @@ export const CreateGig = () => {
                 value={formData.deadline}
                 onChange={handleChange}
                 error={errors.deadline}
-                icon={<Calendar size={18} className="text-neutral-400" />}
+                icon={<Calendar size={18} className="text-dark-muted" />}
                 required
               />
-              <p className="text-xs text-neutral-500 mt-1.5 ml-1">
+              <p className="text-xs text-dark-muted mt-1.5 ml-1">
                 The listing will automatically close for new applications after this date.
               </p>
             </div>
           </div>
 
-          <div className="pt-6 border-t border-neutral-100 dark:border-dark-border flex gap-4 justify-end">
+          <div className="pt-6 border-t border-dark-border flex gap-4 justify-end">
             <Button type="button" variant="ghost" onClick={() => navigate('/dashboard/brand')}>
               Cancel
             </Button>

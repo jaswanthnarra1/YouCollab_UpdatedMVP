@@ -9,9 +9,13 @@ export default {
     extend: {
       colors: {
         primary: {
-          DEFAULT: '#6C5CE7',
-          hover: '#5A4BD1',
-          light: '#EDE9FE',
+          DEFAULT: '#3FE3FF',
+          hover: '#2FD0EC',
+          light: '#7BF0FF',
+          dark: '#0AA8C4',
+        },
+        brand: {
+          blue: '#2353E9',
         },
         secondary: {
           DEFAULT: '#00B894',
@@ -21,19 +25,28 @@ export default {
           DEFAULT: '#FD79A8',
         },
         dark: {
-          bg: '#0F0F0F',
-          surface: '#1A1A1A',
-          border: '#2A2A2A',
-          text: '#FAFAFA',
-          muted: '#A3A3A3',
+          bg: '#050505',
+          surface: '#111111',
+          border: 'rgba(255, 255, 255, 0.08)',
+          text: '#FFFFFF',
+          muted: '#8E8E93',
+          deeper: '#000000',
+          card: '#0A0A0A',
+          sidebar: '#080808',
+          'nav-active': 'rgba(63, 227, 255, 0.08)',
+          hover: '#161616',
         }
       },
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
+        sans: ['Geist', 'sans-serif'],
+        mono: ['Geist Mono', 'monospace'],
       },
       boxShadow: {
-        premium: '0 4px 20px -2px rgba(108, 92, 231, 0.1)',
-        'premium-hover': '0 8px 30px -2px rgba(108, 92, 231, 0.15)',
+        premium: '0 4px 24px rgba(0, 0, 0, 0.6)',
+        'premium-hover': '0 12px 30px rgba(0, 0, 0, 0.8), 0 0 16px rgba(63, 227, 255, 0.03)',
+        glow: '0 0 16px rgba(63, 227, 255, 0.08)',
+        'glow-sm': '0 0 10px rgba(63, 227, 255, 0.04)',
+        'card-glow': '0 0 24px rgba(0, 0, 0, 0.4)',
       }
     },
   },

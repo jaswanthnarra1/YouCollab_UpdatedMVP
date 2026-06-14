@@ -28,7 +28,7 @@ export const GigFilters = ({
   ];
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 items-end bg-white p-5 rounded-3xl border border-neutral-200/60 shadow-sm dark:border-dark-border dark:bg-dark-surface w-full mb-6">
+    <div className="flex flex-col lg:flex-row gap-4 items-end bg-dark-surface p-5 rounded-3xl border border-dark-border shadow-sm w-full mb-6">
       
       {/* Search Input Search */}
       <div className="flex-1 w-full text-left">

@@ -61,16 +61,19 @@ export const InfluencerOnboarding = () => {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-dark-bg flex flex-col justify-center items-center py-12 px-4">
-      <div className="w-full max-w-2xl space-y-8 animate-fade-in">
+    <div className="min-h-screen bg-dark-bg flex flex-col justify-center items-center py-12 px-4 relative overflow-hidden">
+      {/* Glow Backdrop */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-primary/10 rounded-full blur-[100px] pointer-events-none -z-10" />
+
+      <div className="w-full max-w-2xl space-y-8 animate-fade-in z-10">
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold dark:text-dark-text">Set Up Your Creator Profile</h1>
-          <p className="text-neutral-500 dark:text-dark-muted">
+          <h1 className="text-3xl font-bold text-dark-text tracking-tight">Set Up Your Creator Profile</h1>
+          <p className="text-dark-muted text-sm">
             Showcase your aesthetic to Pune's top brands
           </p>
         </div>
 
-        <Card className="p-6 sm:p-8">
+        <Card className="p-6 sm:p-8 border border-dark-border shadow-2xl backdrop-blur-md bg-dark-card/90">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Input
@@ -79,7 +82,7 @@ export const InfluencerOnboarding = () => {
                 value={formData.name}
                 onChange={handleChange}
                 error={errors.name}
-                icon={<User size={18} className="text-neutral-400" />}
+                icon={<User size={18} className="text-dark-muted" />}
                 required
               />
               <Input
@@ -88,7 +91,7 @@ export const InfluencerOnboarding = () => {
                 value={formData.instagramHandle}
                 onChange={handleChange}
                 error={errors.instagramHandle}
-                icon={<Instagram size={18} className="text-neutral-400" />}
+                icon={<Instagram size={18} className="text-dark-muted" />}
                 placeholder="@username"
                 required
               />
@@ -108,7 +111,7 @@ export const InfluencerOnboarding = () => {
                 type="number"
                 value={formData.followerCount}
                 onChange={handleChange}
-                icon={<Users size={18} className="text-neutral-400" />}
+                icon={<Users size={18} className="text-dark-muted" />}
                 placeholder="e.g. 5000"
               />
             </div>
@@ -118,7 +121,7 @@ export const InfluencerOnboarding = () => {
               name="profileImageUrl"
               value={formData.profileImageUrl}
               onChange={handleChange}
-              icon={<Camera size={18} className="text-neutral-400" />}
+              icon={<Camera size={18} className="text-dark-muted" />}
               placeholder="Link to your best photo"
             />
 
@@ -131,12 +134,12 @@ export const InfluencerOnboarding = () => {
               rows={4}
             />
 
-            <div className="pt-4 border-t border-neutral-100 dark:border-dark-border">
+            <div className="pt-4 border-t border-dark-border">
               <Button
                 type="submit"
                 variant="primary"
                 size="lg"
-                className="w-full"
+                className="w-full flex items-center justify-center gap-2"
                 isLoading={isOnboardingInfluencer}
               >
                 Complete Setup & Browse Gigs

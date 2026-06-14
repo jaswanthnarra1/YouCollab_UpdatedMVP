@@ -82,9 +82,9 @@ export const GigDetail = () => {
   }
 
   return (
-    <div className="max-w-5xl mx-auto animate-fade-in pb-12">
+    <div className="max-w-5xl mx-auto animate-fade-in pb-12 text-left">
       {/* Back navigation */}
-      <Link to="/gigs" className="inline-flex items-center text-sm font-semibold text-neutral-500 hover:text-neutral-900 dark:text-dark-muted dark:hover:text-dark-text mb-6 transition-colors group">
+      <Link to="/gigs" className="inline-flex items-center text-sm font-semibold text-dark-muted hover:text-dark-text mb-6 transition-colors group">
         <ChevronLeft size={16} className="mr-1 group-hover:-translate-x-1 transition-transform" />
         Back to Feed
       </Link>
@@ -99,25 +99,25 @@ export const GigDetail = () => {
             
             <div className="relative z-10">
               <div className="flex flex-wrap items-center gap-3 mb-6">
-                <Badge variant={gig.status === 'OPEN' ? 'success' : 'default'} className="uppercase tracking-wider text-[10px]">
+                <Badge variant={gig.status === 'OPEN' ? 'success' : 'neutral'} className="uppercase tracking-wider text-[10px]">
                   {gig.status}
                 </Badge>
-                <Badge variant="default" className="bg-primary/10 text-primary dark:bg-primary/20">
+                <Badge variant="primary">
                   {gig.category}
                 </Badge>
-                <div className="flex items-center text-xs font-semibold text-neutral-500 bg-neutral-100 dark:bg-dark-bg px-2.5 py-1 rounded-md">
+                <div className="flex items-center text-xs font-semibold text-dark-muted bg-dark-bg border border-dark-border px-2.5 py-1 rounded-md">
                   <Eye size={12} className="mr-1.5" />
                   {gig.viewCount || 0} views
                 </div>
               </div>
               
-              <h1 className="text-3xl sm:text-4xl font-extrabold text-neutral-900 dark:text-dark-text mb-4 leading-tight">
+              <h1 className="text-3xl sm:text-4xl font-extrabold text-dark-text mb-4 leading-tight">
                 {gig.title}
               </h1>
               
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm font-medium text-neutral-600 dark:text-dark-muted">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm font-medium text-dark-muted">
                 <div className="flex items-center">
-                  <MapPin size={16} className="mr-2 text-primary" />
+                  <MapPin size={16} className="mr-2 text-primary-light" />
                   {gig.city}
                 </div>
                 <div className="flex items-center">
@@ -135,21 +135,21 @@ export const GigDetail = () => {
           {/* Details Section */}
           <div className="space-y-6">
             <Card className="p-8">
-              <h3 className="text-xl font-bold mb-4 flex items-center gap-2 dark:text-dark-text">
-                <FileText size={20} className="text-primary" />
+              <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-dark-text">
+                <FileText size={20} className="text-primary-light" />
                 Campaign Description
               </h3>
-              <div className="prose dark:prose-invert max-w-none text-neutral-600 dark:text-dark-muted whitespace-pre-wrap leading-relaxed">
+              <div className="prose dark:prose-invert max-w-none text-dark-muted whitespace-pre-wrap leading-relaxed">
                 {gig.description}
               </div>
             </Card>
 
             <Card className="p-8">
-              <h3 className="text-xl font-bold mb-4 flex items-center gap-2 dark:text-dark-text">
+              <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-dark-text">
                 <CheckCircle size={20} className="text-secondary" />
                 Deliverables Required
               </h3>
-              <div className="bg-secondary/5 border border-secondary/20 rounded-2xl p-5 text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap leading-relaxed font-medium">
+              <div className="bg-dark-bg border border-dark-border rounded-2xl p-5 text-dark-text whitespace-pre-wrap leading-relaxed font-medium">
                 {gig.deliverables}
               </div>
             </Card>
@@ -161,8 +161,8 @@ export const GigDetail = () => {
           {/* Action Card */}
           <Card className="p-6 sticky top-24 shadow-premium">
             <div className="mb-6">
-              <p className="text-sm font-semibold text-neutral-500 dark:text-dark-muted uppercase tracking-wider mb-2">Campaign Budget</p>
-              <div className="text-3xl font-extrabold text-neutral-900 dark:text-dark-text tracking-tight">
+              <p className="text-sm font-semibold text-dark-muted uppercase tracking-wider mb-2">Campaign Budget</p>
+              <div className="text-3xl font-extrabold text-dark-text tracking-tight">
                 {formatBudget(gig.budgetMin, gig.budgetMax)}
               </div>
             </div>
@@ -175,7 +175,7 @@ export const GigDetail = () => {
               ) : isInfluencer ? (
                 gig.status === 'OPEN' ? (
                   hasApplied ? (
-                    <Button variant="secondary" className="w-full bg-green-50 text-green-700 border-green-200 hover:bg-green-100 cursor-default" size="lg" disabled>
+                    <Button variant="secondary" className="w-full bg-emerald-500/10 text-emerald-400 border-emerald-500/20 cursor-default" size="lg" disabled>
                       <CheckCircle size={18} className="mr-2" />
                       Applied Successfully
                     </Button>
@@ -200,7 +200,7 @@ export const GigDetail = () => {
                 </Button>
               )}
               
-              <p className="text-xs text-center font-medium text-neutral-400 dark:text-neutral-500 flex items-center justify-center">
+              <p className="text-xs text-center font-medium text-dark-muted flex items-center justify-center">
                 <Clock size={12} className="mr-1" />
                 Applications close {formatDate(gig.deadline)}
               </p>
@@ -209,17 +209,17 @@ export const GigDetail = () => {
 
           {/* Brand Info Card */}
           <Card className="p-6">
-            <h4 className="text-sm font-bold text-neutral-900 dark:text-dark-text mb-4 uppercase tracking-wider">About the Brand</h4>
+            <h4 className="text-sm font-bold text-dark-text mb-4 uppercase tracking-wider">About the Brand</h4>
             
             <div className="flex items-center gap-4 mb-4">
               <Avatar src={gig.brand?.logoUrl} name={gig.brand?.businessName} size="lg" />
               <div>
-                <h3 className="font-bold text-lg dark:text-dark-text">{gig.brand?.businessName}</h3>
-                <p className="text-sm text-neutral-500 dark:text-dark-muted">{gig.brand?.category}</p>
+                <h3 className="font-bold text-lg text-dark-text">{gig.brand?.businessName}</h3>
+                <p className="text-sm text-dark-muted">{gig.brand?.category}</p>
               </div>
             </div>
             
-            <div className="text-sm text-neutral-600 dark:text-neutral-400 mb-4 line-clamp-4">
+            <div className="text-sm text-dark-muted mb-4 line-clamp-4">
               {gig.brand?.bio || "No bio provided."}
             </div>
             
@@ -228,7 +228,7 @@ export const GigDetail = () => {
                 href={gig.brand.website.startsWith('http') ? gig.brand.website : `https://${gig.brand.website}`}
                 target="_blank" 
                 rel="noreferrer"
-                className="text-sm font-semibold text-primary hover:underline flex items-center gap-1.5 w-max"
+                className="text-sm font-semibold text-primary-light hover:text-primary hover:underline flex items-center gap-1.5 w-max"
               >
                 Visit Website
                 <Navigation size={12} className="rotate-45" />
@@ -245,9 +245,9 @@ export const GigDetail = () => {
         title="Apply for this Collab"
       >
         <div className="space-y-4">
-          <div className="bg-primary/5 p-4 rounded-xl border border-primary/10">
-            <h4 className="font-bold text-primary text-sm mb-1">{gig?.title}</h4>
-            <p className="text-xs text-primary/70">{formatBudget(gig?.budgetMin, gig?.budgetMax)}</p>
+          <div className="bg-primary/10 p-4 rounded-xl border border-primary/20">
+            <h4 className="font-bold text-primary-light text-sm mb-1">{gig?.title}</h4>
+            <p className="text-xs text-dark-muted">{formatBudget(gig?.budgetMin, gig?.budgetMax)}</p>
           </div>
           
           <Textarea
@@ -263,7 +263,7 @@ export const GigDetail = () => {
             required
           />
           
-          <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100 dark:border-dark-border">
+          <div className="flex justify-end gap-3 pt-4 border-t border-dark-border">
             <Button variant="ghost" onClick={() => setIsApplyModalOpen(false)}>
               Cancel
             </Button>

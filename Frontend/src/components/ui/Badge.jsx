@@ -10,12 +10,12 @@ export const Badge = ({
   const baseStyles = 'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold select-none border tracking-wide uppercase';
 
   const variants = {
-    neutral: 'bg-neutral-100 text-neutral-800 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:border-neutral-700',
-    primary: 'bg-primary-light text-primary border-primary/20 dark:bg-primary/10 dark:text-primary-light dark:border-primary/20',
-    success: 'bg-emerald-50 text-emerald-700 border-emerald-200/50 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20',
-    warning: 'bg-amber-50 text-amber-700 border-amber-200/50 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20',
-    danger: 'bg-rose-50 text-rose-700 border-rose-200/50 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20',
-    accent: 'bg-pink-50 text-pink-700 border-pink-200/50 dark:bg-pink-500/10 dark:text-pink-400 dark:border-pink-500/20',
+    neutral: 'bg-dark-surface text-dark-muted border-dark-border',
+    primary: 'bg-primary/10 text-primary border-primary/20',
+    success: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20',
+    warning: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
+    danger: 'bg-rose-500/15 text-rose-400 border-rose-500/20',
+    accent: 'bg-pink-500/15 text-pink-400 border-pink-500/20',
   };
 
   return (

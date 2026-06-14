@@ -32,12 +32,12 @@ export const NotificationBell = () => {
     <div className="relative shrink-0" ref={containerRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative rounded-full p-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 transition-all active:scale-95 dark:bg-dark-surface dark:hover:bg-dark-bg dark:text-dark-muted dark:hover:text-dark-text"
+        className="relative rounded-full p-2.5 bg-dark-bg border border-dark-border text-dark-muted hover:text-dark-text hover:bg-dark-hover transition-all active:scale-95"
         aria-label="View notifications alert dropdown"
       >
         <Bell size={18} />
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white dark:ring-dark-surface animate-pulse">
+          <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-extrabold text-dark-deeper ring-2 ring-dark-bg animate-pulse">
             {unreadCount}
           </span>
         )}

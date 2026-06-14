@@ -39,14 +39,14 @@ export const ApplicationCard = ({
   };
 
   return (
-    <Card className="flex flex-col md:flex-row gap-5 border-neutral-200/60 dark:border-dark-border text-left">
+    <Card className="flex flex-col md:flex-row gap-5 text-left">
       
       {/* Creator Info Sidebar Panel */}
-      <div className="flex flex-row md:flex-col items-center md:items-start gap-4 md:w-48 shrink-0 pb-4 md:pb-0 md:border-r border-neutral-100 dark:border-dark-border">
+      <div className="flex flex-row md:flex-col items-center md:items-start gap-4 md:w-48 shrink-0 pb-4 md:pb-0 md:border-r border-dark-border">
         <Avatar src={influencer.profileImageUrl} name={name} size="lg" className="h-16 w-16" />
         
         <div className="flex-1 md:flex-initial space-y-1 text-left">
-          <h4 className="text-sm font-bold text-neutral-900 dark:text-dark-text tracking-tight truncate max-w-[150px]">
+          <h4 className="text-sm font-bold text-dark-text tracking-tight truncate max-w-[150px]">
             {name}
           </h4>
           
@@ -54,7 +54,7 @@ export const ApplicationCard = ({
             href={`https://instagram.com/${handle.replace('@', '')}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-hover hover:underline"
+            className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-light hover:underline"
           >
             <Instagram size={12} />
             {handle}
@@ -77,7 +77,7 @@ export const ApplicationCard = ({
       <div className="flex-1 flex flex-col justify-between">
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3">
-            <span className="flex items-center gap-1 text-[10px] font-bold text-neutral-400 dark:text-dark-muted uppercase tracking-widest">
+            <span className="flex items-center gap-1 text-[10px] font-bold text-dark-muted uppercase tracking-widest">
               <Calendar size={12} />
               Applied {formatDate(application?.createdAt)}
             </span>
@@ -86,11 +86,11 @@ export const ApplicationCard = ({
             </Badge>
           </div>
           
-          <div className="rounded-2xl bg-neutral-50 p-4 border border-neutral-100 dark:bg-dark-bg/60 dark:border-dark-border">
-            <h5 className="text-[11px] font-bold text-neutral-400 dark:text-dark-muted uppercase tracking-wider mb-1.5 select-none">
+          <div className="rounded-2xl bg-dark-bg/60 p-4 border border-dark-border">
+            <h5 className="text-[11px] font-bold text-dark-muted uppercase tracking-wider mb-1.5 select-none">
               Creator's Pitch ✨
             </h5>
-            <p className="text-xs text-neutral-600 dark:text-dark-text leading-relaxed whitespace-pre-line">
+            <p className="text-xs text-dark-text leading-relaxed whitespace-pre-line">
               {application?.coverNote}
             </p>
           </div>
@@ -104,7 +104,6 @@ export const ApplicationCard = ({
               variant="secondary"
               isLoading={isProcessing}
               onClick={() => onDecline(application?.id)}
-              className="border-neutral-300 hover:bg-neutral-50 hover:text-neutral-900 border"
             >
               Decline ✗
             </Button>

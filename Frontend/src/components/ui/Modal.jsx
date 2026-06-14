@@ -37,28 +37,28 @@ export const Modal = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop Backdrop blur */}
       <div
-        className="fixed inset-0 bg-neutral-900/40 backdrop-blur-sm transition-opacity duration-300 dark:bg-black/60"
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300"
         onClick={onClose}
       />
 
       {/* Modal Container */}
       <div
         className={cn(
-          'relative w-full rounded-3xl bg-white p-6 shadow-2xl transition-all duration-300 dark:bg-dark-surface dark:border dark:border-dark-border animate-fade-in z-10',
+          'relative w-full rounded-3xl bg-dark-surface border border-dark-border p-6 shadow-2xl transition-all duration-300 animate-fade-in z-10',
           sizeClasses[size]
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-neutral-100 dark:border-dark-border">
+        <div className="flex items-center justify-between pb-4 border-b border-dark-border">
           {title && (
-            <h3 className="text-lg font-bold text-neutral-950 dark:text-dark-text tracking-tight">
+            <h3 className="text-lg font-bold text-dark-text tracking-tight">
               {title}
             </h3>
           )}
           {showClose && (
             <button
               onClick={onClose}
-              className="rounded-full p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 transition-all dark:hover:bg-dark-bg dark:hover:text-dark-text"
+              className="rounded-full p-1.5 text-dark-muted hover:bg-dark-bg hover:text-dark-text transition-all"
             >
               <X size={18} />
             </button>
@@ -66,7 +66,7 @@ export const Modal = ({
         </div>
 
         {/* Content Body */}
-        <div className="py-4 text-sm text-neutral-600 dark:text-dark-text leading-relaxed">
+        <div className="py-4 text-sm text-dark-text leading-relaxed">
           {children}
         </div>
       </div>

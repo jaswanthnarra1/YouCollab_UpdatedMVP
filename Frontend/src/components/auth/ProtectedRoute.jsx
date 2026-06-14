@@ -10,15 +10,15 @@ export const ProtectedRoute = ({ children }) => {
   if (isInitializing) {
     // Full Page Skeleton Loading UI
     return (
-      <div className="min-h-screen flex flex-col bg-neutral-50 dark:bg-dark-bg p-6 space-y-6">
-        <div className="flex justify-between items-center pb-4 border-b border-neutral-200 dark:border-dark-border">
+      <div className="min-h-screen flex flex-col bg-dark-bg p-6 space-y-6">
+        <div className="flex justify-between items-center pb-4 border-b border-dark-border">
           <Skeleton className="h-6 w-32" />
           <div className="flex gap-3">
             <Skeleton variant="avatar" className="w-8 h-8" />
             <Skeleton variant="avatar" className="w-8 h-8" />
           </div>
         </div>
-        <div className="flex-1 flex gap-6 max-w-7xl mx-auto w-full">
+        <div className="flex-1 flex gap-6 w-full">
           <div className="hidden md:block w-64 space-y-3">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />

@@ -10,13 +10,15 @@ export const Card = ({
   return (
     <div
       className={cn(
-        'rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm transition-all duration-200 dark:border-dark-border dark:bg-dark-surface',
-        hoverable && 'hover:shadow-premium hover:-translate-y-0.5 hover:border-neutral-300 dark:hover:border-neutral-700',
+        'card-premium p-6',
+        hoverable && 'card-premium-hover',
         className
       )}
       {...props}
     >
-      {children}
+      <div className="relative z-10">
+        {children}
+      </div>
     </div>
   );
 };

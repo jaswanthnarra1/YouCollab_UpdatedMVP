@@ -30,15 +30,15 @@ export const NotificationDropdown = ({ onClose }) => {
   };
 
   return (
-    <div className="w-[320px] rounded-3xl border border-neutral-200 bg-white p-4 shadow-xl dark:border-dark-border dark:bg-dark-surface animate-fade-in text-left">
-      <div className="flex items-center justify-between pb-2 border-b border-neutral-100 dark:border-dark-border mb-2 select-none">
-        <h4 className="text-sm font-bold text-neutral-900 dark:text-dark-text tracking-tight">
-          Recent Notifications alert
+    <div className="w-[320px] rounded-3xl border border-dark-border bg-dark-card p-4 shadow-xl animate-fade-in text-left">
+      <div className="flex items-center justify-between pb-2 border-b border-dark-border mb-2 select-none">
+        <h4 className="text-sm font-bold text-dark-text tracking-tight">
+          Recent Notifications
         </h4>
         {notifications.length > 0 && notifications.some((n) => !n.isRead) && (
           <button
             onClick={() => markAllAsRead()}
-            className="text-xs font-semibold text-primary hover:text-primary-hover transition-colors"
+            className="text-xs font-semibold text-primary hover:text-primary-light transition-colors"
           >
             Mark all read
           </button>
@@ -57,9 +57,9 @@ export const NotificationDropdown = ({ onClose }) => {
             </div>
           ))
         ) : notifications.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-neutral-400 select-none">
+          <div className="flex flex-col items-center justify-center py-8 text-dark-muted select-none">
             <BellOff size={24} className="mb-2" />
-            <span className="text-xs font-medium text-neutral-500">Nothing here yet 👀</span>
+            <span className="text-xs font-medium text-dark-muted">Nothing here yet 👀</span>
           </div>
         ) : (
           notifications.map((notif) => (
@@ -68,8 +68,8 @@ export const NotificationDropdown = ({ onClose }) => {
               onClick={() => handleNotificationClick(notif)}
               className={`w-full flex gap-3 p-2.5 rounded-2xl text-left transition-all relative ${
                 notif.isRead
-                  ? 'hover:bg-neutral-50 dark:hover:bg-dark-bg/60 text-neutral-600 dark:text-dark-muted'
-                  : 'bg-primary-light/30 hover:bg-primary-light/50 text-neutral-900 dark:bg-primary/10 dark:hover:bg-primary/15 dark:text-dark-text'
+                  ? 'hover:bg-dark-bg/60 text-dark-muted'
+                  : 'bg-primary/10 hover:bg-primary/15 text-dark-text'
               }`}
             >
               {/* Unread Indicator dot */}

@@ -6,7 +6,7 @@ export const Skeleton = ({
   variant = 'text', // 'text', 'avatar', 'rect'
   ...props
 }) => {
-  const baseStyles = 'bg-neutral-200 dark:bg-dark-border animate-pulse';
+  const baseStyles = 'bg-dark-card animate-pulse';
 
   const variants = {
     text: 'h-4 w-full rounded',

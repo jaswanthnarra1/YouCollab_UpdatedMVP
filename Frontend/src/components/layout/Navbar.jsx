@@ -1,111 +1,141 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { LogOut, LayoutDashboard, Briefcase, FileText, User } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { LogOut, LayoutDashboard, Briefcase, FileText, Settings, Bell, Search } from 'lucide-react';
 import useAuthStore from '../../stores/authStore';
 import { useAuth } from '../../hooks/useAuth';
 import { Avatar } from '../ui/Avatar';
-import { ThemeToggle } from '../ui/ThemeToggle';
 import { NotificationBell } from '../notifications/NotificationBell';
-import { Logo } from '../ui/Logo';
 
 export const Navbar = () => {
   const { user, isAuthenticated } = useAuthStore();
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const handleLogout = () => {
     setDropdownOpen(false);
     logout();
+    navigate('/login');
   };
 
   const displayName = user?.brand?.businessName || user?.influencer?.name || 'My Profile';
 
+  // Compute breadcrumbs based on the active path
+  const getBreadcrumbs = () => {
+    const path = location.pathname;
+    if (path.includes('/dashboard/brand')) return { parent: 'Workspace', current: 'Overview' };
+    if (path.includes('/dashboard/influencer')) return { parent: 'Workspace', current: 'Overview' };
+    if (path.includes('/gigs/create')) return { parent: 'Collabs', current: 'Post a Campaign' };
+    if (path.includes('/gigs/mine')) return { parent: 'Collabs', current: 'My Postings' };
+    if (path.includes('/gigs/')) return { parent: 'Collabs', current: 'Campaign Details' };
+    if (path.includes('/gigs')) return { parent: 'Collabs', current: 'Explore Feed' };
+    if (path.includes('/applications')) return { parent: 'Workspace', current: 'My Pitches' };
+    if (path.includes('/onboarding')) return { parent: 'Account', current: 'Onboarding' };
+    return { parent: 'YouCollab', current: 'Home' };
+  };
+
+  const breadcrumbs = getBreadcrumbs();
+
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-neutral-200/80 bg-white/80 backdrop-blur-md dark:border-dark-border dark:bg-dark-bg/80 select-none">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+    <header className="w-full border-b border-dark-border/40 bg-dark-bg/60 backdrop-blur-md select-none py-3 px-6 sm:px-8 relative z-30">
+      <div className="w-full flex items-center justify-between h-11">
         
-        {/* Brand/Logo Logo */}
-        <Link to="/" className="flex items-center gap-2 select-none">
-          <Logo className="h-9 w-auto drop-shadow-md" />
-          <span className="hidden sm:inline-block rounded-full bg-primary/10 border border-primary/20 px-2.5 py-0.5 text-[10px] font-bold text-primary dark:bg-primary/20 uppercase tracking-widest">
-            YOU-COLLAB
+        {/* Breadcrumbs Left (matches reference image: "Project / Finance Dashboard") */}
+        <div className="flex items-center gap-1.5 text-xs font-semibold">
+          <span className="text-dark-muted hover:text-dark-text cursor-pointer transition-colors">
+            {breadcrumbs.parent}
           </span>
-        </Link>
+          <span className="text-dark-muted/40">/</span>
+          <span className="text-dark-text">
+            {breadcrumbs.current}
+          </span>
+        </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-3">
-          <ThemeToggle />
-          <NotificationBell />
-
+        {/* Action Controls Right (matches reference image: Search, Bell, Avatar dropdown) */}
+        <div className="flex items-center gap-4">
           {isAuthenticated ? (
-            <div className="relative">
-              <button
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="flex items-center gap-1.5 focus:outline-none transition-all active:scale-[0.98]"
+            <>
+              {/* Notifications */}
+              <NotificationBell />
+
+              {/* Quick Settings Icon */}
+              <button 
+                onClick={() => navigate(user?.role === 'BRAND' ? '/dashboard/brand' : '/dashboard/influencer')}
+                className="text-dark-muted hover:text-dark-text transition-colors p-1.5 rounded-lg hover:bg-dark-hover"
+                title="Settings"
               >
-                <Avatar src={user?.avatarUrl} name={displayName} size="sm" />
-                <span className="hidden md:inline-block text-sm font-semibold text-neutral-700 hover:text-neutral-900 dark:text-dark-text dark:hover:text-dark-muted">
-                  {displayName}
-                </span>
+                <Settings size={18} />
               </button>
 
-              {dropdownOpen && (
-                <>
-                  {/* Backdrop clicking mask */}
-                  <div className="fixed inset-0 z-10" onClick={() => setDropdownOpen(false)} />
-                  
-                  {/* Dropdown Options */}
-                  <div className="absolute right-0 mt-2.5 w-52 rounded-2xl border border-neutral-200 bg-white p-2 shadow-xl dark:border-dark-border dark:bg-dark-surface animate-fade-in z-20">
-                    <div className="px-3 py-2 border-b border-neutral-100 dark:border-dark-border mb-1 text-left select-none">
-                      <div className="text-xs font-semibold text-neutral-400 uppercase tracking-wider dark:text-dark-muted">
-                        Role: {user?.role}
+              <div className="relative">
+                <button
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                  className="flex items-center gap-2 focus:outline-none transition-all active:scale-[0.98] p-1 rounded-lg hover:bg-dark-hover"
+                >
+                  <Avatar src={user?.avatarUrl} name={displayName} size="sm" className="border border-dark-border/40" />
+                  <span className="hidden md:inline-block text-xs font-bold text-dark-text hover:text-primary transition-colors">
+                    {displayName}
+                  </span>
+                </button>
+
+                {dropdownOpen && (
+                  <>
+                    {/* Backdrop click mask */}
+                    <div className="fixed inset-0 z-10" onClick={() => setDropdownOpen(false)} />
+                    
+                    {/* Dropdown Options */}
+                    <div className="absolute right-0 mt-2 w-52 rounded-2xl border border-dark-border bg-dark-surface p-2 shadow-premium animate-fade-in z-20">
+                      <div className="px-3 py-2 border-b border-dark-border mb-1 text-left select-none">
+                        <div className="text-[10px] font-bold text-dark-muted uppercase tracking-wider">
+                          Role: {user?.role}
+                        </div>
+                        <div className="text-[12px] font-bold text-dark-text truncate mt-0.5">
+                          {user?.email}
+                        </div>
                       </div>
-                      <div className="text-[13px] font-bold text-neutral-900 truncate dark:text-dark-text">
-                        {user?.email}
-                      </div>
+
+                      <Link
+                        to={user?.role === 'BRAND' ? '/dashboard/brand' : '/dashboard/influencer'}
+                        onClick={() => setDropdownOpen(false)}
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-semibold text-dark-text hover:bg-dark-hover transition-colors"
+                      >
+                        <LayoutDashboard size={14} className="text-primary" />
+                        Dashboard
+                      </Link>
+
+                      <Link
+                        to={user?.role === 'BRAND' ? '/gigs/mine' : '/applications'}
+                        onClick={() => setDropdownOpen(false)}
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-semibold text-dark-text hover:bg-dark-hover transition-colors"
+                      >
+                        {user?.role === 'BRAND' ? <Briefcase size={14} className="text-primary" /> : <FileText size={14} className="text-primary" />}
+                        {user?.role === 'BRAND' ? 'My Collabs' : 'My Applications'}
+                      </Link>
+
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left text-xs font-semibold text-rose-400 hover:bg-rose-950/20 transition-colors"
+                      >
+                        <LogOut size={14} />
+                        Sign out
+                      </button>
                     </div>
-
-                    <Link
-                      to={user?.role === 'BRAND' ? '/dashboard/brand' : '/dashboard/influencer'}
-                      onClick={() => setDropdownOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-sm text-neutral-600 hover:bg-neutral-50 dark:text-dark-text dark:hover:bg-dark-bg/60 transition-colors"
-                    >
-                      <LayoutDashboard size={16} />
-                      Dashboard
-                    </Link>
-
-                    <Link
-                      to={user?.role === 'BRAND' ? '/gigs/mine' : '/applications'}
-                      onClick={() => setDropdownOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-sm text-neutral-600 hover:bg-neutral-50 dark:text-dark-text dark:hover:bg-dark-bg/60 transition-colors"
-                    >
-                      {user?.role === 'BRAND' ? <Briefcase size={16} /> : <FileText size={16} />}
-                      {user?.role === 'BRAND' ? 'My Collabs' : 'My Applications'}
-                    </Link>
-
-                    <button
-                      onClick={handleLogout}
-                      className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left text-sm text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors"
-                    >
-                      <LogOut size={16} />
-                      Sign out
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+                  </>
+                )}
+              </div>
+            </>
           ) : (
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2">
               <Link
                 to="/login"
-                className="text-sm font-semibold text-neutral-600 hover:text-neutral-900 transition-colors dark:text-dark-muted dark:hover:text-dark-text px-3 py-2"
+                className="text-xs font-bold text-dark-muted hover:text-dark-text transition-colors px-3 py-2"
               >
                 Sign in
               </Link>
               <Link
                 to="/signup"
-                className="inline-flex items-center justify-center text-sm font-semibold bg-primary text-white hover:bg-primary-hover px-4 py-2.5 rounded-xl shadow-sm shadow-primary/20 transition-all select-none active:scale-[0.98]"
+                className="inline-flex items-center justify-center text-xs font-bold bg-primary text-dark-deeper hover:bg-primary-hover px-4 py-2 rounded-xl shadow-premium hover:shadow-glow transition-all active:scale-[0.98]"
               >
                 Join Now
               </Link>

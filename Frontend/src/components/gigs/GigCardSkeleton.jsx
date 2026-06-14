@@ -4,7 +4,7 @@ import Skeleton from '../ui/Skeleton';
 
 export const GigCardSkeleton = () => {
   return (
-    <Card className="flex flex-col h-full justify-between border-neutral-200/60 dark:border-dark-border text-left">
+    <Card className="flex flex-col h-full justify-between text-left">
       <div>
         {/* Brand Meta Row */}
         <div className="flex items-center justify-between mb-4">
@@ -33,7 +33,7 @@ export const GigCardSkeleton = () => {
 
       <div>
         {/* Attributes Grid */}
-        <div className="grid grid-cols-2 gap-y-2.5 border-t border-neutral-100 dark:border-dark-border pt-4 mb-4">
+        <div className="grid grid-cols-2 gap-y-2.5 border-t border-dark-border pt-4 mb-4">
           <Skeleton className="h-3 w-20" />
           <Skeleton className="h-3 w-16 justify-self-end" />
           <Skeleton className="h-3 w-24" />

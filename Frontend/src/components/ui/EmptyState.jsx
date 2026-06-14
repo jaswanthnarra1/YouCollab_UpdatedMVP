@@ -14,12 +14,12 @@ export const EmptyState = ({
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center p-8 text-center max-w-sm mx-auto rounded-3xl border border-dashed border-neutral-200 dark:border-dark-border py-12',
+        'flex flex-col items-center justify-center p-8 text-center max-w-sm mx-auto rounded-3xl border border-dashed border-dark-border py-12',
         className
       )}
       {...props}
     >
-      <div className="rounded-2xl bg-neutral-100 p-4 text-neutral-400 dark:bg-dark-surface dark:text-dark-muted mb-4">
+      <div className="rounded-2xl bg-dark-surface text-dark-muted mb-4">
         {icon ? (
           icon
         ) : (
@@ -32,10 +32,10 @@ export const EmptyState = ({
         )}
       </div>
       
-      <h3 className="text-base font-bold text-neutral-900 dark:text-dark-text mb-1 tracking-tight">
+      <h3 className="text-base font-bold text-dark-text mb-1 tracking-tight">
         {title}
       </h3>
-      <p className="text-xs text-neutral-500 dark:text-dark-muted mb-5 max-w-[260px] leading-relaxed">
+      <p className="text-xs text-dark-muted mb-5 max-w-[260px] leading-relaxed">
         {description}
       </p>
 
