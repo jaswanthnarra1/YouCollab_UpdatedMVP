@@ -27,6 +27,7 @@ import CreateGig from './pages/gigs/CreateGig';
 import MyGigs from './pages/gigs/MyGigs';
 import GigApplicants from './pages/gigs/GigApplicants';
 import MyApplications from './pages/applications/MyApplications';
+import InstagramCallback from './pages/instagram/InstagramCallback';
 
 function App() {
   const initAuth = useAuthStore((s) => s.initAuth);
@@ -77,10 +78,12 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
 
-        {/* Onboarding */}
+        {/* Onboarding + Instagram callback */}
         <Route element={<ProtectedRoute />}>
           <Route path="/onboarding/brand" element={<BrandOnboarding />} />
           <Route path="/onboarding/influencer" element={<InfluencerOnboarding />} />
+          {/* Instagram callback must be accessible before/during onboarding */}
+          <Route path="/instagram/callback" element={<InstagramCallback />} />
         </Route>
 
         {/* Dashboard Layout */}

@@ -5,6 +5,7 @@ const gigRoutes = require('./gig.routes');
 const applicationRoutes = require('./application.routes');
 const notificationRoutes = require('./notification.routes');
 const uploadRoutes = require('./upload.routes');
+const instagramRoutes = require('./instagram.routes');
 
 const router = express.Router();
 
@@ -14,6 +15,7 @@ router.use('/gigs', gigRoutes);
 router.use('/applications', applicationRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/upload', uploadRoutes);
+router.use('/instagram', instagramRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {

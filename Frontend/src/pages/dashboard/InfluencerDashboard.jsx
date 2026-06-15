@@ -10,6 +10,7 @@ import Badge from '../../components/ui/Badge';
 import Skeleton from '../../components/ui/Skeleton';
 import EmptyState from '../../components/ui/EmptyState';
 import Avatar from '../../components/ui/Avatar';
+import InstagramConnectCard from '../../components/profile/InstagramConnectCard';
 
 export const InfluencerDashboard = () => {
   const { user } = useAuthStore();
@@ -167,6 +168,9 @@ export const InfluencerDashboard = () => {
           </div>
         </Card>
       </div>
+
+      {/* Instagram Connect Card */}
+      <InstagramConnectCard />
 
       {/* Recent Applications Section */}
       <div className="space-y-4">

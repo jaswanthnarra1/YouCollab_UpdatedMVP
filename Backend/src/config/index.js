@@ -31,5 +31,11 @@ module.exports = {
   EMAIL: {
     RESEND_API_KEY: process.env.RESEND_API_KEY || '',
     FROM_EMAIL: process.env.RESEND_FROM_EMAIL || 'noreply@youcollab.in',
-  }
+  },
+
+  INSTAGRAM: {
+    APP_ID: process.env.INSTAGRAM_APP_ID,
+    APP_SECRET: process.env.INSTAGRAM_APP_SECRET,
+    REDIRECT_URI: process.env.INSTAGRAM_REDIRECT_URI || 'http://localhost:5173/instagram/callback',
+  },
 };
