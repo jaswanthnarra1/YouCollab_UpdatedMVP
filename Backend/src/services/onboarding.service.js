@@ -26,7 +26,7 @@ const onboardBrand = async (userId, data) => {
   // Create brand record
   const { data: brand, error: brandError } = await supabase
     .from('brands')
-    .insert({
+    .upsert({
       userId,
       businessName: data.businessName,
       category: data.category,
@@ -34,7 +34,7 @@ const onboardBrand = async (userId, data) => {
       bio: data.bio,
       logoUrl: data.logoUrl || null,
       website: data.website || null,
-    })
+    }, { onConflict: 'userId' })
     .select('*')
     .single();
 
@@ -94,7 +94,7 @@ const onboardInfluencer = async (userId, data) => {
   // Create influencer record
   const { data: influencer, error: influencerError } = await supabase
     .from('influencers')
-    .insert({
+    .upsert({
       userId,
       name: data.name,
       instagramHandle: data.instagramHandle,
@@ -102,7 +102,7 @@ const onboardInfluencer = async (userId, data) => {
       bio: data.bio,
       profileImageUrl: data.profileImageUrl || null,
       followerCount: data.followerCount || 0,
-    })
+    }, { onConflict: 'userId' })
     .select('*')
     .single();
 

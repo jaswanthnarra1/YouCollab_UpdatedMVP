@@ -5,7 +5,6 @@ import {
   BadgeCheck, Check, X, ArrowLeft, MessageSquareText, Send, Loader2, TrendingUp,
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -79,7 +78,6 @@ export default function GigApplicants() {
   return (
     <div className="relative min-h-screen overflow-hidden">
       <div className="absolute inset-0 neon-grid pointer-events-none" />
-      <Navbar />
       <main className="relative mx-auto max-w-5xl px-4 py-8 space-y-6">
         <Button asChild variant="ghost" size="sm" className="-ml-2"><Link to="/dashboard/brand"><ArrowLeft className="h-4 w-4 mr-1" /> Back</Link></Button>
         <div>

@@ -296,6 +296,73 @@ const getMyGigs = async (userId) => {
   });
 };
 
+/**
+ * Hard delete a Gig (permanently removes it and cascades applications).
+ */
+const deleteGig = async (id, userId) => {
+  const brand = await getBrandByUserId(userId);
+
+  const { data: gig, error: findError } = await supabase
+    .from('gigs')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (findError || !gig) {
+    throw new AppError('Collab not found.', 404, 'NOT_FOUND');
+  }
+
+  if (gig.brandId !== brand.id) {
+    throw new AppError("You don't have permission to delete this collab.", 403, 'FORBIDDEN');
+  }
+
+  // Delete applications first (cascade), then the gig
+  await supabase.from('applications').delete().eq('gigId', id);
+  const { error: deleteError } = await supabase.from('gigs').delete().eq('id', id);
+
+  if (deleteError) {
+    throw new AppError('Failed to delete collab.', 500, 'DATABASE_ERROR');
+  }
+
+  return { message: 'Collab permanently deleted.' };
+};
+
+/**
+ * Toggle gig status between OPEN and CLOSED.
+ */
+const toggleGigStatus = async (id, userId) => {
+  const brand = await getBrandByUserId(userId);
+
+  const { data: gig, error: findError } = await supabase
+    .from('gigs')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (findError || !gig) {
+    throw new AppError('Collab not found.', 404, 'NOT_FOUND');
+  }
+
+  if (gig.brandId !== brand.id) {
+    throw new AppError("You don't have permission to update this collab.", 403, 'FORBIDDEN');
+  }
+
+  const newStatus = gig.status === 'OPEN' ? 'CLOSED' : 'OPEN';
+
+  const { data: updatedGig, error: updateError } = await supabase
+    .from('gigs')
+    .update({ status: newStatus })
+    .eq('id', id)
+    .select('*')
+    .single();
+
+  if (updateError) {
+    throw new AppError('Failed to toggle collab status.', 500, 'DATABASE_ERROR');
+  }
+
+  return updatedGig;
+};
+
 module.exports = {
   createGig,
   getGigs,
@@ -303,4 +370,6 @@ module.exports = {
   updateGig,
   closeGig,
   getMyGigs,
+  deleteGig,
+  toggleGigStatus,
 };

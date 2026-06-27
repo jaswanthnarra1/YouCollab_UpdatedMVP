@@ -16,8 +16,10 @@ interface Props {
 export default function AuthPage({ mode }: Props) {
   const [params] = useSearchParams();
   const initialRole = (params.get("role") as Role) || "INFLUENCER";
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] = useState<Role>(initialRole);
   const [loading, setLoading] = useState(false);
   const { setUser, setToken } = useAuthStore();
@@ -28,18 +30,28 @@ export default function AuthPage({ mode }: Props) {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = mode === "login"
-        ? await authService.login(email, password)
-        : await authService.register(email, password, role);
-      if (!res?.user) throw new Error("Auth failed");
-      setUser(res.user);
-      if (res.accessToken) setToken(res.accessToken);
-      const dest = !res.user.isOnboarded
-        ? res.user.role === "BRAND" ? "/onboarding/brand" : "/onboarding/influencer"
-        : res.user.role === "BRAND" ? "/dashboard/brand" : "/dashboard/influencer";
-      navigate(dest);
+      if (mode === "login") {
+        const res = await authService.login(email, password);
+        if (!res?.user) throw new Error("Auth failed");
+        setUser(res.user);
+        if (res.accessToken) setToken(res.accessToken);
+        const dest = !res.user.isOnboarded
+          ? res.user.role === "BRAND" ? "/onboarding/brand" : "/onboarding/influencer"
+          : res.user.role === "BRAND" ? "/dashboard/brand" : "/dashboard/influencer";
+        navigate(dest);
+      } else {
+        if (password !== confirmPassword) {
+          toast({ variant: "destructive", title: "Passwords mismatch", description: "Password and Confirm Password do not match." });
+          setLoading(false);
+          return;
+        }
+        await authService.register(name, email, password, role);
+        toast({ title: "OTP Code Sent! ✉️", description: "Please check your inbox for a 6-digit verification code." });
+        navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
+      }
     } catch (err) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
+        || (err as { response?: { data?: { message?: string } } })?.response?.data?.message
         || (err as Error).message
         || "Something went wrong";
       toast({ variant: "destructive", title: mode === "login" ? "Login failed" : "Sign up failed", description: msg });
@@ -106,6 +118,20 @@ export default function AuthPage({ mode }: Props) {
 
           {/* Form */}
           <form className="space-y-3" onSubmit={submit}>
+            {mode === "register" && (
+              <div className="space-y-1">
+                <Label htmlFor="name" className="text-[12px]">Full Name</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={role === "BRAND" ? "e.g. Koregaon Coffee Co." : "e.g. Aarav Sharma"}
+                  className="h-9 text-[13px] rounded-sm"
+                />
+              </div>
+            )}
             <div className="space-y-1">
               <Label htmlFor="email" className="text-[12px]">Email</Label>
               <Input
@@ -130,7 +156,28 @@ export default function AuthPage({ mode }: Props) {
                 placeholder="••••••••"
                 className="h-9 text-[13px] rounded-sm"
               />
+              {mode === "login" && (
+                <div className="flex justify-end">
+                  <Link to="/forgot-password" className="text-[11px] text-muted-foreground hover:text-foreground transition-colors">
+                    Forgot password?
+                  </Link>
+                </div>
+              )}
             </div>
+            {mode === "register" && (
+              <div className="space-y-1">
+                <Label htmlFor="confirmPassword" className="text-[12px]">Confirm Password</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="h-9 text-[13px] rounded-sm"
+                />
+              </div>
+            )}
             <Button
               type="submit"
               disabled={loading}
@@ -142,42 +189,6 @@ export default function AuthPage({ mode }: Props) {
             </Button>
           </form>
 
-          {/* Divider */}
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border" />
-            </div>
-            <div className="relative flex justify-center text-[10px] uppercase tracking-[0.12em]">
-              <span className="bg-background px-2 text-muted-foreground">Or preview</span>
-            </div>
-          </div>
-
-          {/* Demo buttons */}
-          <div className="grid grid-cols-2 gap-2">
-            {(["INFLUENCER", "BRAND"] as Role[]).map((r) => (
-              <Button
-                key={r}
-                type="button"
-                variant="outline"
-                className="h-9 text-[12px] rounded-sm"
-                onClick={() => {
-                  setUser({
-                    id: `demo-${r.toLowerCase()}`,
-                    email: `demo+${r.toLowerCase()}@youcollab.in`,
-                    role: r,
-                    isOnboarded: true,
-                    name: r === "BRAND" ? "Koregaon Coffee Co." : "Demo Creator",
-                  });
-                  navigate(r === "BRAND" ? "/dashboard/brand" : "/dashboard/influencer");
-                }}
-              >
-                Demo {r === "BRAND" ? "Brand" : "Creator"}
-              </Button>
-            ))}
-          </div>
-          <p className="text-[11px] text-muted-foreground text-center -mt-2">
-            Demo mode skips the backend — explore the UI without an API.
-          </p>
 
           {/* Footer link */}
           <p className="text-[11px] text-muted-foreground text-left pt-2 border-t border-border">

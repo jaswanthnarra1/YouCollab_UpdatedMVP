@@ -28,10 +28,10 @@ const hashToken = (token) => {
 };
 
 /**
- * Register a new user.
- * Creates user in both Supabase Auth (if available) and the public.users table.
+ * Initiate registration of a new user using native Supabase Auth.
+ * Supabase triggers SMTP OTP verification code delivery natively.
  */
-const register = async (email, password, role) => {
+const register = async (name, email, password, role) => {
   const { data: existingUser } = await supabase
     .from('users')
     .select('id')
@@ -42,67 +42,36 @@ const register = async (email, password, role) => {
     throw new AppError('An account with this email already exists.', 409, 'CONFLICT');
   }
 
-  // Step 1: Create user in Supabase Auth (if admin client is available)
-  let authId = null;
-  try {
-    if (supabaseAdmin) {
-      const { user: authUser } = await supabaseAuth.signUp(email, password, { role });
-      authId = authUser?.id || null;
+  // Register in Supabase Auth
+  const { error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { name, role }
     }
-  } catch (authErr) {
-    // Log but don't block — custom JWT auth is the primary system
-    console.warn(`Supabase Auth sign-up skipped: ${authErr.message}`);
-  }
-
-  // Step 2: Create user in public.users table
-  const passwordHash = await bcrypt.hash(password, 12);
-  const insertData = { email, passwordHash, role };
-  if (authId) insertData.authId = authId;
-
-  const { data: user, error } = await supabase
-    .from('users')
-    .insert(insertData)
-    .select('id, email, role, isOnboarded, createdAt')
-    .single();
-
-  if (error) throw new AppError('Failed to create account.', 500, 'DATABASE_ERROR');
-
-  const accessToken = generateAccessToken(user);
-  const refreshTokenString = generateRefreshToken(user);
-
-  // Save refresh token in DB
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
-
-  await supabase.from('refresh_tokens').insert({
-    userId: user.id,
-    tokenHash: hashToken(refreshTokenString),
-    expiresAt: expiresAt.toISOString(),
   });
 
-  return {
-    user,
-    accessToken,
-    refreshToken: refreshTokenString,
-  };
+  if (error) {
+    throw new AppError(error.message, 400, 'BAD_REQUEST');
+  }
+
+  return { success: true, message: 'Verification OTP sent successfully.' };
 };
 
 /**
  * Login an existing user.
  */
 const login = async (email, password) => {
-  const { data: user } = await supabase
-    .from('users')
-    .select('*, brand:brands(*), influencer:influencers(*)')
-    .eq('email', email)
-    .maybeSingle();
+  // Sign in using Supabase Auth
+  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  });
 
-  if (!user) {
-    throw new AppError('Incorrect email or password.', 401, 'UNAUTHORIZED');
-  }
-
-  const isPasswordMatch = await bcrypt.compare(password, user.passwordHash);
-  if (!isPasswordMatch) {
+  if (authError) {
+    if (authError.message.includes('Email not confirmed')) {
+      throw new AppError('Please verify your email address first.', 401, 'UNAUTHORIZED');
+    }
     throw new AppError('Incorrect email or password.', 401, 'UNAUTHORIZED');
   }
 
@@ -361,6 +330,124 @@ const updateEmail = async (userId, newEmail) => {
   return user;
 };
 
+/**
+ * Verify a registration OTP code and complete user setup.
+ */
+const verifyOtp = async (email, otp) => {
+  // Verify OTP via Supabase Auth
+  const { data: authData, error: authError } = await supabase.auth.verifyOtp({
+    email,
+    token: otp,
+    type: 'signup'
+  });
+
+  if (authError) {
+    throw new AppError(authError.message, 400, 'BAD_REQUEST');
+  }
+
+  const authUser = authData.user;
+  if (!authUser) {
+    throw new AppError('Verification failed. User session not returned.', 400, 'BAD_REQUEST');
+  }
+
+  const name = authUser.user_metadata?.name || 'User';
+  const role = authUser.user_metadata?.role || 'INFLUENCER';
+
+  // Check if user already exists in public.users
+  let { data: user } = await supabase
+    .from('users')
+    .select('id, email, role, isOnboarded, createdAt')
+    .eq('email', email)
+    .maybeSingle();
+
+  if (!user) {
+    // Insert user record in public.users
+    const { data: newUser, error: userError } = await supabase
+      .from('users')
+      .insert({
+        email,
+        passwordHash: 'SUPABASE_AUTH', // Password is secure under Supabase Auth
+        role,
+        authId: authUser.id,
+        isOnboarded: false
+      })
+      .select('id, email, role, isOnboarded, createdAt')
+      .single();
+
+    if (userError) {
+      console.error('Error creating public user:', userError);
+      throw new AppError('Failed to create user profile in database.', 500, 'DATABASE_ERROR');
+    }
+    user = newUser;
+
+    // Create the profile based on role
+    if (role === 'BRAND') {
+      const { error: brandError } = await supabase
+        .from('brands')
+        .insert({
+          userId: user.id,
+          businessName: name,
+          category: 'Cafe',
+          location: 'Pune',
+          bio: 'Welcome to our brand profile.'
+        });
+      if (brandError) {
+        console.error('Error creating brand profile:', brandError);
+      }
+    } else {
+      const { error: creatorError } = await supabase
+        .from('influencers')
+        .insert({
+          userId: user.id,
+          name,
+          instagramHandle: '',
+          niche: 'Fashion',
+          bio: 'Welcome to my creator profile.',
+          followerCount: 0
+        });
+      if (creatorError) {
+        console.error('Error creating creator profile:', creatorError);
+      }
+    }
+  }
+
+  // Generate tokens
+  const accessToken = generateAccessToken(user);
+  const refreshTokenString = generateRefreshToken(user);
+
+  // Save refresh token in DB
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
+
+  await supabase.from('refresh_tokens').insert({
+    userId: user.id,
+    tokenHash: hashToken(refreshTokenString),
+    expiresAt: expiresAt.toISOString(),
+  });
+
+  return {
+    user,
+    accessToken,
+    refreshToken: refreshTokenString,
+  };
+};
+
+/**
+ * Resend registration OTP code.
+ */
+const resendOtp = async (email) => {
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email
+  });
+
+  if (error) {
+    throw new AppError(error.message, 400, 'BAD_REQUEST');
+  }
+
+  return { success: true, message: 'Verification code resent successfully.' };
+};
+
 module.exports = {
   register,
   login,
@@ -369,4 +456,6 @@ module.exports = {
   getMe,
   requestPasswordReset,
   updateEmail,
+  verifyOtp,
+  resendOtp,
 };

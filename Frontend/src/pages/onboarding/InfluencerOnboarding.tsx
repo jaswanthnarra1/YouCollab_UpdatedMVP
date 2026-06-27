@@ -38,8 +38,12 @@ export default function InfluencerOnboarding() {
       toast({ title: "You're in!", description: "Welcome to YouCollab." });
       navigate("/dashboard/influencer");
     },
-    onError: (err: { response?: { data?: { message?: string } } }) => {
-      toast({ variant: "destructive", title: "Couldn't save", description: err?.response?.data?.message ?? "Try again." });
+    onError: (err: any) => {
+      toast({ 
+        variant: "destructive", 
+        title: "Couldn't save", 
+        description: err?.response?.data?.error?.message ?? err?.response?.data?.message ?? "Try again." 
+      });
     },
   });
 
@@ -49,7 +53,8 @@ export default function InfluencerOnboarding() {
     onError: () => toast({ variant: "destructive", title: "Instagram connect failed" }),
   });
 
-  const valid = name && bio.length >= 10 && niche;
+  const countWords = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
+  const valid = name && countWords(bio) >= 3 && niche;
 
   return (
     <div className="relative min-h-screen overflow-hidden">
@@ -83,9 +88,9 @@ export default function InfluencerOnboarding() {
           </div>
 
           <div className="space-y-1.5">
-            <Label>Bio <span className="text-muted-foreground">(min 10 chars)</span></Label>
+            <Label>Bio <span className="text-muted-foreground">(min 3 words)</span></Label>
             <Textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="What makes your content unforgettable?" className="glass min-h-[110px]" />
-            <p className="text-xs text-muted-foreground">{bio.length}/10</p>
+            <p className="text-xs text-muted-foreground">{countWords(bio)}/3 words</p>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4">
@@ -111,7 +116,7 @@ export default function InfluencerOnboarding() {
                 <Button
                   onClick={() => connectIG.mutate()}
                   disabled={connectIG.isPending}
-                  className="mt-3 bg-white text-foreground hover:bg-white/90 border-0"
+                  className="mt-3 bg-gradient-brand text-primary-foreground hover:opacity-95 border-0"
                 >
                   {connectIG.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Connect Instagram"}
                 </Button>

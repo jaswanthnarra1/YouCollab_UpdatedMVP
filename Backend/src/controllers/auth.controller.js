@@ -17,18 +17,14 @@ const getCookieOptions = () => {
  * Register User controller.
  */
 const register = asyncHandler(async (req, res) => {
-  const { email, password, role } = req.body;
+  const { name, email, password, role } = req.body;
 
-  const result = await authService.register(email, password, role);
+  const result = await authService.register(name, email, password, role);
 
-  // Set httpOnly refresh token cookie
-  res.cookie(config.JWT.REFRESH_COOKIE_NAME, result.refreshToken, getCookieOptions());
-
-  res.status(201).json({
+  res.status(200).json({
     success: true,
     data: {
-      user: result.user,
-      accessToken: result.accessToken,
+      message: 'Verification code sent to your email.',
     },
   });
 });
@@ -111,10 +107,62 @@ const me = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Forgot Password controller.
+ */
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  const result = await authService.requestPasswordReset(email);
+
+  res.status(200).json({
+    success: true,
+    data: result,
+  });
+});
+
+/**
+ * Verify OTP controller.
+ */
+const verifyOtp = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+
+  const result = await authService.verifyOtp(email, otp);
+
+  // Set httpOnly refresh token cookie
+  res.cookie(config.JWT.REFRESH_COOKIE_NAME, result.refreshToken, getCookieOptions());
+
+  res.status(200).json({
+    success: true,
+    data: {
+      user: result.user,
+      accessToken: result.accessToken,
+    },
+  });
+});
+
+/**
+ * Resend OTP controller.
+ */
+const resendOtp = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  const result = await authService.resendOtp(email);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      message: result.message,
+    },
+  });
+});
+
 module.exports = {
   register,
   login,
   refresh,
   logout,
   me,
+  forgotPassword,
+  verifyOtp,
+  resendOtp,
 };

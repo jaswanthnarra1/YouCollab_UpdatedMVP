@@ -78,6 +78,31 @@ const mine = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Hard delete a collab.
+ */
+const destroy = asyncHandler(async (req, res) => {
+  const result = await gigService.deleteGig(req.params.id, req.user.id);
+
+  res.status(200).json({
+    success: true,
+    data: result,
+  });
+});
+
+/**
+ * Toggle collab status (OPEN ↔ CLOSED).
+ */
+const toggleStatus = asyncHandler(async (req, res) => {
+  const gig = await gigService.toggleGigStatus(req.params.id, req.user.id);
+
+  res.status(200).json({
+    success: true,
+    data: gig,
+    message: gig.status === 'OPEN' ? 'Collab is now live! 🎉' : 'Collab paused.',
+  });
+});
+
 module.exports = {
   create,
   list,
@@ -85,4 +110,6 @@ module.exports = {
   update,
   close,
   mine,
+  destroy,
+  toggleStatus,
 };

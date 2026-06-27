@@ -7,11 +7,19 @@ interface AuthResponse {
 }
 
 export const authService = {
-  async register(email: string, password: string, role: Role) {
-    const { data } = await apiClient.post("/api/auth/register", { email, password, role });
+  async register(name: string, email: string, password: string, role: Role) {
+    const { data } = await apiClient.post("/api/auth/register", { name, email, password, role });
+    return unwrap<{ message: string }>(data);
+  },
+  async verifyOtp(email: string, otp: string) {
+    const { data } = await apiClient.post("/api/auth/verify-otp", { email, otp });
     const payload = unwrap<AuthResponse>(data);
     if (payload?.accessToken) tokenStorage.set(payload.accessToken);
     return payload;
+  },
+  async resendOtp(email: string) {
+    const { data } = await apiClient.post("/api/auth/resend-otp", { email });
+    return unwrap<{ message: string }>(data);
   },
   async login(email: string, password: string) {
     const { data } = await apiClient.post("/api/auth/login", { email, password });
@@ -32,5 +40,9 @@ export const authService = {
       /* noop */
     }
     tokenStorage.set(null);
+  },
+  async forgotPassword(email: string) {
+    const { data } = await apiClient.post("/api/auth/forgot-password", { email });
+    return unwrap<{ message: string }>(data);
   },
 };

@@ -36,11 +36,16 @@ export default function BrandOnboarding() {
       toast({ title: "Welcome to YouCollab!" });
       navigate("/dashboard/brand");
     },
-    onError: (err: { response?: { data?: { message?: string } } }) =>
-      toast({ variant: "destructive", title: "Save failed", description: err?.response?.data?.message ?? "Try again." }),
+    onError: (err: any) =>
+      toast({ 
+        variant: "destructive", 
+        title: "Save failed", 
+        description: err?.response?.data?.error?.message ?? err?.response?.data?.message ?? "Try again." 
+      }),
   });
 
-  const valid = businessName && category && location && bio.length >= 10;
+  const countWords = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
+  const valid = businessName && category && location && countWords(bio) >= 3;
 
   return (
     <div className="relative min-h-screen overflow-hidden">
@@ -72,9 +77,9 @@ export default function BrandOnboarding() {
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label>Bio <span className="text-muted-foreground">(min 10 chars)</span></Label>
+            <Label>Bio <span className="text-muted-foreground">(min 3 words)</span></Label>
             <Textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="What does your brand stand for?" className="glass min-h-[110px]" />
-            <p className="text-xs text-muted-foreground">{bio.length}/10</p>
+            <p className="text-xs text-muted-foreground">{countWords(bio)}/3 words</p>
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
