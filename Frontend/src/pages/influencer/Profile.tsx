@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { Loader2, Sparkles, ArrowLeft, Instagram, Pencil } from "lucide-react";
+import { Loader2, ArrowLeft, Instagram, Pencil } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,25 +99,28 @@ export default function CreatorProfile() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      <div className="absolute inset-0 neon-grid pointer-events-none" />
-      <main className="relative mx-auto max-w-2xl px-4 pt-8 pb-20">
-        <div className="mb-4">
-          <Button onClick={() => navigate("/dashboard/influencer")} variant="ghost" size="sm" className="-ml-2 text-muted-foreground hover:text-foreground">
+    <div className="min-h-screen bg-background text-foreground">
+      <main className="mx-auto max-w-2xl px-6 py-10 space-y-6">
+        
+        {/* Back Link */}
+        <div>
+          <Button onClick={() => navigate("/dashboard/influencer")} variant="ghost" size="sm" className="-ml-2 text-muted-foreground hover:text-foreground h-8 text-[12px] rounded-sm">
             <ArrowLeft className="h-4 w-4 mr-1" /> Back to Dashboard
           </Button>
         </div>
 
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-          <div className="chip mb-3"><Sparkles className="h-3 w-3 text-primary" /> Profile settings</div>
-          <h1 className="text-3xl font-semibold font-sans">Creator profile</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage details about your media presence shown to brands.</p>
-        </motion.div>
+        {/* Header Section matching Dashboard layout */}
+        <div>
+          <span className="inline-block border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground rounded-sm mb-3">Profile settings</span>
+          <h1 className="text-3xl font-semibold tracking-tight">Creator profile</h1>
+          <p className="text-[13px] text-muted-foreground mt-1">Manage details about your media presence shown to brands.</p>
+        </div>
 
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-strong rounded-3xl p-6 space-y-5">
+        {/* Content Panel Box matching Dashboard card style */}
+        <div className="border border-border rounded-sm p-6 bg-background space-y-5">
           <div className="flex items-center gap-4">
             {/* Avatar Container with Pen Upload Overlay */}
-            <div className="relative group h-16 w-16 rounded-2xl bg-gradient-brand shrink-0 flex items-center justify-center text-primary-foreground font-bold text-xl overflow-hidden border border-border">
+            <div className="relative group h-16 w-16 rounded-sm bg-gradient-brand shrink-0 flex items-center justify-center text-primary-foreground font-bold text-xl overflow-hidden border border-border">
               {uploading ? (
                 <Loader2 className="h-5 w-5 animate-spin text-white" />
               ) : profileImageUrl ? (
@@ -147,51 +149,52 @@ export default function CreatorProfile() {
           </div>
 
           <div className="space-y-1.5">
-            <Label>Full name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Riya Sen" className="glass" />
+            <Label className="text-[12px]">Full name</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Riya Sen" className="h-9 text-[13px] rounded-sm" />
           </div>
 
           <div className="space-y-1.5">
-            <Label>Registered Email <span className="text-muted-foreground">(read-only)</span></Label>
-            <Input value={profile?.email || ""} disabled className="glass opacity-60 cursor-not-allowed" />
+            <Label className="text-[12px]">Registered Email <span className="text-muted-foreground">(read-only)</span></Label>
+            <Input value={profile?.email || ""} disabled className="h-9 text-[13px] rounded-sm opacity-60 cursor-not-allowed bg-muted/40" />
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Instagram handle</Label>
+              <Label className="text-[12px]">Instagram handle</Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">@</span>
-                <Input value={instagramHandle} onChange={(e) => setInstagramHandle(e.target.value)} placeholder="username" className="glass pl-7" />
+                <Input value={instagramHandle} onChange={(e) => setInstagramHandle(e.target.value)} placeholder="username" className="h-9 text-[13px] rounded-sm pl-7" />
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label>Follower count</Label>
-              <Input type="number" min={0} value={followerCount} onChange={(e) => setFollowerCount(e.target.value === "" ? "" : Number(e.target.value))} placeholder="12500" className="glass" />
+              <Label className="text-[12px]">Follower count</Label>
+              <Input type="number" min={0} value={followerCount} onChange={(e) => setFollowerCount(e.target.value === "" ? "" : Number(e.target.value))} placeholder="12500" className="h-9 text-[13px] rounded-sm" />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label>Primary Niche</Label>
+            <Label className="text-[12px]">Primary Niche</Label>
             <Select value={niche} onValueChange={setNiche}>
-              <SelectTrigger className="glass"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-9 text-[13px] rounded-sm bg-background border-border"><SelectValue /></SelectTrigger>
               <SelectContent>{NICHES.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}</SelectContent>
             </Select>
           </div>
 
           <div className="space-y-1.5">
-            <Label>Bio <span className="text-muted-foreground">(min 3 words)</span></Label>
-            <Textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Tell brands about your audience engagement and content style..." className="glass min-h-[110px]" />
+            <Label className="text-[12px]">Bio <span className="text-muted-foreground">(min 3 words)</span></Label>
+            <Textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Tell brands about your audience engagement and content style..." className="text-[13px] rounded-sm min-h-[110px]" />
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>{countWords(bio)}/3 words</span>
             </div>
           </div>
 
           <div className="flex justify-end pt-2">
-            <Button disabled={!valid || update.isPending || uploading} onClick={() => update.mutate()} className="bg-gradient-brand text-primary-foreground border-0">
+            <Button disabled={!valid || update.isPending || uploading} onClick={() => update.mutate()} className="h-9 text-[13px] rounded-sm bg-gradient-brand text-primary-foreground border-0 shadow-md hover:opacity-95">
               {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save changes"}
             </Button>
           </div>
-        </motion.div>
+        </div>
+
       </main>
     </div>
   );

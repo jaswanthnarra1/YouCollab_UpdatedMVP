@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LayoutGrid, Compass, FileText, User, Settings, LogOut } from "lucide-react";
+import { LayoutGrid, Compass, FileText, User, Settings, LogOut, PlusSquare, MessageSquare, Briefcase, Users } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { Logo } from "@/components/ui/logo";
 import { authService } from "@/services/auth";
@@ -25,43 +25,83 @@ export function Sidebar() {
   const isBrand = user.role === "BRAND";
 
   // Menu items based on role
-  const menuItems = [
-    {
-      label: "Dashboard",
-      icon: LayoutGrid,
-      path: isBrand ? "/dashboard/brand" : "/dashboard/influencer",
-      active: location.pathname === (isBrand ? "/dashboard/brand" : "/dashboard/influencer") && !location.search.includes("tab=pitches"),
-    },
-    {
-      label: "Browse Gigs",
-      icon: Compass,
-      path: "/marketplace",
-      active: location.pathname === "/marketplace" || location.pathname.startsWith("/gigs/"),
-    },
-    ...(isBrand 
-      ? [] 
-      : [
-          {
-            label: "My Applications",
-            icon: FileText,
-            path: "/dashboard/influencer?tab=pitches",
-            active: location.search.includes("tab=pitches"),
-          }
-        ]
-    ),
-    {
-      label: "Profile",
-      icon: User,
-      path: isBrand ? "/profile/brand" : "/profile/creator",
-      active: location.pathname === (isBrand ? "/profile/brand" : "/profile/creator"),
-    },
-    {
-      label: "Settings",
-      icon: Settings,
-      path: "/settings",
-      active: location.pathname === "/settings",
-    }
-  ];
+  const menuItems = isBrand
+    ? [
+        {
+          label: "Dashboard",
+          icon: LayoutGrid,
+          path: "/dashboard/brand",
+          active: location.pathname === "/dashboard/brand" && (!location.search.includes("tab=") || location.search.includes("tab=dashboard")),
+        },
+        {
+          label: "Post Gig",
+          icon: PlusSquare,
+          path: "/gigs/new",
+          active: location.pathname === "/gigs/new",
+        },
+        {
+          label: "My Gigs",
+          icon: Briefcase,
+          path: "/dashboard/brand?tab=gigs",
+          active: location.pathname === "/dashboard/brand" && location.search.includes("tab=gigs"),
+        },
+        {
+          label: "Applications",
+          icon: Users,
+          path: "/dashboard/brand?tab=applications",
+          active: location.pathname === "/dashboard/brand" && location.search.includes("tab=applications"),
+        },
+        {
+          label: "Messages",
+          icon: MessageSquare,
+          path: "/dashboard/brand?tab=messages",
+          active: location.pathname === "/dashboard/brand" && location.search.includes("tab=messages"),
+        },
+        {
+          label: "Profile",
+          icon: User,
+          path: "/profile/brand",
+          active: location.pathname === "/profile/brand",
+        },
+        {
+          label: "Settings",
+          icon: Settings,
+          path: "/settings",
+          active: location.pathname === "/settings",
+        },
+      ]
+    : [
+        {
+          label: "Dashboard",
+          icon: LayoutGrid,
+          path: "/dashboard/influencer",
+          active: location.pathname === "/dashboard/influencer" && !location.search.includes("tab=pitches"),
+        },
+        {
+          label: "Browse Gigs",
+          icon: Compass,
+          path: "/marketplace",
+          active: location.pathname === "/marketplace" || location.pathname.startsWith("/gigs/"),
+        },
+        {
+          label: "My Applications",
+          icon: FileText,
+          path: "/dashboard/influencer?tab=pitches",
+          active: location.search.includes("tab=pitches"),
+        },
+        {
+          label: "Profile",
+          icon: User,
+          path: "/profile/creator",
+          active: location.pathname === "/profile/creator",
+        },
+        {
+          label: "Settings",
+          icon: Settings,
+          path: "/settings",
+          active: location.pathname === "/settings",
+        },
+      ];
 
   // Get user initials
   const getInitials = (name: string = "") => {

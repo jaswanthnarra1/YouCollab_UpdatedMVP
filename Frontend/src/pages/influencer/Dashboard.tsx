@@ -14,7 +14,7 @@ import { applicationsService } from "@/services/applications";
 import { instagramService } from "@/services/instagram";
 import { CATEGORIES } from "@/lib/constants";
 import { useAuthStore } from "@/stores/authStore";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 function StatCard({ label, value, Icon }: { label: string; value: string; Icon: typeof TrendingUp }) {
   return (
@@ -210,9 +210,21 @@ export default function InfluencerDashboard() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const [active, setActive] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
   const [openGig, setOpenGig] = useState<Gig | null>(null);
-  const [tab, setTab] = useState<"gigs" | "pitches">("gigs");
+  const [query, setQuery] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = (searchParams.get("tab") as "gigs" | "pitches") === "pitches" ? "pitches" : "gigs";
+  const setTab = (t: "gigs" | "pitches") => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (t === "pitches") {
+        next.set("tab", "pitches");
+      } else {
+        next.delete("tab");
+      }
+      return next;
+    });
+  };
 
   const { data: gigs = [] } = useQuery({ queryKey: ["gigs"], queryFn: gigsService.list });
   const { data: myApps = [] } = useQuery({ queryKey: ["myApplications"], queryFn: applicationsService.mine, retry: false });
@@ -338,7 +350,7 @@ export default function InfluencerDashboard() {
                             <span className={`px-1.5 py-0.5 rounded-sm text-[9px] font-bold ${
                               a.status === "ACCEPTED"
                                 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/25"
-                                : a.status === "REJECTED"
+                                : a.status === "REJECTED" || a.status === "CANCELLED"
                                 ? "bg-red-500/10 text-red-400 border border-red-500/25"
                                 : "bg-amber-500/10 text-amber-400 border border-amber-500/25"
                             }`}>

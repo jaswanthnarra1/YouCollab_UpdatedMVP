@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { Loader2, Sparkles, ArrowLeft, Pencil } from "lucide-react";
+import { Loader2, ArrowLeft, Pencil } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,25 +99,28 @@ export default function BrandProfile() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      <div className="absolute inset-0 neon-grid pointer-events-none" />
-      <main className="relative mx-auto max-w-2xl px-4 pt-8 pb-20">
-        <div className="mb-4">
-          <Button onClick={() => navigate("/dashboard/brand")} variant="ghost" size="sm" className="-ml-2 text-muted-foreground hover:text-foreground">
+    <div className="min-h-screen bg-background text-foreground">
+      <main className="mx-auto max-w-2xl px-6 py-10 space-y-6">
+        
+        {/* Back Link */}
+        <div>
+          <Button onClick={() => navigate("/dashboard/brand")} variant="ghost" size="sm" className="-ml-2 text-muted-foreground hover:text-foreground h-8 text-[12px] rounded-sm">
             <ArrowLeft className="h-4 w-4 mr-1" /> Back to Dashboard
           </Button>
         </div>
 
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-          <div className="chip mb-3"><Sparkles className="h-3 w-3 text-primary" /> Profile settings</div>
-          <h1 className="text-3xl font-semibold font-sans">Brand profile</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage details about your business shown to creators.</p>
-        </motion.div>
+        {/* Header Section matching Dashboard layout */}
+        <div>
+          <span className="inline-block border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground rounded-sm mb-3">Profile settings</span>
+          <h1 className="text-3xl font-semibold tracking-tight">Brand profile</h1>
+          <p className="text-[13px] text-muted-foreground mt-1">Manage details about your business shown to creators.</p>
+        </div>
 
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-strong rounded-3xl p-6 space-y-5">
+        {/* Content Panel Box matching Dashboard card style */}
+        <div className="border border-border rounded-sm p-6 bg-background space-y-5">
           <div className="flex items-center gap-4">
             {/* Logo Container with Pen Upload Overlay */}
-            <div className="relative group h-16 w-16 rounded-2xl bg-gradient-brand shrink-0 flex items-center justify-center text-primary-foreground font-bold text-xl overflow-hidden border border-border">
+            <div className="relative group h-16 w-16 rounded-sm bg-gradient-brand shrink-0 flex items-center justify-center text-primary-foreground font-bold text-xl overflow-hidden border border-border">
               {uploading ? (
                 <Loader2 className="h-5 w-5 animate-spin text-white" />
               ) : logoUrl ? (
@@ -145,48 +147,49 @@ export default function BrandProfile() {
           </div>
 
           <div className="space-y-1.5">
-            <Label>Business name</Label>
-            <Input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Koregaon Coffee Co." className="glass" />
+            <Label className="text-[12px]">Business name</Label>
+            <Input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Koregaon Coffee Co." className="h-9 text-[13px] rounded-sm" />
           </div>
 
           <div className="space-y-1.5">
-            <Label>Registered Email <span className="text-muted-foreground">(read-only)</span></Label>
-            <Input value={profile?.email || ""} disabled className="glass opacity-60 cursor-not-allowed" />
+            <Label className="text-[12px]">Registered Email <span className="text-muted-foreground">(read-only)</span></Label>
+            <Input value={profile?.email || ""} disabled className="h-9 text-[13px] rounded-sm opacity-60 cursor-not-allowed bg-muted/40" />
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Category</Label>
+              <Label className="text-[12px]">Category</Label>
               <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger className="glass"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 text-[13px] rounded-sm bg-background border-border"><SelectValue /></SelectTrigger>
                 <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Location</Label>
-              <Input value={location} onChange={(e) => setLocation(e.target.value)} className="glass" />
+              <Label className="text-[12px]">Location</Label>
+              <Input value={location} onChange={(e) => setLocation(e.target.value)} className="h-9 text-[13px] rounded-sm" />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label>Bio <span className="text-muted-foreground">(min 3 words)</span></Label>
-            <Textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="What does your brand stand for?" className="glass min-h-[110px]" />
+            <Label className="text-[12px]">Bio <span className="text-muted-foreground">(min 3 words)</span></Label>
+            <Textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="What does your brand stand for?" className="text-[13px] rounded-sm min-h-[110px]" />
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>{countWords(bio)}/3 words</span>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label>Website (optional)</Label>
-            <Input type="url" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." className="glass" />
+            <Label className="text-[12px]">Website (optional)</Label>
+            <Input type="url" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." className="h-9 text-[13px] rounded-sm" />
           </div>
 
           <div className="flex justify-end pt-2">
-            <Button disabled={!valid || update.isPending || uploading} onClick={() => update.mutate()} className="bg-gradient-brand text-primary-foreground border-0">
+            <Button disabled={!valid || update.isPending || uploading} onClick={() => update.mutate()} className="h-9 text-[13px] rounded-sm bg-gradient-brand text-primary-foreground border-0 shadow-md hover:opacity-95">
               {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save changes"}
             </Button>
           </div>
-        </motion.div>
+        </div>
+
       </main>
     </div>
   );

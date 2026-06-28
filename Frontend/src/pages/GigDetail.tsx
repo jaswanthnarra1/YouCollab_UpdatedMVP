@@ -86,6 +86,8 @@ export default function GigDetail() {
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="glass-strong rounded-2xl p-6 space-y-4">
               <div className="flex flex-wrap gap-2">
                 <span className="chip text-foreground font-semibold">{gig.category}</span>
+                {gig.platform && <span className="chip text-foreground font-semibold bg-primary/10 border-primary/20">{gig.platform}</span>}
+                {gig.campaignType && <span className="chip text-foreground font-semibold bg-secondary/10 border-secondary/20">{gig.campaignType}</span>}
                 <span className="chip text-muted-foreground"><MapPin className="h-3.5 w-3.5 mr-1" />{gig.city}</span>
                 <span className="chip text-muted-foreground">
                   Status: <span className={`font-bold ml-1 ${gig.status === "OPEN" ? "text-emerald-400" : "text-zinc-400"}`}>{gig.status}</span>
@@ -126,6 +128,11 @@ export default function GigDetail() {
               <div className="pt-4 border-t border-border/30">
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2">Deliverables Expected</h3>
                 <p className="text-[14px] leading-relaxed text-muted-foreground whitespace-pre-wrap">{gig.deliverables}</p>
+              </div>
+
+              <div className="pt-4 border-t border-border/30">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2">Creator Requirements</h3>
+                <p className="text-[14px] leading-relaxed text-muted-foreground whitespace-pre-wrap">{gig.creatorRequirements || "No specific requirements outlined."}</p>
               </div>
             </motion.div>
 

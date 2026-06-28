@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search, MapPin, IndianRupee, Calendar, Sparkles } from "lucide-react";
+import { Search, MapPin, IndianRupee, Calendar } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,48 +47,56 @@ export default function Marketplace() {
   }, [gigs, activeCategory, activeLocation, searchQuery]);
 
   return (
-    <div className="relative min-h-screen overflow-hidden text-foreground">
-      <div className="absolute inset-0 neon-grid pointer-events-none" />
-      <main className="relative mx-auto max-w-[1200px] px-6 py-10 space-y-8">
+    <div className="min-h-screen bg-background text-foreground">
+      <main className="mx-auto max-w-[1200px] px-6 py-10 space-y-8">
+        
+        {/* Header Section matching Dashboard */}
         <div>
-          <div className="chip mb-3"><Sparkles className="h-3 w-3 text-primary" /> Collab Marketplace</div>
+          <span className="inline-block border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground rounded-sm mb-3">Collab Marketplace</span>
           <h1 className="text-3xl font-semibold tracking-tight">Browse briefs in Pune</h1>
-          <p className="text-sm text-muted-foreground mt-1">Connect directly with brands. Pitch in seconds.</p>
+          <p className="text-[13px] text-muted-foreground mt-1">Connect directly with Pune brands. Pitch in seconds.</p>
         </div>
 
-        {/* Filters Panel */}
-        <div className="glass-strong rounded-2xl p-5 space-y-4">
-          <div className="grid md:grid-cols-3 gap-3">
-            {/* Search Input */}
-            <div className="relative md:col-span-2">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input 
-                placeholder="Search gigs or brand names..." 
-                value={searchQuery} 
-                onChange={(e) => setSearchQuery(e.target.value)} 
-                className="h-9 text-[13px] pl-9 rounded-sm glass border-border/40" 
-              />
+        {/* Filter Toolbar matching Dashboard layout (no glass card wrappers) */}
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight">Browse gigs</h2>
+              <p className="text-[12px] text-muted-foreground">Filter by category, location, or search keywords.</p>
             </div>
+            
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Location selection dropdown */}
+              <div className="relative flex items-center gap-1.5 border border-border rounded-sm px-2.5 bg-background h-9">
+                <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <select
+                  value={activeLocation}
+                  onChange={(e) => setActiveLocation(e.target.value)}
+                  className="bg-transparent text-[12px] text-foreground focus:outline-none cursor-pointer pr-1"
+                >
+                  {PUNE_LOCATIONS.map((loc) => (
+                    <option key={loc} value={loc} className="bg-background text-foreground">
+                      {loc}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            {/* Location selector */}
-            <div className="flex gap-2 items-center">
-              <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-              <select
-                value={activeLocation}
-                onChange={(e) => setActiveLocation(e.target.value)}
-                className="w-full h-9 rounded-sm glass text-[13px] border border-border/40 bg-background/50 px-2 py-1 focus:outline-none"
-              >
-                {PUNE_LOCATIONS.map((loc) => (
-                  <option key={loc} value={loc} className="bg-[#1A1A24] text-foreground">
-                    {loc}
-                  </option>
-                ))}
-              </select>
+              {/* Search input field */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input 
+                  placeholder="Search briefs or brands..." 
+                  value={searchQuery} 
+                  onChange={(e) => setSearchQuery(e.target.value)} 
+                  className="h-9 text-[13px] pl-9 w-64 rounded-sm" 
+                />
+              </div>
             </div>
           </div>
 
-          {/* Categories Horizontal Scroller */}
-          <div className="flex flex-wrap gap-1.5 pt-2 border-t border-border/30">
+          {/* Categories list matching Dashboard category buttons */}
+          <div className="flex flex-wrap gap-1.5">
             <button
               onClick={() => setActiveCategory(null)}
               className={`text-[11px] uppercase tracking-wider px-2.5 py-1 border rounded-sm transition-colors ${
@@ -111,19 +119,19 @@ export default function Marketplace() {
           </div>
         </div>
 
-        {/* Grid display */}
+        {/* Display briefs grid */}
         {isLoading ? (
-          <div className="glass rounded-xl p-20 text-center text-[13px] text-muted-foreground">
+          <div className="border border-border rounded-sm p-20 text-center text-[13px] text-muted-foreground">
             Loading marketplace briefs...
           </div>
         ) : filteredGigs.length === 0 ? (
-          <div className="glass rounded-xl p-20 text-center text-[13px] text-muted-foreground">
-            No active campaigns match your current filters. Try resetting search or locations.
+          <div className="border border-border rounded-sm p-20 text-center text-[13px] text-muted-foreground">
+            No active campaigns match your current filters. Try resetting search or location categories.
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredGigs.map((g) => (
-              <div key={g.id} className="border border-border rounded-sm p-5 bg-background flex flex-col justify-between hover:bg-muted/30 transition-colors">
+              <div key={g.id} className="border border-border rounded-sm p-5 bg-background flex flex-col justify-between hover:border-zinc-500/50 transition-colors">
                 <div>
                   <div className="flex items-center justify-between text-[11px] uppercase tracking-wider text-muted-foreground">
                     <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> {g.city || "Pune"}</span>
@@ -133,7 +141,7 @@ export default function Marketplace() {
                   <p className="mt-1 text-[12px] text-muted-foreground line-clamp-2">{g.deliverables}</p>
                   
                   {g.brand?.businessName && (
-                    <p className="mt-3 text-[11px] text-muted-foreground">
+                    <p className="mt-2 text-[11px] text-muted-foreground">
                       Brand: <span className="text-foreground font-medium">{g.brand.businessName}</span>
                     </p>
                   )}
@@ -152,7 +160,7 @@ export default function Marketplace() {
                 </div>
 
                 <div className="mt-5 flex gap-2">
-                  <Button asChild className="w-full h-8 text-[12px] rounded-sm bg-gradient-brand text-primary-foreground border-0">
+                  <Button asChild className="w-full h-8 text-[12px] rounded-sm bg-gradient-brand text-primary-foreground border-0 shadow-sm hover:opacity-95">
                     <Link to={`/gigs/${g.id}`}>View brief & details</Link>
                   </Button>
                 </div>

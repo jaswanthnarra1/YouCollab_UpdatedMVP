@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,22 +10,54 @@ import { authService } from "@/services/auth";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [sent, setSent] = useState(false);
+  const [step, setStep] = useState<1 | 2>(1);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
-  const submit = async (e: React.FormEvent) => {
+  const submitEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
       await authService.forgotPassword(email);
-      setSent(true);
+      toast({ title: "OTP Code Sent! ✉️", description: "If an account exists, a 6-digit password reset code has been sent." });
+      setStep(2);
     } catch (err) {
       const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
         || (err as { response?: { data?: { message?: string } } })?.response?.data?.message
         || (err as Error).message
-        || "Please try again.";
+        || "Request failed. Try again.";
       toast({ variant: "destructive", title: "Request failed", description: msg });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password !== confirmPassword) {
+      toast({ variant: "destructive", title: "Passwords mismatch", description: "Password and Confirm Password do not match." });
+      return;
+    }
+    if (otp.length !== 6) {
+      toast({ variant: "destructive", title: "Invalid code", description: "The verification code must be exactly 6 digits." });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await authService.resetPassword(email, otp, password);
+      toast({ title: "Password Reset Successful! ✨", description: "You can now sign in with your new password." });
+      navigate("/login");
+    } catch (err) {
+      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
+        || (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        || (err as Error).message
+        || "Password reset failed. Try again.";
+      toast({ variant: "destructive", title: "Reset failed", description: msg });
     } finally {
       setLoading(false);
     }
@@ -62,26 +94,12 @@ export default function ForgotPassword() {
               Reset your password
             </h1>
             <p className="text-[13px] text-muted-foreground">
-              Enter your email and we'll send a reset link.
+              {step === 1 ? "Enter your email and we'll send a 6-digit code." : `Enter the code sent to ${email} and your new password.`}
             </p>
           </div>
 
-          {sent ? (
-            <div className="flex flex-col items-center gap-3 py-4">
-              <div className="h-12 w-12 rounded-sm border border-border flex items-center justify-center">
-                <CheckCircle2 className="h-6 w-6 text-foreground" />
-              </div>
-              <p className="text-[13px] text-center text-muted-foreground">
-                If an account with <span className="text-foreground font-medium">{email}</span> exists, a reset link has been sent. Check your inbox.
-              </p>
-              <Button asChild variant="outline" className="h-9 text-[13px] rounded-sm mt-2">
-                <Link to="/login">
-                  <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Back to login
-                </Link>
-              </Button>
-            </div>
-          ) : (
-            <form className="space-y-3" onSubmit={submit}>
+          {step === 1 ? (
+            <form className="space-y-3" onSubmit={submitEmail}>
               <div className="space-y-1">
                 <Label htmlFor="email" className="text-[12px]">Email</Label>
                 <Input
@@ -100,9 +118,68 @@ export default function ForgotPassword() {
                 className="w-full h-9 text-[13px] rounded-sm gap-1.5"
               >
                 {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : (
-                  <>Send reset link <ArrowRight className="h-3.5 w-3.5" /></>
+                  <>Send reset code <ArrowRight className="h-3.5 w-3.5" /></>
                 )}
               </Button>
+            </form>
+          ) : (
+            <form className="space-y-3" onSubmit={submitReset}>
+              <div className="space-y-1">
+                <Label htmlFor="otp" className="text-[12px]">Verification Code (OTP)</Label>
+                <Input
+                  id="otp"
+                  type="text"
+                  required
+                  maxLength={6}
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="6-digit code"
+                  className="h-9 text-[13px] rounded-sm font-bold tracking-[0.2em] text-center"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="password" className="text-[12px]">New Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="h-9 text-[13px] rounded-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="confirmPassword" className="text-[12px]">Confirm New Password</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="h-9 text-[13px] rounded-sm"
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full h-9 text-[13px] rounded-sm gap-1.5 bg-gradient-brand text-primary-foreground border-0 shadow-md hover:opacity-95"
+              >
+                {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : (
+                  <>Reset Password <ArrowRight className="h-3.5 w-3.5" /></>
+                )}
+              </Button>
+              <div className="flex justify-between pt-1">
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Change email address
+                </button>
+              </div>
             </form>
           )}
 

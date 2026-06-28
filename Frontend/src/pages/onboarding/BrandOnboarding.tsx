@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
@@ -53,7 +53,7 @@ export default function BrandOnboarding() {
       <Navbar />
       <main className="relative mx-auto max-w-2xl px-4 pt-8 pb-20">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-          <div className="chip mb-3"><Sparkles className="h-3 w-3 text-primary" /> Brand setup</div>
+          <div className="chip mb-3">Brand setup</div>
           <h1 className="text-3xl font-semibold">Tell us about your brand</h1>
           <p className="text-sm text-muted-foreground mt-1">Creators will see this on every gig you post.</p>
         </motion.div>

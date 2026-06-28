@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Instagram, Loader2, Sparkles } from "lucide-react";
+import { Instagram, Loader2 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
@@ -62,7 +62,7 @@ export default function InfluencerOnboarding() {
       <Navbar />
       <main className="relative mx-auto max-w-2xl px-4 pt-8 pb-20">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-          <div className="chip mb-3"><Sparkles className="h-3 w-3 text-primary" /> Step 1 of 1</div>
+          <div className="chip mb-3">Step 1 of 1</div>
           <h1 className="text-3xl font-semibold">Set up your creator profile</h1>
           <p className="text-sm text-muted-foreground mt-1">A few details so Pune brands can find you.</p>
         </motion.div>

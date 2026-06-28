@@ -1,4 +1,4 @@
-const supabase = require('./supabase');
+const { supabase, supabaseAdmin } = require('./supabase');
 const AppError = require('../utils/AppError');
 const { parsePagination, paginateResults } = require('../utils/pagination');
 
@@ -6,15 +6,24 @@ const { parsePagination, paginateResults } = require('../utils/pagination');
  * Helper to retrieve brand associated with userId.
  */
 const getBrandByUserId = async (userId) => {
-  const { data: brand, error } = await supabase
+  console.log(`[getBrandByUserId] Finding brand profile for user ID: ${userId}`);
+  const { data: brand, error } = await supabaseAdmin
     .from('brands')
     .select('*')
     .eq('userId', userId)
     .maybeSingle();
 
-  if (error || !brand) {
+  if (error) {
+    console.error(`[getBrandByUserId] Supabase database error:`, error);
+    throw new AppError(`Database profile query failed: ${error.message}`, 500, 'DATABASE_ERROR');
+  }
+  
+  if (!brand) {
+    console.warn(`[getBrandByUserId] No brand profile found for user ID: ${userId}`);
     throw new AppError('Complete your brand onboarding to perform this action.', 400, 'ONBOARDING_REQUIRED');
   }
+  
+  console.log(`[getBrandByUserId] Resolved Brand ID: ${brand.id} for user: ${userId}`);
   return brand;
 };
 
@@ -22,29 +31,40 @@ const getBrandByUserId = async (userId) => {
  * Create a new Gig.
  */
 const createGig = async (userId, data) => {
+  console.log(`[Create Gig Debug] Start. User ID: ${userId}`);
+  
   const brand = await getBrandByUserId(userId);
+  console.log(`[Create Gig Debug] Found Brand ID: ${brand.id} for user ${userId}`);
 
-  const { data: newGig, error } = await supabase
+  const payload = {
+    brandId: brand.id,
+    title: data.title,
+    description: data.description,
+    budgetMin: data.budgetMin,
+    budgetMax: data.budgetMax,
+    deliverables: data.deliverables,
+    creatorRequirements: data.creatorRequirements,
+    platform: data.platform,
+    campaignType: data.campaignType,
+    deadline: data.deadline,
+    category: data.category,
+    city: data.city || 'Pune',
+    status: data.status || 'OPEN',
+  };
+  console.log(`[Create Gig Debug] Submitting payload to Supabase:`, JSON.stringify(payload));
+
+  const { data: newGig, error } = await supabaseAdmin
     .from('gigs')
-    .insert({
-      brandId: brand.id,
-      title: data.title,
-      description: data.description,
-      budgetMin: data.budgetMin,
-      budgetMax: data.budgetMax || null,
-      deliverables: data.deliverables,
-      deadline: data.deadline,
-      category: data.category,
-      city: 'Pune', // MVP constraint
-      status: 'OPEN',
-    })
+    .insert(payload)
     .select('*, brand:brands(*)')
     .single();
 
   if (error) {
-    throw new AppError('Failed to create collab.', 500, 'DATABASE_ERROR');
+    console.error(`[Create Gig Debug] Supabase error:`, error);
+    throw new AppError(`Failed to create gig: ${error.message}`, 500, 'DATABASE_ERROR');
   }
 
+  console.log(`[Create Gig Debug] Gig created successfully: ID = ${newGig.id}`);
   return newGig;
 };
 
@@ -52,27 +72,30 @@ const createGig = async (userId, data) => {
  * Get all open gigs with filters, search, and cursor-based pagination.
  */
 const getGigs = async (filters) => {
+  console.log(`[getGigs] Start. Filters:`, JSON.stringify(filters));
   const { cursor, limit } = parsePagination(filters, 12);
   const { search, category, sort } = filters;
 
-  let query = supabase
+  let query = supabaseAdmin
     .from('gigs')
     .select('*, brand:brands(id, businessName, category, logoUrl, user:users(lastActiveAt)), applications(count)', { count: 'exact' })
     .eq('status', 'OPEN')
     .eq('city', 'Pune');
 
   if (category) {
+    console.log(`[getGigs] Adding category filter: ${category}`);
     query = query.eq('category', category);
   }
 
   if (search) {
+    console.log(`[getGigs] Adding search filter: ${search}`);
     query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
   }
 
   // Handle ordering and cursor-based filtering
   if (sort === 'budget_high') {
     if (cursor) {
-      const { data: cursorItem } = await supabase
+      const { data: cursorItem } = await supabaseAdmin
         .from('gigs')
         .select('budgetMin, id')
         .eq('id', cursor)
@@ -84,7 +107,7 @@ const getGigs = async (filters) => {
     query = query.order('budgetMin', { ascending: false }).order('id', { ascending: false });
   } else if (sort === 'budget_low') {
     if (cursor) {
-      const { data: cursorItem } = await supabase
+      const { data: cursorItem } = await supabaseAdmin
         .from('gigs')
         .select('budgetMin, id')
         .eq('id', cursor)
@@ -97,7 +120,7 @@ const getGigs = async (filters) => {
   } else {
     // Default: Sort by createdAt desc
     if (cursor) {
-      const { data: cursorItem } = await supabase
+      const { data: cursorItem } = await supabaseAdmin
         .from('gigs')
         .select('createdAt, id')
         .eq('id', cursor)
@@ -113,8 +136,11 @@ const getGigs = async (filters) => {
   const { data: gigs, error, count: total } = await query.limit(limit + 1);
 
   if (error) {
-    throw new AppError('Failed to fetch collabs.', 500, 'DATABASE_ERROR');
+    console.error(`[getGigs] Supabase select error:`, error);
+    throw new AppError(`Failed to fetch collabs: ${error.message}`, 500, 'DATABASE_ERROR');
   }
+
+  console.log(`[getGigs] Success. Returned records count: ${gigs?.length ?? 0}, Total count: ${total}`);
 
   const formattedGigs = (gigs || []).map(gig => {
     const appCount = gig.applications && gig.applications[0] ? gig.applications[0].count : 0;
@@ -137,19 +163,27 @@ const getGigs = async (filters) => {
  * Fetch a single Gig by ID. Increments viewCount if visited by non-owner.
  */
 const getGigById = async (id, userId) => {
-  const { data: gig, error } = await supabase
+  console.log(`[getGigById] Fetching gig details for ID: ${id}, request user: ${userId}`);
+  const { data: gig, error } = await supabaseAdmin
     .from('gigs')
     .select('*, brand:brands(id, userId, businessName, category, location, bio, logoUrl, website, user:users(lastActiveAt)), applications(count)')
     .eq('id', id)
     .maybeSingle();
 
-  if (error || !gig) {
+  if (error) {
+    console.error(`[getGigById] Database error:`, error);
+    throw new AppError(`Failed to fetch gig details: ${error.message}`, 500, 'DATABASE_ERROR');
+  }
+  
+  if (!gig) {
+    console.warn(`[getGigById] No gig record found for ID: ${id}`);
     throw new AppError('This collab does not exist or has been deleted.', 404, 'NOT_FOUND');
   }
 
   // Increment viewCount if user is not the creator brand
   if (gig.brand.userId !== userId) {
-    await supabase.rpc('increment_view_count', { gig_id: id });
+    console.log(`[getGigById] Visitor is non-owner. Incrementing viewCount for gig: ${id}`);
+    await supabaseAdmin.rpc('increment_view_count', { gig_id: id });
     gig.viewCount += 1;
   }
 
@@ -157,14 +191,14 @@ const getGigById = async (id, userId) => {
   let hasApplied = false;
   let application = null;
 
-  const { data: influencer } = await supabase
+  const { data: influencer } = await supabaseAdmin
     .from('influencers')
     .select('id')
     .eq('userId', userId)
     .maybeSingle();
 
   if (influencer) {
-    const { data: appData } = await supabase
+    const { data: appData } = await supabaseAdmin
       .from('applications')
       .select('*')
       .eq('gigId', id)
@@ -180,6 +214,7 @@ const getGigById = async (id, userId) => {
   const appCount = gig.applications && gig.applications[0] ? gig.applications[0].count : 0;
   const { applications, ...rest } = gig;
 
+  console.log(`[getGigById] Success. isOwner = ${gig.brand.userId === userId}, hasApplied = ${hasApplied}`);
   return {
     ...rest,
     _count: {
@@ -194,9 +229,10 @@ const getGigById = async (id, userId) => {
  * Update an existing Gig.
  */
 const updateGig = async (id, userId, data) => {
+  console.log(`[updateGig] Start. ID: ${id}, User: ${userId}`);
   const brand = await getBrandByUserId(userId);
 
-  const { data: gig, error: findError } = await supabase
+  const { data: gig, error: findError } = await supabaseAdmin
     .from('gigs')
     .select('*')
     .eq('id', id)
@@ -216,11 +252,16 @@ const updateGig = async (id, userId, data) => {
   if (data.budgetMin !== undefined) updateData.budgetMin = data.budgetMin;
   if (data.budgetMax !== undefined) updateData.budgetMax = data.budgetMax;
   if (data.deliverables !== undefined) updateData.deliverables = data.deliverables;
+  if (data.creatorRequirements !== undefined) updateData.creatorRequirements = data.creatorRequirements;
+  if (data.platform !== undefined) updateData.platform = data.platform;
+  if (data.campaignType !== undefined) updateData.campaignType = data.campaignType;
   if (data.deadline !== undefined) updateData.deadline = data.deadline;
   if (data.category !== undefined) updateData.category = data.category;
   if (data.status !== undefined) updateData.status = data.status;
 
-  const { data: updatedGig, error: updateError } = await supabase
+  console.log(`[updateGig] Submitting updates:`, JSON.stringify(updateData));
+
+  const { data: updatedGig, error: updateError } = await supabaseAdmin
     .from('gigs')
     .update(updateData)
     .eq('id', id)
@@ -228,9 +269,11 @@ const updateGig = async (id, userId, data) => {
     .single();
 
   if (updateError) {
-    throw new AppError('Failed to update collab.', 500, 'DATABASE_ERROR');
+    console.error(`[updateGig] Supabase error:`, updateError);
+    throw new AppError(`Failed to update collab: ${updateError.message}`, 500, 'DATABASE_ERROR');
   }
 
+  console.log(`[updateGig] Success. Updated Gig ID: ${updatedGig.id}`);
   return updatedGig;
 };
 
@@ -238,9 +281,10 @@ const updateGig = async (id, userId, data) => {
  * Soft-close a Gig (sets status to CLOSED).
  */
 const closeGig = async (id, userId) => {
+  console.log(`[closeGig] Start. ID: ${id}, User: ${userId}`);
   const brand = await getBrandByUserId(userId);
 
-  const { data: gig, error: findError } = await supabase
+  const { data: gig, error: findError } = await supabaseAdmin
     .from('gigs')
     .select('*')
     .eq('id', id)
@@ -254,7 +298,7 @@ const closeGig = async (id, userId) => {
     throw new AppError("You don't have permission to close this collab.", 403, 'FORBIDDEN');
   }
 
-  const { data: updatedGig, error: updateError } = await supabase
+  const { data: updatedGig, error: updateError } = await supabaseAdmin
     .from('gigs')
     .update({ status: 'CLOSED' })
     .eq('id', id)
@@ -262,9 +306,11 @@ const closeGig = async (id, userId) => {
     .single();
 
   if (updateError) {
-    throw new AppError('Failed to close collab.', 500, 'DATABASE_ERROR');
+    console.error(`[closeGig] Supabase error:`, updateError);
+    throw new AppError(`Failed to close collab: ${updateError.message}`, 500, 'DATABASE_ERROR');
   }
 
+  console.log(`[closeGig] Success. Gig closed: ${updatedGig.id}`);
   return updatedGig;
 };
 
@@ -272,17 +318,22 @@ const closeGig = async (id, userId) => {
  * Get brand's own posted gigs.
  */
 const getMyGigs = async (userId) => {
+  console.log(`[getMyGigs] Start. User: ${userId}`);
   const brand = await getBrandByUserId(userId);
+  console.log(`[getMyGigs] Brand profile ID: ${brand.id}`);
 
-  const { data: gigs, error } = await supabase
+  const { data: gigs, error } = await supabaseAdmin
     .from('gigs')
     .select('*, applications(count)')
     .eq('brandId', brand.id)
     .order('createdAt', { ascending: false });
 
   if (error) {
-    throw new AppError('Failed to fetch your collabs.', 500, 'DATABASE_ERROR');
+    console.error(`[getMyGigs] Supabase query error:`, error);
+    throw new AppError(`Failed to fetch your collabs: ${error.message}`, 500, 'DATABASE_ERROR');
   }
+
+  console.log(`[getMyGigs] Success. Gigs count in DB: ${gigs?.length ?? 0}`);
 
   return (gigs || []).map(gig => {
     const appCount = gig.applications && gig.applications[0] ? gig.applications[0].count : 0;
@@ -300,9 +351,10 @@ const getMyGigs = async (userId) => {
  * Hard delete a Gig (permanently removes it and cascades applications).
  */
 const deleteGig = async (id, userId) => {
+  console.log(`[deleteGig] Start. ID: ${id}, User: ${userId}`);
   const brand = await getBrandByUserId(userId);
 
-  const { data: gig, error: findError } = await supabase
+  const { data: gig, error: findError } = await supabaseAdmin
     .from('gigs')
     .select('*')
     .eq('id', id)
@@ -317,13 +369,15 @@ const deleteGig = async (id, userId) => {
   }
 
   // Delete applications first (cascade), then the gig
-  await supabase.from('applications').delete().eq('gigId', id);
-  const { error: deleteError } = await supabase.from('gigs').delete().eq('id', id);
+  await supabaseAdmin.from('applications').delete().eq('gigId', id);
+  const { error: deleteError } = await supabaseAdmin.from('gigs').delete().eq('id', id);
 
   if (deleteError) {
-    throw new AppError('Failed to delete collab.', 500, 'DATABASE_ERROR');
+    console.error(`[deleteGig] Database delete error:`, deleteError);
+    throw new AppError(`Failed to delete collab: ${deleteError.message}`, 500, 'DATABASE_ERROR');
   }
 
+  console.log(`[deleteGig] Success. Gig deleted: ${id}`);
   return { message: 'Collab permanently deleted.' };
 };
 
@@ -331,9 +385,10 @@ const deleteGig = async (id, userId) => {
  * Toggle gig status between OPEN and CLOSED.
  */
 const toggleGigStatus = async (id, userId) => {
+  console.log(`[toggleGigStatus] Start. ID: ${id}, User: ${userId}`);
   const brand = await getBrandByUserId(userId);
 
-  const { data: gig, error: findError } = await supabase
+  const { data: gig, error: findError } = await supabaseAdmin
     .from('gigs')
     .select('*')
     .eq('id', id)
@@ -348,8 +403,9 @@ const toggleGigStatus = async (id, userId) => {
   }
 
   const newStatus = gig.status === 'OPEN' ? 'CLOSED' : 'OPEN';
+  console.log(`[toggleGigStatus] Changing status from ${gig.status} to ${newStatus}`);
 
-  const { data: updatedGig, error: updateError } = await supabase
+  const { data: updatedGig, error: updateError } = await supabaseAdmin
     .from('gigs')
     .update({ status: newStatus })
     .eq('id', id)
@@ -357,9 +413,11 @@ const toggleGigStatus = async (id, userId) => {
     .single();
 
   if (updateError) {
-    throw new AppError('Failed to toggle collab status.', 500, 'DATABASE_ERROR');
+    console.error(`[toggleGigStatus] Update error:`, updateError);
+    throw new AppError(`Failed to toggle collab status: ${updateError.message}`, 500, 'DATABASE_ERROR');
   }
 
+  console.log(`[toggleGigStatus] Success. New status is ${updatedGig.status}`);
   return updatedGig;
 };
 

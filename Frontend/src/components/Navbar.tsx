@@ -38,9 +38,11 @@ export function Navbar() {
               <Link to={dashboardHref} className="text-[13px] text-foreground/70 hover:text-foreground transition-colors h-8 px-3 flex items-center">
                 Dashboard
               </Link>
-              <Link to="/marketplace" className="text-[13px] text-foreground/70 hover:text-foreground transition-colors h-8 px-3 flex items-center">
-                Marketplace
-              </Link>
+              {user.role !== "BRAND" && (
+                <Link to="/marketplace" className="text-[13px] text-foreground/70 hover:text-foreground transition-colors h-8 px-3 flex items-center">
+                  Marketplace
+                </Link>
+              )}
               <Link to={user.role === "BRAND" ? "/profile/brand" : "/profile/creator"} className="text-[13px] text-foreground/70 hover:text-foreground transition-colors h-8 px-3 flex items-center">
                 Profile
               </Link>

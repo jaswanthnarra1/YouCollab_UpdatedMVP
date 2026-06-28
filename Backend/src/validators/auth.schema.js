@@ -31,9 +31,19 @@ const resendOtpSchema = z.object({
     .email('Please enter a valid email address'),
 });
 
+const resetPasswordSchema = z.object({
+  email: z.string({ required_error: 'Email is required' })
+    .email('Please enter a valid email address'),
+  otp: z.string({ required_error: 'OTP is required' })
+    .length(6, 'OTP must be exactly 6 digits'),
+  password: z.string({ required_error: 'Password is required' })
+    .min(6, 'Password must be at least 6 characters long'),
+});
+
 module.exports = {
   registerSchema,
   loginSchema,
   verifyOtpSchema,
   resendOtpSchema,
+  resetPasswordSchema,
 };

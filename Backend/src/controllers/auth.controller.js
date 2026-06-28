@@ -156,6 +156,22 @@ const resendOtp = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Reset password controller.
+ */
+const resetPassword = asyncHandler(async (req, res) => {
+  const { email, otp, password } = req.body;
+
+  const result = await authService.resetPassword(email, otp, password);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      message: result.message,
+    },
+  });
+});
+
 module.exports = {
   register,
   login,
@@ -165,4 +181,5 @@ module.exports = {
   forgotPassword,
   verifyOtp,
   resendOtp,
+  resetPassword,
 };
