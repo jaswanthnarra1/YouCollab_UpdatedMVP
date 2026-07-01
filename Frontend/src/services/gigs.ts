@@ -1,30 +1,5 @@
 import { apiClient, unwrap } from "@/lib/api";
-
-export interface Gig {
-  id: string;
-  title: string;
-  description: string;
-  deliverables: string;
-  budgetMin: number;
-  budgetMax: number;
-  deadline: string;
-  category: string;
-  city: string;
-  brand?: { businessName?: string; logoUrl?: string };
-  createdAt?: string;
-  status?: string;
-}
-
-export interface CreateGigPayload {
-  title: string;
-  description: string;
-  deliverables: string;
-  budgetMin: number;
-  budgetMax: number;
-  deadline: string;
-  category: string;
-  city: string;
-}
+import type { Gig, CreateGigPayload } from "@/types";
 
 export const gigsService = {
   list: async (): Promise<Gig[]> => {

@@ -1,23 +1,5 @@
 import { apiClient, unwrap } from "@/lib/api";
-import type { AuthUser } from "@/stores/authStore";
-
-export interface BrandProfilePayload {
-  businessName?: string;
-  category?: string;
-  location?: string;
-  bio?: string;
-  website?: string;
-  logoUrl?: string;
-}
-
-export interface CreatorProfilePayload {
-  name?: string;
-  instagramHandle?: string;
-  niche?: string;
-  bio?: string;
-  profileImageUrl?: string;
-  followerCount?: number;
-}
+import type { AuthUser, BrandProfilePayload, CreatorProfilePayload } from "@/types";
 
 export const profileService = {
   getProfile: async (): Promise<AuthUser> => {

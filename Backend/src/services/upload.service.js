@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const config = require('../config');
 const logger = require('../utils/logger');
-const supabaseStorage = require('../../supabase/storage');
+const supabaseStorage = require('./storage');
 
 /**
  * Upload Service

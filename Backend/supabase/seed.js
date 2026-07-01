@@ -1,19 +1,18 @@
 /**
- * YouCollab — Database Seeder
- * =============================
- * Seeds the database with sample data for development.
+ * YouCollab — Database Seeder with Supabase Auth Integration
+ * =========================================================
+ * Seeds both Supabase Auth and the local/public PostgreSQL tables
+ * with Pune-based brands, influencers, gigs, and messages.
  *
  * Usage:
  *   node Backend/supabase/seed.js
- *
- * Environment:
- *   DATABASE_URL must be set in Backend/.env
  */
 
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 
 const { Client } = require('pg');
 const bcrypt = require('bcryptjs');
+const { supabaseAdmin } = require('./client');
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -32,47 +31,97 @@ async function run() {
     await client.connect();
     console.log('✅ Connected to Supabase PostgreSQL database.');
 
-    // 1. Clean existing records (cascades automatically due to ON DELETE CASCADE)
+    // ─── 1. Clean existing records in Supabase Auth ──────────────────
+    console.log('\n🧹 Cleaning existing Supabase Auth users...');
+    const emailsToSeed = [
+      'cafe@youcollab.in',
+      'urbanfit@youcollab.in',
+      'priya@youcollab.in',
+      'arjun@youcollab.in',
+      'sneha@youcollab.in'
+    ];
+
+    try {
+      const { data: listData, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+        perPage: 100
+      });
+      if (listError) throw listError;
+
+      for (const u of (listData?.users || [])) {
+        if (emailsToSeed.includes(u.email)) {
+          console.log(`   Removing Auth User: ${u.email}`);
+          await supabaseAdmin.auth.admin.deleteUser(u.id);
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️  Could not clean Supabase Auth users (skipping):', e.message);
+    }
+
+    // ─── 2. Clean database tables ────────────────────────────────────
     console.log('\n🧹 Cleaning existing database records...');
     await client.query('DELETE FROM messages');
     await client.query('DELETE FROM reviews');
+    await client.query('DELETE FROM notifications');
+    await client.query('DELETE FROM applications');
+    await client.query('DELETE FROM gigs');
+    await client.query('DELETE FROM brands');
+    await client.query('DELETE FROM influencers');
     await client.query('DELETE FROM users');
 
     // Hash password "password123"
     const passwordHash = await bcrypt.hash('password123', 12);
 
-    // ─── 2. Insert Brand Users ──────────────────────────────────────────
-    console.log('👔 Inserting brand users...');
+    // Auth user creation helper
+    const createAuthUser = async (email, password, name, role) => {
+      console.log(`   Creating Auth User: ${email}`);
+      const { data, error } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { name, role }
+      });
+      if (error) {
+        throw new Error(`Failed to create Auth user ${email}: ${error.message}`);
+      }
+      return data.user;
+    };
 
+    // ─── 3. Insert Brand Users ───────────────────────────────────────
+    console.log('\n👔 Seeding brand users in Auth & DB...');
+
+    const brandUser1Auth = await createAuthUser('cafe@youcollab.in', 'password123', 'German Bakery', 'BRAND');
     const brandUser1Res = await client.query(
-      `INSERT INTO users (email, "passwordHash", role, "isOnboarded", "avatarUrl") 
-       VALUES ($1, $2, $3, $4, $5) 
+      `INSERT INTO users (email, "passwordHash", role, "isOnboarded", "avatarUrl", "authId") 
+       VALUES ($1, $2, $3, $4, $5, $6) 
        RETURNING id`,
       [
         'cafe@youcollab.in',
         passwordHash,
         'BRAND',
         true,
-        'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=150'
+        'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=150',
+        brandUser1Auth.id
       ]
     );
     const brandUser1Id = brandUser1Res.rows[0].id;
 
+    const brandUser2Auth = await createAuthUser('urbanfit@youcollab.in', 'password123', 'UrbanFit Studio', 'BRAND');
     const brandUser2Res = await client.query(
-      `INSERT INTO users (email, "passwordHash", role, "isOnboarded", "avatarUrl") 
-       VALUES ($1, $2, $3, $4, $5) 
+      `INSERT INTO users (email, "passwordHash", role, "isOnboarded", "avatarUrl", "authId") 
+       VALUES ($1, $2, $3, $4, $5, $6) 
        RETURNING id`,
       [
         'urbanfit@youcollab.in',
         passwordHash,
         'BRAND',
         true,
-        'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=150'
+        'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=150',
+        brandUser2Auth.id
       ]
     );
     const brandUser2Id = brandUser2Res.rows[0].id;
 
-    // ─── 3. Insert Brand Profiles ───────────────────────────────────────
+    // ─── 4. Insert Brand Profiles ────────────────────────────────────
     console.log('🏢 Inserting brand profiles...');
 
     const brand1Res = await client.query(
@@ -107,52 +156,58 @@ async function run() {
     );
     const brand2Id = brand2Res.rows[0].id;
 
-    // ─── 4. Insert Influencer Users ─────────────────────────────────────
-    console.log('🌟 Inserting influencer users...');
+    // ─── 5. Insert Influencer Users ──────────────────────────────────
+    console.log('\n🌟 Seeding influencer users in Auth & DB...');
 
+    const influencer1Auth = await createAuthUser('priya@youcollab.in', 'password123', 'Priya Sharma', 'INFLUENCER');
     const influencer1UserRes = await client.query(
-      `INSERT INTO users (email, "passwordHash", role, "isOnboarded", "avatarUrl") 
-       VALUES ($1, $2, $3, $4, $5) 
+      `INSERT INTO users (email, "passwordHash", role, "isOnboarded", "avatarUrl", "authId") 
+       VALUES ($1, $2, $3, $4, $5, $6) 
        RETURNING id`,
       [
         'priya@youcollab.in',
         passwordHash,
         'INFLUENCER',
         true,
-        'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150'
+        'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+        influencer1Auth.id
       ]
     );
     const influencer1UserId = influencer1UserRes.rows[0].id;
 
+    const influencer2Auth = await createAuthUser('arjun@youcollab.in', 'password123', 'Arjun Mehta', 'INFLUENCER');
     const influencer2UserRes = await client.query(
-      `INSERT INTO users (email, "passwordHash", role, "isOnboarded", "avatarUrl") 
-       VALUES ($1, $2, $3, $4, $5) 
+      `INSERT INTO users (email, "passwordHash", role, "isOnboarded", "avatarUrl", "authId") 
+       VALUES ($1, $2, $3, $4, $5, $6) 
        RETURNING id`,
       [
         'arjun@youcollab.in',
         passwordHash,
         'INFLUENCER',
         true,
-        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150'
+        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+        influencer2Auth.id
       ]
     );
     const influencer2UserId = influencer2UserRes.rows[0].id;
 
+    const influencer3Auth = await createAuthUser('sneha@youcollab.in', 'password123', 'Sneha Kulkarni', 'INFLUENCER');
     const influencer3UserRes = await client.query(
-      `INSERT INTO users (email, "passwordHash", role, "isOnboarded", "avatarUrl") 
-       VALUES ($1, $2, $3, $4, $5) 
+      `INSERT INTO users (email, "passwordHash", role, "isOnboarded", "avatarUrl", "authId") 
+       VALUES ($1, $2, $3, $4, $5, $6) 
        RETURNING id`,
       [
         'sneha@youcollab.in',
         passwordHash,
         'INFLUENCER',
         true,
-        'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150'
+        'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150',
+        influencer3Auth.id
       ]
     );
     const influencer3UserId = influencer3UserRes.rows[0].id;
 
-    // ─── 5. Insert Influencer Profiles ──────────────────────────────────
+    // ─── 6. Insert Influencer Profiles ───────────────────────────────
     console.log('📸 Inserting influencer profiles...');
 
     const influencer1Res = await client.query(
@@ -203,8 +258,8 @@ async function run() {
     );
     const influencer3Id = influencer3Res.rows[0].id;
 
-    // ─── 6. Insert Gigs ─────────────────────────────────────────────────
-    console.log('🎯 Inserting gigs...');
+    // ─── 7. Insert Gigs ──────────────────────────────────────────────
+    console.log('\n🎯 Inserting gigs...');
 
     const gig1Res = await client.query(
       `INSERT INTO gigs ("brandId", title, description, "budgetMin", "budgetMax", deliverables, deadline, category, city, status) 
@@ -254,7 +309,7 @@ async function run() {
     );
     const gig3Id = gig3Res.rows[0].id;
 
-    // ─── 7. Insert Applications ─────────────────────────────────────────
+    // ─── 8. Insert Applications ──────────────────────────────────────
     console.log('📝 Inserting applications...');
 
     const app1Res = await client.query(
@@ -291,7 +346,7 @@ async function run() {
       ]
     );
 
-    // ─── 8. Insert Notifications ────────────────────────────────────────
+    // ─── 9. Insert Notifications ─────────────────────────────────────
     console.log('🔔 Inserting notifications...');
 
     await client.query(
@@ -320,7 +375,7 @@ async function run() {
       ]
     );
 
-    // ─── 9. Insert Messages ─────────────────────────────────────────────
+    // ─── 10. Insert Messages ─────────────────────────────────────────
     console.log('💬 Inserting sample messages...');
 
     await client.query(
@@ -343,7 +398,7 @@ async function run() {
       ]
     );
 
-    // ─── 10. Insert Reviews ─────────────────────────────────────────────
+    // ─── 11. Insert Reviews ──────────────────────────────────────────
     console.log('⭐ Inserting sample reviews...');
 
     await client.query(
@@ -351,7 +406,7 @@ async function run() {
        VALUES ($1, $2, $3, $4, $5)`,
       [
         app2Id, brandUser2Id, influencer2UserId,
-        5, 'Arjun delivered amazing content! His fitness reels had incredible engagement. Highly recommend!'
+        5, 'Arjun delivered amazing content! His fitness reels had engagement. Highly recommend!'
       ]
     );
 

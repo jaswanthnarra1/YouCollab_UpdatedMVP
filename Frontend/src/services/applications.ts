@@ -1,30 +1,5 @@
 import { apiClient, unwrap } from "@/lib/api";
-
-export type AppStatus = "PENDING" | "ACCEPTED" | "REJECTED";
-
-export interface Application {
-  id: string;
-  gigId: string;
-  coverNote: string;
-  status: AppStatus;
-  createdAt?: string;
-  gig?: { id: string; title: string; category?: string };
-  influencer?: {
-    id: string;
-    name?: string;
-    niche?: string;
-    bio?: string;
-    profileImageUrl?: string;
-    instagram?: {
-      isConnected: boolean;
-      username?: string;
-      followersCount?: number;
-      mediaCount?: number;
-      averageLikes?: number;
-      engagementRate?: number;
-    };
-  };
-}
+import type { AppStatus, Application } from "@/types";
 
 export const applicationsService = {
   apply: async (gigId: string, coverNote: string) => {

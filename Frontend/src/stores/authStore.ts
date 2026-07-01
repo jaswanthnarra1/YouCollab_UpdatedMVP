@@ -1,16 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-
-export type Role = "BRAND" | "INFLUENCER";
-
-export interface AuthUser {
-  id: string;
-  email: string;
-  role: Role;
-  isOnboarded: boolean;
-  name?: string;
-  profile?: Record<string, unknown>;
-}
+import type { Role, AuthUser } from "@/types";
 
 interface AuthState {
   user: AuthUser | null;

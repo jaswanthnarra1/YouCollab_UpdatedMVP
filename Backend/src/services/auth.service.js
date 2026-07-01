@@ -119,10 +119,19 @@ const register = async (name, email, password, role) => {
     await emailService.sendMail(email, 'Your Verification Code', htmlContent);
   } catch (mailError) {
     console.warn(`[OTP Send Fallback] Failed to deliver email via Resend: ${mailError.message}`);
-    console.log(`📬 [OTP Code Log] Email: ${email} | Code: ${otp}`);
   }
 
-  return { success: true, message: 'Verification OTP sent successfully.' };
+  // In development, log and return OTP so it can be used without email delivery
+  const isDev = config.NODE_ENV === 'development';
+  if (isDev) {
+    console.log(`\n🔑 [DEV MODE] OTP for ${email}: ${otp}\n`);
+  }
+
+  return {
+    success: true,
+    message: 'Verification OTP sent successfully.',
+    ...(isDev && { dev_otp: otp }),
+  };
 };
 
 /**
@@ -386,7 +395,6 @@ const requestPasswordReset = async (email) => {
     await emailService.sendMail(email, 'Password Reset Code', htmlContent);
   } catch (mailError) {
     console.warn(`[OTP Send Fallback] Failed to deliver email via Resend: ${mailError.message}`);
-    console.log(`📬 [OTP Code Log] Email: ${email} | Code: ${otp}`);
   }
 
   return { message: 'If an account with that email exists, a reset code has been sent.' };
@@ -590,10 +598,18 @@ const resendOtp = async (email) => {
     await emailService.sendMail(email, 'Your New Verification Code', htmlContent);
   } catch (mailError) {
     console.warn(`[OTP Send Fallback] Failed to deliver email via Resend: ${mailError.message}`);
-    console.log(`📬 [OTP Code Log] Email: ${email} | Code: ${otp}`);
   }
 
-  return { success: true, message: 'Verification code resent successfully.' };
+  const isDev = config.NODE_ENV === 'development';
+  if (isDev) {
+    console.log(`\n🔑 [DEV MODE] Resent OTP for ${email}: ${otp}\n`);
+  }
+
+  return {
+    success: true,
+    message: 'Verification code resent successfully.',
+    ...(isDev && { dev_otp: otp }),
+  };
 };
 
 /**

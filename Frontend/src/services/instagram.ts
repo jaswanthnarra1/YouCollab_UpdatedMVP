@@ -1,16 +1,5 @@
 import { apiClient, unwrap } from "@/lib/api";
-
-export interface InstagramProfile {
-  isConnected: boolean;
-  username?: string;
-  followersCount?: number;
-  followingCount?: number;
-  mediaCount?: number;
-  averageLikes?: number;
-  engagementRate?: number;
-  profilePicUrl?: string;
-  bio?: string;
-}
+import type { InstagramProfile } from "@/types";
 
 export const instagramService = {
   connect: async (): Promise<{ url: string; state: string }> => {

@@ -6,7 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const config = require('./config');
 const logger = require('./utils/logger');
-const routes = require('./routes');
+const routes = require('./api');
 const errorHandler = require('./middleware/errorHandler');
 const { generalLimiter } = require('./middleware/rateLimiter');
 

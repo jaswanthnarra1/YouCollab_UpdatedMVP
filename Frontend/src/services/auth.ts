@@ -9,7 +9,7 @@ interface AuthResponse {
 export const authService = {
   async register(name: string, email: string, password: string, role: Role) {
     const { data } = await apiClient.post("/api/auth/register", { name, email, password, role });
-    return unwrap<{ message: string }>(data);
+    return unwrap<{ message: string; dev_otp?: string }>(data);
   },
   async verifyOtp(email: string, otp: string) {
     const { data } = await apiClient.post("/api/auth/verify-otp", { email, otp });
@@ -19,7 +19,7 @@ export const authService = {
   },
   async resendOtp(email: string) {
     const { data } = await apiClient.post("/api/auth/resend-otp", { email });
-    return unwrap<{ message: string }>(data);
+    return unwrap<{ message: string; dev_otp?: string }>(data);
   },
   async login(email: string, password: string) {
     const { data } = await apiClient.post("/api/auth/login", { email, password });
