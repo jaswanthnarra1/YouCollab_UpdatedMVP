@@ -1,51 +1,59 @@
+const nodemailer = require('nodemailer');
 const config = require('../config');
-const AppError = require('../utils/AppError');
 
 /**
- * Send an email via Resend REST API using native fetch (or dynamic fallback to https module if global fetch is not present).
- * This avoids external library dependencies and is extremely robust.
+ * Create a reusable Gmail SMTP transporter.
+ * Uses an App Password (not your regular Gmail password).
+ *
+ * Setup steps:
+ *  1. Enable 2-Step Verification on your Google account.
+ *  2. Go to https://myaccount.google.com/apppasswords
+ *  3. Create an App Password for "Mail" → "Other (custom name)"
+ *  4. Set GMAIL_USER and GMAIL_APP_PASSWORD in your .env / Railway Variables.
+ */
+const createTransporter = () => {
+  const user = config.EMAIL.GMAIL_USER;
+  const pass = config.EMAIL.GMAIL_APP_PASSWORD;
+
+  if (!user || !pass) {
+    return null; // will mock in dev if not configured
+  }
+
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user, pass },
+  });
+};
+
+/**
+ * Send an email via Gmail SMTP (nodemailer).
+ * Falls back to a console log if credentials are not set (dev mode).
+ *
+ * @param {string|string[]} to   - Recipient email(s)
+ * @param {string}          subject
+ * @param {string}          html - HTML body
  */
 const sendMail = async (to, subject, html) => {
-  const apiKey = config.EMAIL.RESEND_API_KEY;
-  const from = config.EMAIL.FROM_EMAIL;
+  const transporter = createTransporter();
+  const fromName = config.EMAIL.FROM_NAME || 'YouCollab';
+  const fromAddr = config.EMAIL.GMAIL_USER || 'noreply@youcollab.in';
+  const from = `"${fromName}" <${fromAddr}>`;
 
-  if (!apiKey) {
-    console.warn(`[Resend Mocked Email] To: ${to}, Subject: ${subject}`);
-    return { id: 'mocked-id' };
+  // No credentials configured → mock in development
+  if (!transporter) {
+    console.warn(`[Gmail Mocked Email] To: ${to}, Subject: ${subject}`);
+    return { messageId: 'mocked-id' };
   }
 
-  const payload = {
+  const info = await transporter.sendMail({
     from,
-    to: Array.isArray(to) ? to : [to],
+    to: Array.isArray(to) ? to.join(', ') : to,
     subject,
     html,
-  };
+  });
 
-  try {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error('Resend error payload:', data);
-      throw new AppError(data?.message || 'Failed to send verification email.', response.status, 'EMAIL_ERROR');
-    }
-
-    return data;
-  } catch (err) {
-    if (err instanceof AppError) throw err;
-    console.error('Error sending email via Resend:', err);
-    throw new AppError('Verification email service is temporarily unavailable.', 500, 'EMAIL_ERROR');
-  }
+  console.log(`[Gmail] Email sent: ${info.messageId}`);
+  return info;
 };
 
-module.exports = {
-  sendMail,
-};
+module.exports = { sendMail };
