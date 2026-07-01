@@ -19,23 +19,34 @@ app.use(
   })
 );
 
-// Configure CORS
+// Configure CORS — allow dev origins + any URL set via CLIENT_URL env var
+const allowedOrigins = [
+  'http://localhost:8080',
+  'http://127.0.0.1:8080',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
+  // Production origins from CLIENT_URL env (comma-separated list supported)
+  ...config.CLIENT_URL.split(',').map((u) => u.trim()).filter(Boolean),
+];
+
 app.use(
   cors({
-    origin: [
-      config.CLIENT_URL,
-      'http://localhost:8080',
-      'http://127.0.0.1:8080',
-      'http://localhost:5173',
-      'http://localhost:5174',
-      'http://127.0.0.1:5173',
-      'http://127.0.0.1:5174'
-    ],
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, Postman, same-origin)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin ${origin} not allowed`));
+      }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   })
 );
+
 
 // Log requests
 app.use((req, res, next) => {
