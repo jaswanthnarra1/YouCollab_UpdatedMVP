@@ -32,8 +32,33 @@ const generate6DigitOtp = () => {
 };
 
 /**
+ * Find a Supabase Auth user by email.
+ *
+ * The admin API has no direct "get by email", so we page through listUsers().
+ * Using a large perPage keeps this to a single round-trip in practice while
+ * remaining correct beyond the default first page (~50 users), which the
+ * previous single unpaginated call silently missed.
+ *
+ * @param {string} email
+ * @returns {Promise<object|null>}
+ */
+const findAuthUserByEmail = async (email) => {
+  const perPage = 1000;
+  for (let page = 1; ; page++) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
+    if (error) throw new AppError('Failed to look up auth records.', 500, 'AUTH_ERROR');
+
+    const match = data?.users?.find((u) => u.email === email);
+    if (match) return match;
+
+    // Stop once we've read the last (partial or empty) page.
+    if (!data?.users || data.users.length < perPage) return null;
+  }
+};
+
+/**
  * Initiate registration of a new user.
- * Generates a 6-digit OTP, stores signup data in email_otps table, and sends via Resend.
+ * Generates a 6-digit OTP, stores signup data in email_otps table, and sends via Gmail SMTP.
  */
 const register = async (name, email, password, role) => {
   // Check if user already exists in public users table
@@ -48,8 +73,7 @@ const register = async (name, email, password, role) => {
   }
 
   // Check if unconfirmed in Supabase Auth; delete to allow retry if so
-  const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
-  const existingAuthUser = listData?.users?.find(u => u.email === email);
+  const existingAuthUser = await findAuthUserByEmail(email);
 
   if (existingAuthUser) {
     if (!existingAuthUser.email_confirmed_at) {
@@ -118,7 +142,7 @@ const register = async (name, email, password, role) => {
   try {
     await emailService.sendMail(email, 'Your Verification Code', htmlContent);
   } catch (mailError) {
-    console.warn(`[OTP Send Fallback] Failed to deliver email via Resend: ${mailError.message}`);
+    console.warn(`[OTP Send Fallback] Failed to deliver email via Gmail SMTP: ${mailError.message}`);
   }
 
   // In development, log and return OTP so it can be used without email delivery
@@ -394,7 +418,7 @@ const requestPasswordReset = async (email) => {
   try {
     await emailService.sendMail(email, 'Password Reset Code', htmlContent);
   } catch (mailError) {
-    console.warn(`[OTP Send Fallback] Failed to deliver email via Resend: ${mailError.message}`);
+    console.warn(`[OTP Send Fallback] Failed to deliver email via Gmail SMTP: ${mailError.message}`);
   }
 
   return { message: 'If an account with that email exists, a reset code has been sent.' };
@@ -439,8 +463,7 @@ const verifyOtp = async (email, otp) => {
 
   // Check if already created in Supabase Auth (check unconfirmed)
   let authUser;
-  const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
-  const existingAuthUser = listData?.users?.find(u => u.email === email);
+  const existingAuthUser = await findAuthUserByEmail(email);
 
   if (existingAuthUser) {
     // If user exists and is unconfirmed, confirm them. Else use existing.
@@ -597,7 +620,7 @@ const resendOtp = async (email) => {
   try {
     await emailService.sendMail(email, 'Your New Verification Code', htmlContent);
   } catch (mailError) {
-    console.warn(`[OTP Send Fallback] Failed to deliver email via Resend: ${mailError.message}`);
+    console.warn(`[OTP Send Fallback] Failed to deliver email via Gmail SMTP: ${mailError.message}`);
   }
 
   const isDev = config.NODE_ENV === 'development';
@@ -649,8 +672,7 @@ const resetPassword = async (email, otp, newPassword) => {
   }
 
   // Find user's auth record to update
-  const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
-  const authUser = listData?.users?.find(u => u.email === email);
+  const authUser = await findAuthUserByEmail(email);
 
   if (!authUser) {
     throw new AppError('User auth record not found.', 404, 'NOT_FOUND');

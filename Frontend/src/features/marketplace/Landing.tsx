@@ -1,10 +1,232 @@
-import { ArrowRight, Sun, Moon, Shield, Target, MapPin, Sparkles, Users, CheckCircle2, TrendingUp } from "lucide-react";
+import { ArrowRight, Sun, Moon, Shield, Target, MapPin, Sparkles, Users, CheckCircle2, TrendingUp, Lock, Minus, Plus, Coins } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Link } from "react-router-dom";
 import { Logo } from "@/components/ui/logo";
 import { motion, useInView } from "framer-motion";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useTheme } from "next-themes";
+
+/* ═══════════════════════════════════════════════════
+   Trial Credit Calculator — same tier/cost model the
+   backend enforces once a brand actually signs up
+   (Backend/src/constants/credits.js): 500 credits,
+   Nano 100cr, Micro 300cr, Mid-tier locked on the trial.
+   ═══════════════════════════════════════════════════ */
+
+const TRIAL_CREDITS = 500;
+const TIER_COST = { nano: 100, micro: 300 } as const;
+type Tier = keyof typeof TIER_COST;
+
+const CreditCalculatorSection = () => {
+  const [counts, setCounts] = useState<Record<Tier, number>>({ nano: 0, micro: 0 });
+
+  const spent = counts.nano * TIER_COST.nano + counts.micro * TIER_COST.micro;
+  const balance = TRIAL_CREDITS - spent;
+  const percentLeft = (balance / TRIAL_CREDITS) * 100;
+
+  const adjust = (tier: Tier, delta: number) => {
+    setCounts((prev) => {
+      const next = prev[tier] + delta;
+      if (next < 0) return prev;
+      const nextSpent = spent - prev[tier] * TIER_COST[tier] + next * TIER_COST[tier];
+      if (nextSpent > TRIAL_CREDITS) return prev;
+      return { ...prev, [tier]: next };
+    });
+  };
+
+  const loadPreset = (nano: number, micro: number) => setCounts({ nano, micro });
+
+  const status =
+    balance === 0
+      ? { text: "Perfect mix — all 500 credits put to work.", tone: "#4bd493" }
+      : balance < TIER_COST.nano
+      ? { text: "Balance too low for another hire.", tone: "#e4bd48" }
+      : { text: "Add creators to see how far your trial pack goes.", tone: "rgba(255,255,255,0.5)" };
+
+  const tiers: { id: Tier; label: string; range: string; badgeColor: string; locked?: boolean }[] = [
+    { id: "nano", label: "Nano Creator", range: "< 1K followers", badgeColor: "#4bd493" },
+    { id: "micro", label: "Micro Creator", range: "1K – 10K followers", badgeColor: "#5B8CFF" },
+  ];
+
+  const featuresRef = useRef(null);
+  const inView = useInView(featuresRef, { once: true, margin: "-80px" });
+
+  return (
+    <section className="relative py-28 px-6 overflow-hidden" id="credits" style={{ background: "#0B0D13" }}>
+      <div
+        className="absolute rounded-full pointer-events-none"
+        style={{
+          top: "10%", right: "-10%", width: "45%", height: "55%",
+          background: "radial-gradient(ellipse, rgba(91,140,255,0.05) 0%, transparent 70%)",
+          filter: "blur(50px)",
+        }}
+      />
+
+      <div className="mx-auto max-w-[1100px] relative z-10">
+        <motion.div
+          ref={featuresRef}
+          initial={{ opacity: 0, y: 30 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="mb-14"
+        >
+          <p className="text-xs uppercase tracking-[0.2em] text-[#5B8CFF] font-semibold mb-4">
+            No cost to start
+          </p>
+          <h2
+            className="font-semibold tracking-[-0.03em] max-w-[560px] leading-[1.15] text-white"
+            style={{ fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)" }}
+          >
+            500 free credits.
+            <br />
+            Zero commitment.
+          </h2>
+          <p className="mt-4 max-w-[480px] text-[14px] text-white/45 leading-relaxed">
+            Every brand starts with a trial pack. Spend it hiring creators — see
+            exactly how far it stretches before you type a single card number.
+          </p>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="grid grid-cols-1 md:grid-cols-12 gap-6 rounded-[24px] border border-white/[0.06] bg-[#12141C] p-6 sm:p-8 shadow-[0_12px_40px_rgba(0,0,0,0.35)]"
+        >
+          {/* Left: tier selectors */}
+          <div className="md:col-span-7 space-y-3">
+            {tiers.map((t) => (
+              <div
+                key={t.id}
+                className="p-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:border-[#2353E9]/30 transition-colors flex items-center justify-between"
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-white/90 text-[14px]">{t.label}</span>
+                    <span
+                      className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                      style={{ backgroundColor: `${t.badgeColor}1a`, color: t.badgeColor }}
+                    >
+                      {t.range}
+                    </span>
+                  </div>
+                  <p className="text-[12px] text-white/40 mt-1">
+                    <span className="font-semibold text-[#88a3ff]">{TIER_COST[t.id]} credits</span> per hire
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => adjust(t.id, -1)}
+                    className="h-8 w-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/70 transition-colors"
+                    aria-label={`Remove one ${t.label}`}
+                  >
+                    <Minus className="h-3.5 w-3.5" />
+                  </button>
+                  <span className="w-5 text-center font-bold text-white/90 tabular-nums">{counts[t.id]}</span>
+                  <button
+                    onClick={() => adjust(t.id, 1)}
+                    className="h-8 w-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/70 transition-colors"
+                    aria-label={`Add one ${t.label}`}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {/* Mid-tier, locked */}
+            <div className="p-4 rounded-2xl border border-dashed border-white/10 bg-white/[0.015] flex items-center justify-between opacity-60">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-white/50 text-[14px]">Mid-Tier Creator</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-white/5 text-white/40">
+                    10K+ followers
+                  </span>
+                </div>
+                <p className="text-[11px] text-white/30 mt-1">Unlocks after the trial pack</p>
+              </div>
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-white/40 bg-white/5 px-3 py-1.5 rounded-full border border-white/5">
+                <Lock className="h-3 w-3" /> Locked
+              </span>
+            </div>
+
+            {/* Presets */}
+            <div className="pt-3 flex flex-wrap gap-2">
+              <button onClick={() => loadPreset(2, 1)} className="text-[11px] font-medium px-3 py-1.5 rounded-full border border-white/10 text-white/60 hover:text-white hover:border-[#2353E9]/40 transition-colors">
+                1 Micro + 2 Nano
+              </button>
+              <button onClick={() => loadPreset(5, 0)} className="text-[11px] font-medium px-3 py-1.5 rounded-full border border-white/10 text-white/60 hover:text-white hover:border-[#2353E9]/40 transition-colors">
+                5 Nano
+              </button>
+              <button onClick={() => loadPreset(1, 1)} className="text-[11px] font-medium px-3 py-1.5 rounded-full border border-white/10 text-white/60 hover:text-white hover:border-[#2353E9]/40 transition-colors">
+                1 Nano + 1 Micro
+              </button>
+              <button onClick={() => loadPreset(0, 0)} className="text-[11px] font-medium px-3 py-1.5 rounded-full text-white/40 hover:text-white/70 ml-auto transition-colors">
+                Reset
+              </button>
+            </div>
+          </div>
+
+          {/* Right: live balance */}
+          <div className="md:col-span-5 rounded-2xl bg-gradient-to-br from-[#161A2B] to-[#0F111A] border border-white/[0.05] p-6 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-white/40 font-semibold">
+                <Coins className="h-3 w-3 text-[#5B8CFF]" /> Trial balance
+              </div>
+              <div className="mt-3 flex items-baseline gap-1.5">
+                <span className="text-4xl font-black tracking-tight tabular-nums" style={{ color: balance === 0 ? "#4bd493" : "white" }}>
+                  {balance}
+                </span>
+                <span className="text-sm text-white/35 font-medium">/ {TRIAL_CREDITS} credits</span>
+              </div>
+
+              <div className="w-full bg-white/5 rounded-full h-2 mt-5 overflow-hidden">
+                <motion.div
+                  className="h-2 rounded-full"
+                  style={{ background: balance === 0 ? "#4bd493" : "#2353E9" }}
+                  animate={{ width: `${percentLeft}%` }}
+                  transition={{ duration: 0.4, ease: "easeOut" }}
+                />
+              </div>
+
+              <div className="mt-6 space-y-2 text-[13px]">
+                <div className="flex justify-between text-white/40">
+                  <span>Nano allocation</span>
+                  <span className="font-mono text-white/80 tabular-nums">{counts.nano * TIER_COST.nano} cr</span>
+                </div>
+                <div className="flex justify-between text-white/40">
+                  <span>Micro allocation</span>
+                  <span className="font-mono text-white/80 tabular-nums">{counts.micro * TIER_COST.micro} cr</span>
+                </div>
+                <div className="border-t border-white/[0.06] pt-2 flex justify-between font-semibold">
+                  <span className="text-white/40">Total spent</span>
+                  <span className="font-mono text-[#88a3ff] tabular-nums">{spent} cr</span>
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="mt-6 p-3 rounded-xl bg-white/[0.03] border border-white/[0.05] text-[12px] text-center font-medium"
+              style={{ color: status.tone }}
+            >
+              {status.text}
+            </div>
+          </div>
+        </motion.div>
+
+        <div className="mt-8 flex justify-center">
+          <Link to="/register">
+            <button className="group bg-[#2353E9] text-white rounded-full px-7 py-3 font-semibold text-[13px] shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/30 hover:scale-[1.03] active:scale-[0.98] transition-all duration-300 flex items-center gap-2">
+              Claim your 500 credits
+              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+            </button>
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+};
 
 /* ═══════════════════════════════════════════════════
    Floating Product Cards — Capsule-style hero cards
@@ -625,6 +847,9 @@ const Landing = () => {
           </div>
         </div>
       </section>
+
+      {/* ═══ Trial Credit Calculator ═══ */}
+      <CreditCalculatorSection />
 
       {/* ═══ Social Proof ═══ */}
       <section className="py-24 px-6 bg-muted/30" id="social-proof">

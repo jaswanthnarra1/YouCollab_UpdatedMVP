@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Backend for You Collab Marketplace",
   "main": "src/index.js",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js"

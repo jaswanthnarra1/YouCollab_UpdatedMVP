@@ -1,6 +1,7 @@
 const supabase = require('./supabase');
 const AppError = require('../utils/AppError');
 const { parsePagination, paginateResults } = require('../utils/pagination');
+const { TIER_COST, getTier } = require('../utils/credits');
 
 /**
  * Helper to retrieve influencer associated with userId.
@@ -215,16 +216,55 @@ const updateStatus = async (applicationId, userId, status) => {
     throw new AppError('This application has already been processed.', 400, 'BAD_REQUEST');
   }
 
-  // Update status
+  // Hiring a creator spends trial credits, priced by their follower tier.
+  let tierCost = 0;
+  if (status === 'ACCEPTED') {
+    const tier = getTier(application.influencer.followerCount);
+    if (tier === 'MID') {
+      throw new AppError('Mid-tier creators (10K+ followers) unlock after the trial pack.', 400, 'TIER_LOCKED');
+    }
+    tierCost = TIER_COST[tier];
+  }
+
+  // Conditioned on status still being PENDING at write time — the atomic guard
+  // that closes the gap between the read above and this write, so two
+  // concurrent accepts on the same application can't both go through.
   const { data: updatedApplication, error: updateError } = await supabase
     .from('applications')
     .update({ status })
     .eq('id', applicationId)
+    .eq('status', 'PENDING')
     .select('*')
-    .single();
+    .maybeSingle();
 
-  if (updateError) {
-    throw new AppError('Failed to update application status.', 500, 'DATABASE_ERROR');
+  if (updateError || !updatedApplication) {
+    throw new AppError('This application has already been processed.', 400, 'BAD_REQUEST');
+  }
+
+  if (status === 'ACCEPTED') {
+    // Atomic DB-side decrement — avoids the lost-update race a JS-computed
+    // "credits - tierCost" would have if this brand has two hires in flight.
+    const { data: debitRows, error: debitError } = await supabase.rpc('debit_brand_credits', {
+      p_brand_id: brand.id,
+      p_amount: tierCost,
+    });
+
+    if (debitError || !debitRows?.length) {
+      // Roll back — the hire didn't actually go through.
+      await supabase.from('applications').update({ status: 'PENDING' }).eq('id', applicationId);
+      throw new AppError('Not enough trial credits for this hire.', 402, 'INSUFFICIENT_CREDITS');
+    }
+
+    // The same hire credits the creator's earned balance — the brand's spend
+    // and the creator's earning are one transaction, not two disconnected numbers.
+    const { error: creditError } = await supabase.rpc('credit_influencer_earnings', {
+      p_influencer_id: application.influencer.id,
+      p_amount: tierCost,
+    });
+
+    if (creditError) {
+      console.error('Failed to credit influencer earnings:', creditError);
+    }
   }
 
   // Notify the Influencer
@@ -254,9 +294,87 @@ const updateStatus = async (applicationId, userId, status) => {
   return updatedApplication;
 };
 
+/**
+ * Load an application along with both parties' user IDs, and confirm the
+ * requesting user is one of them (the brand owner or the applying influencer).
+ */
+const getApplicationForMessaging = async (applicationId, userId) => {
+  const { data: application, error } = await supabase
+    .from('applications')
+    .select('id, status, gig:gigs(brand:brands(userId)), influencer:influencers(userId)')
+    .eq('id', applicationId)
+    .maybeSingle();
+
+  if (error || !application) {
+    throw new AppError('Collab not found.', 404, 'NOT_FOUND');
+  }
+
+  const brandUserId = application.gig?.brand?.userId;
+  const influencerUserId = application.influencer?.userId;
+
+  if (userId !== brandUserId && userId !== influencerUserId) {
+    throw new AppError("You don't have access to this conversation.", 403, 'FORBIDDEN');
+  }
+
+  if (application.status !== 'ACCEPTED') {
+    throw new AppError('Messaging opens once the collab is approved.', 400, 'BAD_REQUEST');
+  }
+
+  const otherUserId = userId === brandUserId ? influencerUserId : brandUserId;
+  return { otherUserId };
+};
+
+/**
+ * Fetch the message thread for an approved collaboration.
+ * ponytail: fixed 200-message cap, no pagination — fine for a single-thread
+ * DM view; revisit with cursor pagination if threads grow long in practice.
+ */
+const getMessages = async (applicationId, userId) => {
+  await getApplicationForMessaging(applicationId, userId);
+
+  const { data: messages, error } = await supabase
+    .from('messages')
+    .select('*')
+    .eq('applicationId', applicationId)
+    .order('createdAt', { ascending: true })
+    .limit(200);
+
+  if (error) {
+    throw new AppError('Failed to load messages.', 500, 'DATABASE_ERROR');
+  }
+
+  return messages || [];
+};
+
+/**
+ * Send a message within an approved collaboration's thread.
+ */
+const sendMessage = async (applicationId, userId, content) => {
+  const { otherUserId } = await getApplicationForMessaging(applicationId, userId);
+
+  const { data: message, error } = await supabase
+    .from('messages')
+    .insert({
+      senderId: userId,
+      receiverId: otherUserId,
+      applicationId,
+      content,
+    })
+    .select('*')
+    .single();
+
+  if (error) {
+    throw new AppError('Failed to send message.', 500, 'DATABASE_ERROR');
+  }
+
+  return message;
+};
+
 module.exports = {
   apply,
   getGigApplications,
   getMyApplications,
   updateStatus,
+  getMessages,
+  sendMessage,
 };

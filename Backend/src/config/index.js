@@ -1,6 +1,15 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 
+// Fail fast in production if the JWT secret is not explicitly configured.
+// The fallback below is a dev-only convenience and must never be used to sign
+// real tokens in a deployed environment.
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  throw new Error(
+    'FATAL: JWT_SECRET must be set in production. Refusing to start with the insecure default secret.'
+  );
+}
+
 module.exports = {
   PORT: process.env.PORT || 5000,
   NODE_ENV: process.env.NODE_ENV || 'development',

@@ -247,8 +247,6 @@ const updateGig = async (id, userId, data) => {
   if (data.category !== undefined) updateData.category = data.category;
   if (data.status !== undefined) updateData.status = data.status;
 
-  console.log(`[updateGig] Submitting updates:`, JSON.stringify(updateData));
-
   const { data: updatedGig, error: updateError } = await supabaseAdmin
     .from('gigs')
     .update(updateData)

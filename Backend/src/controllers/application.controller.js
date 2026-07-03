@@ -65,9 +65,35 @@ const updateStatus = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Fetch the DM thread for an approved collaboration.
+ */
+const listMessages = asyncHandler(async (req, res) => {
+  const messages = await applicationService.getMessages(req.params.id, req.user.id);
+
+  res.status(200).json({
+    success: true,
+    data: messages,
+  });
+});
+
+/**
+ * Send a message within an approved collaboration's thread.
+ */
+const sendMessage = asyncHandler(async (req, res) => {
+  const message = await applicationService.sendMessage(req.params.id, req.user.id, req.body.content);
+
+  res.status(201).json({
+    success: true,
+    data: message,
+  });
+});
+
 module.exports = {
   apply,
   listApplicants,
   listMyApplications,
   updateStatus,
+  listMessages,
+  sendMessage,
 };

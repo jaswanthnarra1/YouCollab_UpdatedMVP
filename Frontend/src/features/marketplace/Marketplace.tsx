@@ -38,8 +38,8 @@ export default function Marketplace() {
         ? true 
         : brandLoc.toLowerCase().includes(activeLocation.toLowerCase()) || g.city.toLowerCase().includes(activeLocation.toLowerCase());
       
-      const matchSearch = searchQuery 
-        ? (g.title + g.description + (g as any).brand?.businessName || "").toLowerCase().includes(searchQuery.toLowerCase()) 
+      const matchSearch = searchQuery
+        ? (g.title + g.description + ((g as any).brand?.businessName || "")).toLowerCase().includes(searchQuery.toLowerCase())
         : true;
       
       return matchCategory && matchLocation && matchSearch && g.status === "OPEN";

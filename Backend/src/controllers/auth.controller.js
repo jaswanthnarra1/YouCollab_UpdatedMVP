@@ -25,6 +25,7 @@ const register = asyncHandler(async (req, res) => {
     success: true,
     data: {
       message: 'Verification code sent to your email.',
+      ...(result.dev_otp && { dev_otp: result.dev_otp }),
     },
   });
 });
@@ -152,6 +153,7 @@ const resendOtp = asyncHandler(async (req, res) => {
     success: true,
     data: {
       message: result.message,
+      ...(result.dev_otp && { dev_otp: result.dev_otp }),
     },
   });
 });

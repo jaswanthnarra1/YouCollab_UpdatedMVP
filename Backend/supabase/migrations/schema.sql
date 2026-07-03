@@ -20,6 +20,33 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS "authId" UUID UNIQUE;
 CREATE INDEX IF NOT EXISTS idx_users_auth_id ON users("authId");
 
 -- ============================================
+-- 1b. Brand trial credits (one-time 500-credit pack)
+-- ============================================
+
+ALTER TABLE brands ADD COLUMN IF NOT EXISTS credits INTEGER NOT NULL DEFAULT 500;
+
+-- Creators earn credits from the same hire transaction that debits the
+-- brand's balance — starts at 0, there's no trial pack on this side.
+ALTER TABLE influencers ADD COLUMN IF NOT EXISTS credits INTEGER NOT NULL DEFAULT 0;
+
+-- Atomic credit debit/credit — the UPDATE reads and writes the balance in a
+-- single statement, so two concurrent hires for the same brand/creator can't
+-- lose one write to the other the way a JS-side read-then-write would.
+CREATE OR REPLACE FUNCTION debit_brand_credits(p_brand_id UUID, p_amount INTEGER)
+RETURNS TABLE(credits INTEGER) AS $$
+  UPDATE brands SET credits = credits - p_amount
+  WHERE id = p_brand_id AND credits >= p_amount
+  RETURNING credits;
+$$ LANGUAGE sql;
+
+CREATE OR REPLACE FUNCTION credit_influencer_earnings(p_influencer_id UUID, p_amount INTEGER)
+RETURNS TABLE(credits INTEGER) AS $$
+  UPDATE influencers SET credits = credits + p_amount
+  WHERE id = p_influencer_id
+  RETURNING credits;
+$$ LANGUAGE sql;
+
+-- ============================================
 -- 2. Messages Table (Brand-Influencer DMs)
 -- ============================================
 

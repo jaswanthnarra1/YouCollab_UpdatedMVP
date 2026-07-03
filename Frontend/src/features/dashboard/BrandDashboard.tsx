@@ -1,29 +1,33 @@
-import { applicationsService, type Application } from "@/services/applications";
+import { applicationsService, type Application, type Message } from "@/services/applications";
+import { profileService } from "@/services/profile";
+import { getTier, TIER_COST } from "@/lib/credits";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 import { Button } from "@/components/common/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/common/dialog";
 import { gigsService, type Gig } from "@/services/gigs";
 import { Link, useSearchParams } from "react-router-dom";
-import { 
-  Plus, 
-  IndianRupee, 
-  Calendar, 
-  MapPin, 
-  Users, 
-  Briefcase, 
-  Eye, 
-  Edit3, 
-  Trash2, 
-  Play, 
-  Pause, 
-  MessageSquare, 
-  Check, 
-  X, 
-  TrendingUp, 
-  Bookmark, 
+import {
+  Plus,
+  IndianRupee,
+  Calendar,
+  MapPin,
+  Users,
+  Briefcase,
+  Eye,
+  Edit3,
+  Trash2,
+  Play,
+  Pause,
+  MessageSquare,
+  Check,
+  X,
+  TrendingUp,
+  Bookmark,
   BookmarkCheck,
   Mail,
   Send,
-  UserCheck
+  UserCheck,
+  Coins,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/common/select";
 import { useAuthStore } from "@/stores/authStore";
@@ -31,7 +35,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
-type MyGigsTab = "active" | "pending" | "closed" | "archived";
+type MyGigsTab = "active" | "closed";
 type AppFilterTab = "new" | "shortlisted" | "accepted" | "rejected";
 
 export default function BrandDashboard() {
@@ -42,10 +46,13 @@ export default function BrandDashboard() {
   const activeTab = searchParams.get("tab") || "dashboard";
 
   // State queries
-  const { data: gigs = [], isLoading: isLoadingGigs } = useQuery({ 
-    queryKey: ["gigs", "mine"], 
-    queryFn: gigsService.mine 
+  const { data: gigs = [], isLoading: isLoadingGigs } = useQuery({
+    queryKey: ["gigs", "mine"],
+    queryFn: gigsService.mine
   });
+
+  const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: profileService.getProfile });
+  const credits: number | null = (profile?.brand as { credits?: number } | undefined)?.credits ?? null;
 
   // Fetch applications for all gigs
   const [apps, setApps] = useState<Application[]>([]);
@@ -99,9 +106,15 @@ export default function BrandDashboard() {
       applicationsService.updateStatus(aid, status),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["gigs", "mine"] });
+      qc.invalidateQueries({ queryKey: ["profile"] });
       fetchAllApplications();
     },
-    onError: () => toast({ variant: "destructive", title: "Action failed" }),
+    onError: (e: { response?: { data?: { error?: { message?: string } } } }) =>
+      toast({
+        variant: "destructive",
+        title: "Action failed",
+        description: e?.response?.data?.error?.message,
+      }),
   });
 
   // Shortlisted local state sync
@@ -135,16 +148,20 @@ export default function BrandDashboard() {
 
   const handleConfirmApprove = () => {
     if (!selectedAppToApprove) return;
+    const approvedApp = selectedAppToApprove;
     updateAppStatus.mutate(
-      { aid: selectedAppToApprove.id, status: "ACCEPTED" },
+      { aid: approvedApp.id, status: "ACCEPTED" },
       {
         onSuccess: () => {
-          toast({ 
-            title: "Creator approved successfully! 🎉", 
-            description: "Contact information has been shared." 
+          toast({
+            title: "Creator approved successfully! 🎉",
+            description: "Contact info shared — say hello to kick things off.",
           });
           setConfirmApproveOpen(false);
           setSelectedAppToApprove(null);
+          // Jump straight into the DM thread so the brand can message the creator immediately.
+          setSelectedChatPartner(approvedApp);
+          setSearchParams({ tab: "messages" });
         }
       }
     );
@@ -155,10 +172,31 @@ export default function BrandDashboard() {
   const [appFilterSubTab, setAppFilterSubTab] = useState<AppFilterTab>("new");
   const [selectedGigFilter, setSelectedGigFilter] = useState<string>("all");
 
-  // Chat simulation state
+  // Collaboration DMs
   const [selectedChatPartner, setSelectedChatPartner] = useState<Application | null>(null);
   const [chatMessageText, setChatMessageText] = useState("");
-  const [chatHistories, setChatHistories] = useState<Record<string, { from: "me" | "them"; text: string; time: string }[]>>({});
+
+  const { data: threadMessages = [] } = useQuery({
+    queryKey: ["messages", selectedChatPartner?.id],
+    queryFn: () => applicationsService.getMessages(selectedChatPartner!.id),
+    enabled: activeTab === "messages" && !!selectedChatPartner,
+    refetchInterval: 4000, // ponytail: polling, not realtime — Supabase Realtime is disabled on this backend
+  });
+
+  const sendMessageMutation = useMutation({
+    mutationFn: (content: string) => applicationsService.sendMessage(selectedChatPartner!.id, content),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["messages", selectedChatPartner?.id] });
+    },
+    onError: () => toast({ variant: "destructive", title: "Message failed to send" }),
+  });
+
+  const handleSendChatMessage = () => {
+    const text = chatMessageText.trim();
+    if (!text || !selectedChatPartner) return;
+    sendMessageMutation.mutate(text);
+    setChatMessageText("");
+  };
 
   // Active Approved Collaborations
   const approvedCollabs = useMemo(() => {
@@ -266,13 +304,16 @@ export default function BrandDashboard() {
                 <h1 className="text-3xl font-semibold tracking-tight">Hey {user?.name ?? "Brand"}.</h1>
                 <p className="text-[13px] text-muted-foreground mt-1">Review applicant portfolios and coordinate campaigns.</p>
               </div>
-              <Button asChild className="h-9 text-[13px] rounded-sm bg-gradient-brand text-primary-foreground border-0 shadow-md">
-                <Link to="/gigs/new"><Plus className="h-4 w-4 mr-1" /> Post New Gig</Link>
-              </Button>
+              <div className="flex items-center gap-3">
+                <NotificationBell />
+                <Button asChild className="h-9 text-[13px] rounded-sm bg-gradient-brand text-primary-foreground border-0 shadow-md">
+                  <Link to="/gigs/new"><Plus className="h-4 w-4 mr-1" /> Post New Gig</Link>
+                </Button>
+              </div>
             </div>
 
             {/* Premium Stat Cards */}
-            <div className="grid sm:grid-cols-4 gap-4">
+            <div className="grid sm:grid-cols-5 gap-4">
               {[
                 { label: "Total Active Gigs", value: totalActiveGigs, icon: Briefcase },
                 { label: "Total Applications", value: totalApplications, icon: Users },
@@ -289,6 +330,15 @@ export default function BrandDashboard() {
                   </div>
                 </div>
               ))}
+              <div className="border border-primary/25 rounded-sm p-4 bg-primary/5 flex items-center gap-3">
+                <div className="h-9 w-9 rounded-sm border border-primary/25 flex items-center justify-center bg-primary/10 shrink-0">
+                  <Coins className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Trial Credits</p>
+                  <p className="text-xl font-semibold tracking-tight mt-0.5 text-primary">{credits ?? "…"}</p>
+                </div>
+              </div>
             </div>
 
             {/* Dashboard Bottom Section */}
@@ -372,7 +422,7 @@ export default function BrandDashboard() {
 
             {/* Campaign sub-tabs */}
             <div className="flex border-b border-border gap-2">
-              {(["active", "pending", "closed", "archived"] as MyGigsTab[]).map((st) => (
+              {(["active", "closed"] as MyGigsTab[]).map((st) => (
                 <button
                   key={st}
                   onClick={() => setMyGigsSubTab(st)}
@@ -395,8 +445,6 @@ export default function BrandDashboard() {
                 const filtered = gigs.filter(g => {
                   if (myGigsSubTab === "active") return g.status === "OPEN";
                   if (myGigsSubTab === "closed") return g.status === "CLOSED";
-                  if (myGigsSubTab === "pending") return (g as any).status === "PENDING";
-                  if (myGigsSubTab === "archived") return (g as any).status === "ARCHIVED";
                   return true;
                 });
 
@@ -794,49 +842,40 @@ export default function BrandDashboard() {
                         </div>
                       </div>
 
-                      {/* Render history if any */}
-                      {(chatHistories[selectedChatPartner.id] || []).map((msg, idx) => (
-                        <div key={idx} className={`flex ${msg.from === "me" ? "justify-end" : "justify-start"}`}>
-                          <div className={`max-w-[80%] rounded-sm px-3 py-2 ${
-                            msg.from === "me" ? "bg-gradient-brand text-primary-foreground border-0" : "bg-muted/30 border border-border"
-                          }`}>
-                            <p className="leading-relaxed">{msg.text}</p>
-                            <span className="text-[8px] text-muted-foreground/80 block text-right mt-1">{msg.time}</span>
+                      {/* Real message thread, backed by /api/applications/:id/messages */}
+                      {threadMessages.map((msg: Message) => {
+                        const fromMe = msg.senderId === user?.id;
+                        return (
+                          <div key={msg.id} className={`flex ${fromMe ? "justify-end" : "justify-start"}`}>
+                            <div className={`max-w-[80%] rounded-sm px-3 py-2 ${
+                              fromMe ? "bg-gradient-brand text-primary-foreground border-0" : "bg-muted/30 border border-border"
+                            }`}>
+                              <p className="leading-relaxed">{msg.content}</p>
+                              <span className="text-[8px] text-muted-foreground/80 block text-right mt-1">
+                                {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
 
                     {/* Chat Textbox */}
                     <div className="p-3 border-t border-border flex gap-2">
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={chatMessageText}
                         onChange={(e) => setChatMessageText(e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter" && chatMessageText.trim()) {
-                            const newMsg = { from: "me" as const, text: chatMessageText, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-                            setChatHistories({
-                              ...chatHistories,
-                              [selectedChatPartner.id]: [...(chatHistories[selectedChatPartner.id] || []), newMsg]
-                            });
-                            setChatMessageText("");
-                          }
+                          if (e.key === "Enter") handleSendChatMessage();
                         }}
-                        placeholder="Write messages..." 
-                        className="flex-1 bg-background border border-border rounded-sm h-9 px-3 text-xs focus:outline-none" 
+                        placeholder="Write messages..."
+                        className="flex-1 bg-background border border-border rounded-sm h-9 px-3 text-xs focus:outline-none"
                       />
-                      <Button 
-                        onClick={() => {
-                          if (!chatMessageText.trim()) return;
-                          const newMsg = { from: "me" as const, text: chatMessageText, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-                          setChatHistories({
-                            ...chatHistories,
-                            [selectedChatPartner.id]: [...(chatHistories[selectedChatPartner.id] || []), newMsg]
-                          });
-                          setChatMessageText("");
-                        }}
-                        size="icon" 
+                      <Button
+                        onClick={handleSendChatMessage}
+                        disabled={sendMessageMutation.isPending}
+                        size="icon"
                         className="h-9 w-9 bg-gradient-brand text-primary-foreground rounded-sm shrink-0 border-0"
                       >
                         <Send className="h-4 w-4" />
@@ -897,22 +936,69 @@ export default function BrandDashboard() {
       <Dialog open={confirmApproveOpen} onOpenChange={setConfirmApproveOpen}>
         <DialogContent className="border-border text-foreground max-w-sm rounded-sm bg-background">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-foreground">Approve this creator for collaboration?</DialogTitle>
+            <DialogTitle className="text-base font-bold text-foreground">Approve & hire this creator?</DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground leading-relaxed pt-1">
-              Approving <strong>{(selectedAppToApprove?.influencer as any)?.name}</strong> will share your brand's registered email with them, and reveal their verified email to you.
+              Approving <strong>{(selectedAppToApprove?.influencer as any)?.name}</strong> charges your trial credits for this hire and shares contact emails both ways. Are you sure?
             </DialogDescription>
           </DialogHeader>
+
+          {selectedAppToApprove && (() => {
+            const followerCount = (selectedAppToApprove.influencer as any)?.followerCount ?? 0;
+            const tier = getTier(followerCount);
+            const locked = tier === "MID";
+            const cost = locked ? null : TIER_COST[tier];
+            const insufficient = !locked && credits !== null && cost !== null && credits < cost;
+            const remainingAfter = !locked && credits !== null && cost !== null ? credits - cost : null;
+
+            return (
+              <div className="rounded-sm border border-border bg-muted/20 p-3 text-xs space-y-1.5">
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Creator tier</span>
+                  <span className="font-medium text-foreground">
+                    {tier === "NANO" ? "Nano (< 1K)" : tier === "MICRO" ? "Micro (1K–10K)" : "Mid-tier (10K+)"}
+                  </span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Hire cost</span>
+                  <span className="font-medium text-foreground">{locked ? "—" : `− ${cost} credits`}</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Current balance</span>
+                  <span className="font-medium text-foreground">{credits ?? "…"}</span>
+                </div>
+                <div className="flex justify-between border-t border-border/60 pt-1.5 mt-1.5">
+                  <span className="text-muted-foreground">Remaining after this hire</span>
+                  <span className={`font-semibold ${insufficient ? "text-red-400" : "text-primary"}`}>
+                    {locked ? "—" : remainingAfter}
+                  </span>
+                </div>
+                {locked && (
+                  <p className="text-amber-500 pt-1">Mid-tier creators unlock after the trial pack — can't hire yet.</p>
+                )}
+                {insufficient && (
+                  <p className="text-amber-500 pt-1">Not enough trial credits left for this hire.</p>
+                )}
+              </div>
+            );
+          })()}
+
           <DialogFooter className="gap-2 sm:gap-0 mt-3">
-            <Button 
-              variant="ghost" 
-              onClick={() => { setConfirmApproveOpen(false); setSelectedAppToApprove(null); }} 
+            <Button
+              variant="ghost"
+              onClick={() => { setConfirmApproveOpen(false); setSelectedAppToApprove(null); }}
               className="h-9 text-xs rounded-sm hover:bg-zinc-800"
             >
               Cancel
             </Button>
-            <Button 
-              onClick={handleConfirmApprove} 
-              className="h-9 text-xs rounded-sm bg-gradient-brand text-primary-foreground border-0 shadow-md hover:opacity-95"
+            <Button
+              onClick={handleConfirmApprove}
+              disabled={
+                updateAppStatus.isPending ||
+                !selectedAppToApprove ||
+                getTier((selectedAppToApprove?.influencer as any)?.followerCount ?? 0) === "MID" ||
+                (credits !== null && credits < TIER_COST[getTier((selectedAppToApprove?.influencer as any)?.followerCount ?? 0) as "NANO" | "MICRO"])
+              }
+              className="h-9 text-xs rounded-sm bg-gradient-brand text-primary-foreground border-0 shadow-md hover:opacity-95 disabled:opacity-50"
             >
               Approve
             </Button>

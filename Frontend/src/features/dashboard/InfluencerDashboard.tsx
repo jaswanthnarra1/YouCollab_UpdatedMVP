@@ -1,12 +1,15 @@
-import { applicationsService } from "@/services/applications";
+import { applicationsService, type Message } from "@/services/applications";
+import { profileService } from "@/services/profile";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 import { Button } from "@/components/common/button";
 import { CATEGORIES } from "@/constants";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/common/dialog";
 import { gigsService, type Gig } from "@/services/gigs";
 import { Input } from "@/components/common/input";
+import type { Application } from "@/types";
 import {
   Instagram, BadgeCheck, RefreshCw, Unlink, IndianRupee, Calendar,
-  MapPin, Wallet, Send, Loader2, Search, TrendingUp, Sparkles
+  MapPin, Send, Loader2, Search, TrendingUp, Sparkles, MessageSquare, Coins, Clock, CheckCircle2
 } from "lucide-react";
 import { instagramService } from "@/services/instagram";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -16,15 +19,15 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
-function StatCard({ label, value, Icon }: { label: string; value: string; Icon: typeof TrendingUp }) {
+function StatCard({ label, value, Icon, accent }: { label: string; value: string; Icon: typeof TrendingUp; accent?: boolean }) {
   return (
-    <div className="border border-border rounded-sm p-4 flex items-center gap-3 bg-background">
-      <div className="h-9 w-9 rounded-sm border border-border flex items-center justify-center">
-        <Icon className="h-4 w-4 text-foreground/70" />
+    <div className={`border rounded-sm p-4 flex items-center gap-3 ${accent ? "border-primary/25 bg-primary/5" : "border-border bg-background"}`}>
+      <div className={`h-9 w-9 rounded-sm border flex items-center justify-center ${accent ? "border-primary/25 bg-primary/10" : "border-border"}`}>
+        <Icon className={`h-4 w-4 ${accent ? "text-primary" : "text-foreground/70"}`} />
       </div>
       <div>
         <p className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
-        <p className="text-lg font-semibold tracking-tight">{value}</p>
+        <p className={`text-lg font-semibold tracking-tight${accent ? " text-primary" : ""}`}>{value}</p>
       </div>
     </div>
   );
@@ -206,11 +209,86 @@ function ApplyDialog({ gig, onClose }: { gig: Gig | null; onClose: () => void })
   );
 }
 
+function MessageDialog({ application, onClose }: { application: Application | null; onClose: () => void }) {
+  const { user } = useAuthStore();
+  const qc = useQueryClient();
+  const [text, setText] = useState("");
+
+  const { data: messages = [] } = useQuery({
+    queryKey: ["messages", application?.id],
+    queryFn: () => applicationsService.getMessages(application!.id),
+    enabled: !!application,
+    refetchInterval: 4000, // ponytail: polling, not realtime — Supabase Realtime is disabled on this backend
+  });
+
+  const send = useMutation({
+    mutationFn: (content: string) => applicationsService.sendMessage(application!.id, content),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["messages", application?.id] }),
+  });
+
+  const handleSend = () => {
+    const content = text.trim();
+    if (!content) return;
+    send.mutate(content);
+    setText("");
+  };
+
+  return (
+    <Dialog open={!!application} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="border-border max-w-md rounded-sm bg-background flex flex-col h-[520px]">
+        {application && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="text-base font-semibold tracking-tight">{application.gig?.brand?.businessName || "Brand"}</DialogTitle>
+              <p className="text-[11px] text-muted-foreground">{application.gig?.title}</p>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto space-y-3 text-xs py-2">
+              {messages.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">No messages yet. Say hello!</p>
+              ) : (
+                messages.map((msg: Message) => {
+                  const fromMe = msg.senderId === user?.id;
+                  return (
+                    <div key={msg.id} className={`flex ${fromMe ? "justify-end" : "justify-start"}`}>
+                      <div className={`max-w-[80%] rounded-sm px-3 py-2 ${
+                        fromMe ? "bg-gradient-brand text-primary-foreground border-0" : "bg-muted/30 border border-border"
+                      }`}>
+                        <p className="leading-relaxed">{msg.content}</p>
+                        <span className="text-[8px] text-muted-foreground/80 block text-right mt-1">
+                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            <div className="flex gap-2 pt-2 border-t border-border">
+              <input
+                type="text"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                placeholder="Write a message..."
+                className="flex-1 bg-background border border-border rounded-sm h-9 px-3 text-xs focus:outline-none"
+              />
+              <Button onClick={handleSend} disabled={send.isPending} size="icon" className="h-9 w-9 bg-gradient-brand text-primary-foreground rounded-sm shrink-0 border-0">
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function InfluencerDashboard() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const [active, setActive] = useState<string | null>(null);
   const [openGig, setOpenGig] = useState<Gig | null>(null);
+  const [messagingApp, setMessagingApp] = useState<Application | null>(null);
   const [query, setQuery] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = (searchParams.get("tab") as "gigs" | "pitches") === "pitches" ? "pitches" : "gigs";
@@ -228,6 +306,8 @@ export default function InfluencerDashboard() {
 
   const { data: gigs = [] } = useQuery({ queryKey: ["gigs"], queryFn: gigsService.list });
   const { data: myApps = [] } = useQuery({ queryKey: ["myApplications"], queryFn: applicationsService.mine, retry: false });
+  const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: profileService.getProfile });
+  const credits: number | null = (profile?.influencer as { credits?: number } | undefined)?.credits ?? null;
 
   const filtered = useMemo(() => {
     return gigs.filter((g) =>
@@ -242,16 +322,20 @@ export default function InfluencerDashboard() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <main className="mx-auto max-w-[1200px] px-6 py-10 space-y-10">
-        <div>
-          <span className="inline-block border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground rounded-sm mb-3">Creator</span>
-          <h1 className="text-3xl font-semibold tracking-tight">Hey {user?.name?.split(" ")[0] ?? "creator"}.</h1>
-          <p className="text-[13px] text-muted-foreground mt-1">Pune brands looking to collab — fresh today.</p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <span className="inline-block border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground rounded-sm mb-3">Creator</span>
+            <h1 className="text-3xl font-semibold tracking-tight">Hey {user?.name?.split(" ")[0] ?? "creator"}.</h1>
+            <p className="text-[13px] text-muted-foreground mt-1">Pune brands looking to collab — fresh today.</p>
+          </div>
+          <NotificationBell />
         </div>
 
-        <div className="grid sm:grid-cols-3 gap-3">
+        <div className="grid sm:grid-cols-4 gap-3">
           <StatCard label="Total pitches sent" value={String(myApps.length)} Icon={Send} />
-          <StatCard label="Pending reviews" value={String(pending)} Icon={TrendingUp} />
-          <StatCard label="Accepted collabs" value={String(accepted)} Icon={Wallet} />
+          <StatCard label="Pending reviews" value={String(pending)} Icon={Clock} />
+          <StatCard label="Accepted collabs" value={String(accepted)} Icon={CheckCircle2} />
+          <StatCard label="Credits earned" value={credits !== null ? String(credits) : "…"} Icon={Coins} accent />
         </div>
 
         <InstagramCard />
@@ -371,9 +455,18 @@ export default function InfluencerDashboard() {
                       </div>
 
                       <div className="mt-5 flex gap-2">
-                        <Button asChild variant="outline" size="sm" className="w-full h-8 text-[12px] rounded-sm">
+                        <Button asChild variant="outline" size="sm" className="flex-1 h-8 text-[12px] rounded-sm">
                           <Link to={`/gigs/${a.gigId}`}>View Brief & Details</Link>
                         </Button>
+                        {a.status === "ACCEPTED" && (
+                          <Button
+                            onClick={() => setMessagingApp(a)}
+                            size="sm"
+                            className="h-8 text-[12px] rounded-sm bg-gradient-brand text-primary-foreground border-0"
+                          >
+                            <MessageSquare className="h-3.5 w-3.5 mr-1" /> Message
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -384,6 +477,7 @@ export default function InfluencerDashboard() {
         </section>
       </main>
       <ApplyDialog gig={openGig} onClose={() => setOpenGig(null)} />
+      <MessageDialog application={messagingApp} onClose={() => setMessagingApp(null)} />
     </div>
   );
 }
