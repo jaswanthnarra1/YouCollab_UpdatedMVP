@@ -9,6 +9,7 @@ const logger = require('./utils/logger');
 const routes = require('./api');
 const errorHandler = require('./middleware/errorHandler');
 const { generalLimiter } = require('./middleware/rateLimiter');
+const AppError = require('./utils/AppError');
 
 const app = express();
 
@@ -19,7 +20,13 @@ app.use(
   })
 );
 
-// Configure CORS — allow dev origins + any URL set via CLIENT_URL env var
+// Configure CORS — allow dev origins + any URL set via CLIENT_URL env var.
+// Trailing slashes are stripped on both sides: a browser's Origin header never
+// has one, but it's an easy thing to paste into CLIENT_URL by accident (e.g.
+// copying straight from the address bar), so normalize rather than requiring
+// an exact match.
+const stripTrailingSlash = (url) => url.replace(/\/+$/, '');
+
 const allowedOrigins = [
   'http://localhost:8080',
   'http://127.0.0.1:8080',
@@ -28,17 +35,17 @@ const allowedOrigins = [
   'http://127.0.0.1:5173',
   'http://127.0.0.1:5174',
   // Production origins from CLIENT_URL env (comma-separated list supported)
-  ...config.CLIENT_URL.split(',').map((u) => u.trim()).filter(Boolean),
+  ...config.CLIENT_URL.split(',').map((u) => stripTrailingSlash(u.trim())).filter(Boolean),
 ];
 
 app.use(
   cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (mobile apps, curl, Postman, same-origin)
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(stripTrailingSlash(origin))) {
         callback(null, true);
       } else {
-        callback(new Error(`CORS: origin ${origin} not allowed`));
+        callback(new AppError(`CORS: origin ${origin} not allowed`, 403, 'CORS_FORBIDDEN'));
       }
     },
     credentials: true,
