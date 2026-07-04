@@ -5,6 +5,7 @@ import { Input } from "@/components/common/input";
 import { Label } from "@/components/common/label";
 import { Link, useNavigate } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/common/select";
+import { useTheme } from "next-themes";
 import { 
   Shield, 
   Bell, 
@@ -41,6 +42,7 @@ export default function Settings() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, logout, patchUser } = useAuthStore();
+  const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<TabType>("account");
 
   // 1. Account & Security Form States
@@ -506,12 +508,11 @@ export default function Settings() {
 
                 <div className="space-y-1.5">
                   <Label className="text-[12px]">Theme Preference</Label>
-                  <Select value={prefs.theme} onValueChange={(val) => updatePref("theme", val)}>
+                  <Select value={theme} onValueChange={setTheme}>
                     <SelectTrigger className="h-9 text-[13px] rounded-sm bg-background border-border"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="dark">Dark Theme</SelectItem>
                       <SelectItem value="light">Light Theme</SelectItem>
-                      <SelectItem value="system">System Preference</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -562,9 +563,14 @@ export default function Settings() {
 
                 <div className="border border-border rounded-sm p-5 bg-background text-center space-y-2">
                   <h4 className="text-[13px] font-semibold">Report a Problem</h4>
-                  <p className="text-[11px] text-muted-foreground">Submit a bug log</p>
+                  <p className="text-[11px] text-muted-foreground">Email us the details directly</p>
                   <div className="pt-1">
-                    <button onClick={() => toast({ title: "Report submitted! Thank you. 📝" })} className="text-[11px] font-semibold text-foreground hover:underline uppercase tracking-wider">Report Bug</button>
+                    <a
+                      href={`mailto:support@youcollab.in?subject=${encodeURIComponent("Bug report from " + (user?.email ?? "a user"))}`}
+                      className="inline-block text-[11px] font-semibold text-foreground hover:underline uppercase tracking-wider"
+                    >
+                      Report Bug
+                    </a>
                   </div>
                 </div>
 
@@ -572,8 +578,8 @@ export default function Settings() {
                   <h4 className="text-[13px] font-semibold">Terms & Privacy</h4>
                   <p className="text-[11px] text-muted-foreground">Legal guidelines</p>
                   <div className="pt-1 flex justify-center gap-3">
-                    <button onClick={() => toast({ title: "Showing Terms (Stub)" })} className="text-[11px] font-semibold text-foreground hover:underline uppercase tracking-wider">Terms</button>
-                    <button onClick={() => toast({ title: "Showing Privacy Policy (Stub)" })} className="text-[11px] font-semibold text-foreground hover:underline uppercase tracking-wider">Privacy</button>
+                    <button onClick={() => toast({ title: "Terms of Service — coming soon" })} className="text-[11px] font-semibold text-foreground hover:underline uppercase tracking-wider">Terms</button>
+                    <button onClick={() => toast({ title: "Privacy Policy — coming soon" })} className="text-[11px] font-semibold text-foreground hover:underline uppercase tracking-wider">Privacy</button>
                   </div>
                 </div>
 
