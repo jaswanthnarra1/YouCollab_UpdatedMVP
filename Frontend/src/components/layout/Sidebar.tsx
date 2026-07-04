@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Logo } from "@/components/ui/logo";
 import { useAuthStore } from "@/stores/authStore";
 
-export function Sidebar() {
+export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const { user, logout } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
@@ -114,7 +114,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="w-64 border-r border-border bg-[#0B0D17] flex flex-col h-screen shrink-0 text-foreground">
+    <aside className="w-64 border-r border-border bg-[#0B0D17] flex flex-col h-full shrink-0 text-foreground">
       {/* Brand Header */}
       <div className="p-6 border-b border-border/40">
         <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
@@ -127,7 +127,7 @@ export function Sidebar() {
       </div>
 
       {/* Nav Menu */}
-      <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
+      <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto" onClick={onNavigate}>
         {menuItems.map((item) => (
           <Link
             key={item.label}

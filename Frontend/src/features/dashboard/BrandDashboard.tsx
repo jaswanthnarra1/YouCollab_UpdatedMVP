@@ -421,7 +421,7 @@ export default function BrandDashboard() {
             </div>
 
             {/* Campaign sub-tabs */}
-            <div className="flex border-b border-border gap-2">
+            <div className="flex border-b border-border gap-2 overflow-x-auto whitespace-nowrap scrollbar-none">
               {(["active", "closed"] as MyGigsTab[]).map((st) => (
                 <button
                   key={st}
@@ -583,7 +583,7 @@ export default function BrandDashboard() {
             </div>
 
             {/* Applications sub-tabs */}
-            <div className="flex border-b border-border gap-2">
+            <div className="flex border-b border-border gap-2 overflow-x-auto whitespace-nowrap scrollbar-none">
               {[
                 { id: "new", label: "New Requests" },
                 { id: "shortlisted", label: "Shortlisted" },

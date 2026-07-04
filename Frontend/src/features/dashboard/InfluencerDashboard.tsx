@@ -342,7 +342,7 @@ export default function InfluencerDashboard() {
 
         <section className="space-y-6">
           {/* Dynamic Tabs */}
-          <div className="flex border-b border-border">
+          <div className="flex border-b border-border overflow-x-auto whitespace-nowrap scrollbar-none">
             <button
               onClick={() => setTab("gigs")}
               className={`pb-3 text-sm font-semibold tracking-tight px-4 border-b-2 transition-colors ${
