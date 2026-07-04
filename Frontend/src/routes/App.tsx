@@ -4,32 +4,43 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
+import { Suspense, lazy } from "react";
 import { AuthBootstrap } from "@/features/auth/AuthBootstrap";
 import { RoleRoute } from "@/features/auth/RoleRoute";
 import { ProtectedRoute } from "@/features/auth/ProtectedRoute";
 import SidebarLayout from "@/components/layout/SidebarLayout";
 import Landing from "@/features/marketplace/Landing";
-import AuthPage from "@/features/auth/AuthPage";
-import ForgotPassword from "@/features/auth/ForgotPassword";
-import InfluencerOnboarding from "@/features/auth/InfluencerOnboarding";
-import BrandOnboarding from "@/features/auth/BrandOnboarding";
-import InfluencerDashboard from "@/features/dashboard/InfluencerDashboard";
-import BrandDashboard from "@/features/dashboard/BrandDashboard";
-import GigCreate from "@/features/gigs/GigCreate";
-import GigEdit from "@/features/gigs/GigEdit";
-import GigApplicants from "@/features/applications/GigApplicants";
-import BrandProfile from "@/features/dashboard/BrandProfile";
-import CreatorProfile from "@/features/dashboard/InfluencerProfile";
-import Marketplace from "@/features/marketplace/Marketplace";
-import GigDetail from "@/features/gigs/GigDetail";
-import InstagramCallback from "@/features/auth/InstagramCallback";
-import Settings from "@/features/dashboard/Settings";
-import VerifyOtpPage from "@/features/auth/VerifyOtpPage";
-import NotFound from "@/components/layout/NotFound";
+
+// Everything past the landing page is behind auth or is a secondary flow —
+// lazy-load it so a first-time visitor's initial bundle is just the landing
+// page + app shell, not the entire dashboard/gigs/profile surface.
+const AuthPage = lazy(() => import("@/features/auth/AuthPage"));
+const ForgotPassword = lazy(() => import("@/features/auth/ForgotPassword"));
+const InfluencerOnboarding = lazy(() => import("@/features/auth/InfluencerOnboarding"));
+const BrandOnboarding = lazy(() => import("@/features/auth/BrandOnboarding"));
+const InfluencerDashboard = lazy(() => import("@/features/dashboard/InfluencerDashboard"));
+const BrandDashboard = lazy(() => import("@/features/dashboard/BrandDashboard"));
+const GigCreate = lazy(() => import("@/features/gigs/GigCreate"));
+const GigEdit = lazy(() => import("@/features/gigs/GigEdit"));
+const GigApplicants = lazy(() => import("@/features/applications/GigApplicants"));
+const BrandProfile = lazy(() => import("@/features/dashboard/BrandProfile"));
+const CreatorProfile = lazy(() => import("@/features/dashboard/InfluencerProfile"));
+const Marketplace = lazy(() => import("@/features/marketplace/Marketplace"));
+const GigDetail = lazy(() => import("@/features/gigs/GigDetail"));
+const InstagramCallback = lazy(() => import("@/features/auth/InstagramCallback"));
+const Settings = lazy(() => import("@/features/dashboard/Settings"));
+const VerifyOtpPage = lazy(() => import("@/features/auth/VerifyOtpPage"));
+const NotFound = lazy(() => import("@/components/layout/NotFound"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
 });
+
+const RouteFallback = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="h-6 w-6 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin" />
+  </div>
+);
 
 const App = () => (
   <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
@@ -39,62 +50,64 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthBootstrap>
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/login" element={<AuthPage mode="login" />} />
-              <Route path="/register" element={<AuthPage mode="register" />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/verify-otp" element={<VerifyOtpPage />} />
-              <Route path="/instagram/callback" element={<InstagramCallback />} />
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
+                <Route path="/" element={<Landing />} />
+                <Route path="/login" element={<AuthPage mode="login" />} />
+                <Route path="/register" element={<AuthPage mode="register" />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/verify-otp" element={<VerifyOtpPage />} />
+                <Route path="/instagram/callback" element={<InstagramCallback />} />
 
-              {/* Protected Sidebar Routes */}
-              <Route element={<SidebarLayout />}>
-                <Route path="/onboarding/influencer" element={
-                  <RoleRoute role="INFLUENCER" allowUnonboarded><InfluencerOnboarding /></RoleRoute>
-                } />
-                <Route path="/onboarding/brand" element={
-                  <RoleRoute role="BRAND" allowUnonboarded><BrandOnboarding /></RoleRoute>
-                } />
+                {/* Protected Sidebar Routes */}
+                <Route element={<SidebarLayout />}>
+                  <Route path="/onboarding/influencer" element={
+                    <RoleRoute role="INFLUENCER" allowUnonboarded><InfluencerOnboarding /></RoleRoute>
+                  } />
+                  <Route path="/onboarding/brand" element={
+                    <RoleRoute role="BRAND" allowUnonboarded><BrandOnboarding /></RoleRoute>
+                  } />
 
-                <Route path="/dashboard/influencer" element={
-                  <RoleRoute role="INFLUENCER"><InfluencerDashboard /></RoleRoute>
-                } />
-                <Route path="/dashboard/brand" element={
-                  <RoleRoute role="BRAND"><BrandDashboard /></RoleRoute>
-                } />
+                  <Route path="/dashboard/influencer" element={
+                    <RoleRoute role="INFLUENCER"><InfluencerDashboard /></RoleRoute>
+                  } />
+                  <Route path="/dashboard/brand" element={
+                    <RoleRoute role="BRAND"><BrandDashboard /></RoleRoute>
+                  } />
 
-                <Route path="/gigs/new" element={
-                  <RoleRoute role="BRAND"><GigCreate /></RoleRoute>
-                } />
-                <Route path="/gigs/:id/edit" element={
-                  <RoleRoute role="BRAND"><GigEdit /></RoleRoute>
-                } />
-                <Route path="/gigs/:id/applicants" element={
-                  <RoleRoute role="BRAND"><GigApplicants /></RoleRoute>
-                } />
-                <Route path="/gigs/:id" element={
-                  <ProtectedRoute><GigDetail /></ProtectedRoute>
-                } />
+                  <Route path="/gigs/new" element={
+                    <RoleRoute role="BRAND"><GigCreate /></RoleRoute>
+                  } />
+                  <Route path="/gigs/:id/edit" element={
+                    <RoleRoute role="BRAND"><GigEdit /></RoleRoute>
+                  } />
+                  <Route path="/gigs/:id/applicants" element={
+                    <RoleRoute role="BRAND"><GigApplicants /></RoleRoute>
+                  } />
+                  <Route path="/gigs/:id" element={
+                    <ProtectedRoute><GigDetail /></ProtectedRoute>
+                  } />
 
-                <Route path="/marketplace" element={
-                  <ProtectedRoute><Marketplace /></ProtectedRoute>
-                } />
+                  <Route path="/marketplace" element={
+                    <ProtectedRoute><Marketplace /></ProtectedRoute>
+                  } />
 
-                <Route path="/profile/brand" element={
-                  <RoleRoute role="BRAND"><BrandProfile /></RoleRoute>
-                } />
-                <Route path="/profile/creator" element={
-                  <RoleRoute role="INFLUENCER"><CreatorProfile /></RoleRoute>
-                } />
-                <Route path="/settings" element={
-                  <ProtectedRoute><Settings /></ProtectedRoute>
-                } />
-              </Route>
+                  <Route path="/profile/brand" element={
+                    <RoleRoute role="BRAND"><BrandProfile /></RoleRoute>
+                  } />
+                  <Route path="/profile/creator" element={
+                    <RoleRoute role="INFLUENCER"><CreatorProfile /></RoleRoute>
+                  } />
+                  <Route path="/settings" element={
+                    <ProtectedRoute><Settings /></ProtectedRoute>
+                  } />
+                </Route>
 
-              {/* Legacy redirects */}
-              <Route path="/auth" element={<Navigate to="/login" replace />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+                {/* Legacy redirects */}
+                <Route path="/auth" element={<Navigate to="/login" replace />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
           </AuthBootstrap>
         </BrowserRouter>
       </TooltipProvider>

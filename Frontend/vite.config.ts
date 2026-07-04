@@ -29,5 +29,19 @@ export default defineConfig(async ({ mode }) => {
         "@": path.resolve(__dirname, "./src"),
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          // Split rarely-changing vendor code from app code so browsers can
+          // cache it across deploys, and so no single chunk balloons past
+          // the size-warning threshold.
+          manualChunks: {
+            "vendor-react": ["react", "react-dom", "react-router-dom"],
+            "vendor-motion": ["framer-motion"],
+            "vendor-query": ["@tanstack/react-query"],
+          },
+        },
+      },
+    },
   };
 });
