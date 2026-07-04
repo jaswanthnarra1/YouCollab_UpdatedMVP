@@ -213,6 +213,8 @@ const login = async (email, password) => {
     role: user.role,
     avatarUrl: user.avatarUrl,
     isOnboarded: user.isOnboarded,
+    notificationPrefs: user.notificationPrefs,
+    privacyPrefs: user.privacyPrefs,
     brand: user.brand,
     influencer: user.influencer,
   };
@@ -298,6 +300,8 @@ const refreshToken = async (oldRefreshToken) => {
     role: user.role,
     avatarUrl: user.avatarUrl,
     isOnboarded: user.isOnboarded,
+    notificationPrefs: user.notificationPrefs,
+    privacyPrefs: user.privacyPrefs,
     brand: user.brand,
     influencer: user.influencer,
   };
@@ -362,6 +366,8 @@ const getMe = async (userId) => {
     avatarUrl: user.avatarUrl,
     isOnboarded: user.isOnboarded,
     lastActiveAt: user.lastActiveAt,
+    notificationPrefs: user.notificationPrefs,
+    privacyPrefs: user.privacyPrefs,
     brand: user.brand,
     influencer: user.influencer,
   };
@@ -813,6 +819,43 @@ const deleteAccount = async (userId) => {
   return { success: true };
 };
 
+/**
+ * Merge and persist notification/privacy preferences (partial updates —
+ * only the keys the client sends are changed, everything else is kept).
+ */
+const updatePreferences = async (userId, { notificationPrefs, privacyPrefs }) => {
+  const { data: user } = await supabase
+    .from('users')
+    .select('notificationPrefs, privacyPrefs')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (!user) {
+    throw new AppError('User not found.', 404, 'NOT_FOUND');
+  }
+
+  const updateData = {};
+  if (notificationPrefs) {
+    updateData.notificationPrefs = { ...user.notificationPrefs, ...notificationPrefs };
+  }
+  if (privacyPrefs) {
+    updateData.privacyPrefs = { ...user.privacyPrefs, ...privacyPrefs };
+  }
+
+  const { data: updated, error } = await supabase
+    .from('users')
+    .update(updateData)
+    .eq('id', userId)
+    .select('notificationPrefs, privacyPrefs')
+    .single();
+
+  if (error) {
+    throw new AppError('Failed to update preferences.', 500, 'DATABASE_ERROR');
+  }
+
+  return updated;
+};
+
 module.exports = {
   register,
   login,
@@ -823,6 +866,7 @@ module.exports = {
   updateEmail,
   changePassword,
   deleteAccount,
+  updatePreferences,
   verifyOtp,
   resendOtp,
   resetPassword,

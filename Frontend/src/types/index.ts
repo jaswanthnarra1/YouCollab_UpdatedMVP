@@ -7,6 +7,8 @@ export interface AuthUser {
   isOnboarded: boolean;
   name?: string;
   profile?: Record<string, unknown>;
+  notificationPrefs?: Record<string, boolean>;
+  privacyPrefs?: Record<string, boolean>;
 }
 
 export type AppStatus = "PENDING" | "ACCEPTED" | "REJECTED";

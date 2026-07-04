@@ -40,7 +40,7 @@ type TabType =
 export default function Settings() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, logout } = useAuthStore();
+  const { user, logout, patchUser } = useAuthStore();
   const [activeTab, setActiveTab] = useState<TabType>("account");
 
   // 1. Account & Security Form States
@@ -48,74 +48,66 @@ export default function Settings() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [newEmail, setNewEmail] = useState("");
-  const [tfaEnabled, setTfaEnabled] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
-  // 2. Notification Preference States
-  const [notifs, setNotifs] = useState({
+  // 2. Notification Preference States — seeded from the real backend value
+  // (users.notificationPrefs), falling back to sensible defaults for
+  // accounts that predate this column.
+  const defaultNotifs = {
     email: true,
     appUpdates: true,
     collabs: true,
     messages: true,
     marketing: false,
     digest: true,
-  });
+  };
+  const [notifs, setNotifs] = useState({ ...defaultNotifs, ...user?.notificationPrefs });
 
-  // 3. Privacy Preference States
-  const [privacy, setPrivacy] = useState({
+  // 3. Privacy Preference States — same pattern (users.privacyPrefs).
+  const defaultPrivacy = {
     publicProfile: true,
     showFollowers: true,
     showContact: false,
     discoverable: true,
     searchVisible: true,
-  });
+  };
+  const [privacy, setPrivacy] = useState({ ...defaultPrivacy, ...user?.privacyPrefs });
 
-  // 4. Connected Accounts States
-  const [connections, setConnections] = useState({
-    instagram: true,
-    youtube: false,
-    tiktok: false,
-    linkedin: false,
-  });
-
-  // 5. Preferences States
+  // 5. Preferences States (local-only — no backend feature reads these yet
+  // besides Theme, which is wired to the real next-themes system below)
   const [prefs, setPrefs] = useState({
     language: "en",
     timeZone: "IST",
     location: "Pune",
     category: "Cafe",
     dateFormat: "DD/MM/YYYY",
-    theme: "dark",
   });
 
-  // Load preferences from localStorage on mount
   useEffect(() => {
-    const savedNotifs = localStorage.getItem("yc.settings.notifs");
-    if (savedNotifs) setNotifs(JSON.parse(savedNotifs));
-
-    const savedPrivacy = localStorage.getItem("yc.settings.privacy");
-    if (savedPrivacy) setPrivacy(JSON.parse(savedPrivacy));
-
     const savedPrefs = localStorage.getItem("yc.settings.prefs");
     if (savedPrefs) setPrefs(JSON.parse(savedPrefs));
-
-    const savedConnections = localStorage.getItem("yc.settings.connections");
-    if (savedConnections) setConnections(JSON.parse(savedConnections));
   }, []);
 
-  // Sync preference helpers
+  // Sync preference helpers — persist to the backend, not just localStorage,
+  // so these actually survive across devices and logout/login.
   const updateNotif = (key: keyof typeof notifs, value: boolean) => {
     const updated = { ...notifs, [key]: value };
     setNotifs(updated);
-    localStorage.setItem("yc.settings.notifs", JSON.stringify(updated));
+    patchUser({ notificationPrefs: updated });
+    authService.updatePreferences({ notificationPrefs: { [key]: value } }).catch(() => {
+      toast({ variant: "destructive", title: "Couldn't save that preference", description: "Try again." });
+    });
     toast({ title: "Notification preference updated" });
   };
 
   const updatePrivacy = (key: keyof typeof privacy, value: boolean) => {
     const updated = { ...privacy, [key]: value };
     setPrivacy(updated);
-    localStorage.setItem("yc.settings.privacy", JSON.stringify(updated));
+    patchUser({ privacyPrefs: updated });
+    authService.updatePreferences({ privacyPrefs: { [key]: value } }).catch(() => {
+      toast({ variant: "destructive", title: "Couldn't save that preference", description: "Try again." });
+    });
     toast({ title: "Privacy preference updated" });
   };
 
@@ -127,8 +119,6 @@ export default function Settings() {
   };
 
   // Account management actions — all three call real backend endpoints.
-  const { patchUser } = useAuthStore();
-
   const changePasswordMutation = useMutation({
     mutationFn: () => authService.changePassword(currentPassword, newPassword),
     onSuccess: () => {

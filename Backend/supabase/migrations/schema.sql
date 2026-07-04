@@ -20,6 +20,30 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS "authId" UUID UNIQUE;
 CREATE INDEX IF NOT EXISTS idx_users_auth_id ON users("authId");
 
 -- ============================================
+-- 1a. Notification / privacy preferences (Settings screen)
+-- ============================================
+-- Server-side storage so preferences survive across devices/logout, instead
+-- of the localStorage-only settings that used to make Settings toggles a
+-- no-op the moment you opened the app on a different device.
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "notificationPrefs" JSONB NOT NULL DEFAULT '{
+  "email": true,
+  "appUpdates": true,
+  "collabs": true,
+  "messages": true,
+  "marketing": false,
+  "digest": true
+}'::jsonb;
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "privacyPrefs" JSONB NOT NULL DEFAULT '{
+  "publicProfile": true,
+  "showFollowers": true,
+  "showContact": false,
+  "discoverable": true,
+  "searchVisible": true
+}'::jsonb;
+
+-- ============================================
 -- 1b. Brand trial credits (one-time 500-credit pack)
 -- ============================================
 

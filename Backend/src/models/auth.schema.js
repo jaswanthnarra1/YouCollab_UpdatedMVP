@@ -52,6 +52,11 @@ const updateEmailSchema = z.object({
     .email('Please enter a valid email address'),
 });
 
+const updatePreferencesSchema = z.object({
+  notificationPrefs: z.record(z.boolean()).optional(),
+  privacyPrefs: z.record(z.boolean()).optional(),
+});
+
 module.exports = {
   registerSchema,
   loginSchema,
@@ -60,4 +65,5 @@ module.exports = {
   resetPasswordSchema,
   changePasswordSchema,
   updateEmailSchema,
+  updatePreferencesSchema,
 };

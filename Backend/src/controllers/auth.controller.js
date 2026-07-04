@@ -214,6 +214,20 @@ const deleteAccount = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Update notification/privacy preferences for the logged-in user.
+ */
+const updatePreferences = asyncHandler(async (req, res) => {
+  const { notificationPrefs, privacyPrefs } = req.body;
+
+  const updated = await authService.updatePreferences(req.user.id, { notificationPrefs, privacyPrefs });
+
+  res.status(200).json({
+    success: true,
+    data: updated,
+  });
+});
+
 module.exports = {
   register,
   login,
@@ -227,4 +241,5 @@ module.exports = {
   changePassword,
   updateEmail,
   deleteAccount,
+  updatePreferences,
 };

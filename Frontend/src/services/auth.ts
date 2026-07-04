@@ -62,4 +62,8 @@ export const authService = {
     tokenStorage.set(null);
     return unwrap<{ message: string }>(data);
   },
+  async updatePreferences(prefs: { notificationPrefs?: Record<string, boolean>; privacyPrefs?: Record<string, boolean> }) {
+    const { data } = await apiClient.patch("/api/auth/preferences", prefs);
+    return unwrap<{ notificationPrefs: Record<string, boolean>; privacyPrefs: Record<string, boolean> }>(data);
+  },
 };
