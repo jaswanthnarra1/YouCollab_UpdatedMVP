@@ -22,6 +22,11 @@ const createTransporter = () => {
   return nodemailer.createTransport({
     service: 'gmail',
     auth: { user, pass },
+    // Some hosts throttle or block outbound SMTP entirely — without these,
+    // nodemailer's defaults can leave a connection attempt hanging for minutes.
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 8000,
   });
 };
 

@@ -139,11 +139,13 @@ const register = async (name, email, password, role) => {
     </div>
   `;
 
-  try {
-    await emailService.sendMail(email, 'Your Verification Code', htmlContent);
-  } catch (mailError) {
+  // Fire-and-forget: email delivery must never block the response. A slow or
+  // unreachable SMTP provider (Gmail from some hosts, notably) would otherwise
+  // hang this whole request — the transporter's own timeouts (email.service.js)
+  // bound how long the background attempt can take, but the client shouldn't wait.
+  emailService.sendMail(email, 'Your Verification Code', htmlContent).catch((mailError) => {
     console.warn(`[OTP Send Fallback] Failed to deliver email via Gmail SMTP: ${mailError.message}`);
-  }
+  });
 
   // In development, log and return OTP so it can be used without email delivery
   const isDev = config.NODE_ENV === 'development';
@@ -415,11 +417,9 @@ const requestPasswordReset = async (email) => {
     </div>
   `;
 
-  try {
-    await emailService.sendMail(email, 'Password Reset Code', htmlContent);
-  } catch (mailError) {
+  emailService.sendMail(email, 'Password Reset Code', htmlContent).catch((mailError) => {
     console.warn(`[OTP Send Fallback] Failed to deliver email via Gmail SMTP: ${mailError.message}`);
-  }
+  });
 
   return { message: 'If an account with that email exists, a reset code has been sent.' };
 };
@@ -617,11 +617,9 @@ const resendOtp = async (email) => {
     </div>
   `;
 
-  try {
-    await emailService.sendMail(email, 'Your New Verification Code', htmlContent);
-  } catch (mailError) {
+  emailService.sendMail(email, 'Your New Verification Code', htmlContent).catch((mailError) => {
     console.warn(`[OTP Send Fallback] Failed to deliver email via Gmail SMTP: ${mailError.message}`);
-  }
+  });
 
   const isDev = config.NODE_ENV === 'development';
   if (isDev) {
