@@ -272,7 +272,7 @@ async function run() {
         3000, 7000,
         '1 Reel, 2 Stories',
         new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        'Food & Beverage', 'Pune', 'OPEN'
+        'Cafe', 'Pune', 'OPEN'
       ]
     );
     const gig1Id = gig1Res.rows[0].id;
@@ -288,7 +288,7 @@ async function run() {
         5000, 10000,
         '1 Youtube Video / Reel Integration',
         new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
-        'Food & Beverage', 'Pune', 'OPEN'
+        'Resto', 'Pune', 'OPEN'
       ]
     );
     const gig2Id = gig2Res.rows[0].id;
@@ -304,7 +304,7 @@ async function run() {
         8000, 15000,
         '4 Reels, 8 Stories, 1 Blog Post',
         new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
-        'Fitness & Wellness', 'Pune', 'OPEN'
+        'Fitness', 'Pune', 'OPEN'
       ]
     );
     const gig3Id = gig3Res.rows[0].id;
