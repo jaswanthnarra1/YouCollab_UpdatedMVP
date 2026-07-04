@@ -7,12 +7,13 @@ import { useState } from "react";
 
 export default function SidebarLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
       {/* Sidebar — persistent from md breakpoint up */}
       <div className="hidden md:flex h-screen shrink-0">
-        <Sidebar />
+        <Sidebar collapsed={collapsed} onToggleCollapse={() => setCollapsed((c) => !c)} />
       </div>
 
       {/* Sidebar — slide-in drawer below md */}

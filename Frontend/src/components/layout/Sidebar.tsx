@@ -1,10 +1,16 @@
 import { authService } from "@/services/auth";
-import { LayoutGrid, Compass, FileText, User, Settings, LogOut, PlusSquare, MessageSquare, Briefcase, Users } from "lucide-react";
+import { LayoutGrid, Compass, FileText, User, Settings, LogOut, PlusSquare, MessageSquare, Briefcase, Users, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Logo } from "@/components/ui/logo";
 import { useAuthStore } from "@/stores/authStore";
 
-export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
+interface SidebarProps {
+  onNavigate?: () => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+}
+
+export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: SidebarProps = {}) {
   const { user, logout } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
@@ -114,17 +120,45 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   };
 
   return (
-    <aside className="w-64 border-r border-border bg-[#0B0D17] flex flex-col h-full shrink-0 text-foreground">
+    <aside className={`${collapsed ? "w-[68px]" : "w-64"} border-r border-border bg-[#0B0D17] flex flex-col h-full shrink-0 text-foreground transition-[width] duration-200`}>
       {/* Brand Header */}
-      <div className="p-6 border-b border-border/40">
-        <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <Logo className="h-8 w-8 rounded-sm" />
-          <span className="text-sm font-semibold tracking-tight">You Collab</span>
-          <span className="ml-2 border border-border px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted-foreground rounded-sm">
-            Pune
-          </span>
+      <div className={`border-b border-border/40 flex items-center ${collapsed ? "justify-center p-4" : "justify-between p-6"}`}>
+        <Link to="/" className={`flex items-center gap-2 hover:opacity-80 transition-opacity min-w-0 ${collapsed ? "justify-center" : ""}`}>
+          <Logo className="h-8 w-8 rounded-sm shrink-0" />
+          {!collapsed && (
+            <>
+              <span className="text-sm font-semibold tracking-tight whitespace-nowrap">You Collab</span>
+              <span className="ml-2 border border-border px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted-foreground rounded-sm whitespace-nowrap">
+                Pune
+              </span>
+            </>
+          )}
         </Link>
+
+        {onToggleCollapse && !collapsed && (
+          <button
+            onClick={onToggleCollapse}
+            className="h-7 w-7 flex items-center justify-center rounded-sm text-muted-foreground hover:text-foreground hover:bg-zinc-800/40 transition-colors shrink-0"
+            title="Collapse sidebar"
+            aria-label="Collapse sidebar"
+          >
+            <ChevronsLeft className="h-4 w-4" />
+          </button>
+        )}
       </div>
+
+      {collapsed && onToggleCollapse && (
+        <div className="flex justify-center py-2 border-b border-border/40">
+          <button
+            onClick={onToggleCollapse}
+            className="h-7 w-7 flex items-center justify-center rounded-sm text-muted-foreground hover:text-foreground hover:bg-zinc-800/40 transition-colors"
+            title="Expand sidebar"
+            aria-label="Expand sidebar"
+          >
+            <ChevronsRight className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Nav Menu */}
       <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto" onClick={onNavigate}>
@@ -132,42 +166,59 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
           <Link
             key={item.label}
             to={item.path}
+            title={collapsed ? item.label : undefined}
             className={`flex items-center gap-3 px-3 py-2 text-xs font-medium uppercase tracking-wider transition-colors rounded-md ${
+              collapsed ? "justify-center" : ""
+            } ${
               item.active
                 ? "bg-zinc-800/80 text-foreground"
                 : "text-muted-foreground hover:text-foreground hover:bg-zinc-800/30"
             }`}
           >
             <item.icon className="h-4 w-4 shrink-0" />
-            <span>{item.label}</span>
+            {!collapsed && <span>{item.label}</span>}
           </Link>
         ))}
       </nav>
 
       {/* User Footer Profile */}
-      <div className="p-4 border-t border-border/40 flex items-center justify-between gap-3 bg-[#080A10]">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="h-8 w-8 rounded-full bg-primary/20 text-primary border border-primary/30 flex items-center justify-center font-bold text-xs shrink-0">
+      <div className={`border-t border-border/40 flex items-center gap-3 bg-[#080A10] ${collapsed ? "justify-center p-3" : "justify-between p-4"}`}>
+        <div className={`flex items-center gap-2 min-w-0 ${collapsed ? "" : ""}`}>
+          <div className="h-8 w-8 rounded-full bg-primary/20 text-primary border border-primary/30 flex items-center justify-center font-bold text-xs shrink-0" title={collapsed ? user.name || "User" : undefined}>
             {user.avatarUrl ? (
               <img src={user.avatarUrl} alt="" className="h-full w-full object-cover rounded-full" />
             ) : (
               getInitials(user.name)
             )}
           </div>
-          <div className="min-w-0">
-            <p className="text-[12px] font-semibold truncate leading-tight text-foreground">{user.name || "User"}</p>
-            <p className="text-[10px] text-muted-foreground truncate leading-none mt-0.5">{user.role}</p>
-          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <p className="text-[12px] font-semibold truncate leading-tight text-foreground">{user.name || "User"}</p>
+              <p className="text-[10px] text-muted-foreground truncate leading-none mt-0.5">{user.role}</p>
+            </div>
+          )}
         </div>
-        
+
+        {!collapsed && (
+          <button
+            onClick={handleLogout}
+            className="h-8 w-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-zinc-800/30 transition-colors rounded-sm shrink-0"
+            title="Sign out"
+          >
+            <LogOut className="h-4.5 w-4.5" />
+          </button>
+        )}
+      </div>
+
+      {collapsed && (
         <button
           onClick={handleLogout}
-          className="h-8 w-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-zinc-800/30 transition-colors rounded-sm"
+          className="h-9 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-zinc-800/30 transition-colors border-t border-border/40 bg-[#080A10]"
           title="Sign out"
         >
-          <LogOut className="h-4.5 w-4.5" />
+          <LogOut className="h-4 w-4" />
         </button>
-      </div>
+      )}
     </aside>
   );
 }
