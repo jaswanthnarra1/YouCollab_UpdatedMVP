@@ -20,8 +20,15 @@ import {
 } from "lucide-react";
 import { Switch } from "@/components/common/switch";
 import { useAuthStore } from "@/stores/authStore";
+import { authService } from "@/services/auth";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useMutation } from "@tanstack/react-query";
+
+function apiErrorMessage(err: unknown, fallback: string): string {
+  const e = err as { response?: { data?: { error?: { message?: string } } } };
+  return e?.response?.data?.error?.message ?? fallback;
+}
 
 type TabType = 
   | "account" 
@@ -36,15 +43,11 @@ export default function Settings() {
   const { user, logout } = useAuthStore();
   const [activeTab, setActiveTab] = useState<TabType>("account");
 
-  // General loading states
-  const [loadingAction, setLoadingAction] = useState<string | null>(null);
-
   // 1. Account & Security Form States
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [newEmail, setNewEmail] = useState("");
-  const [isEmailVerified, setIsEmailVerified] = useState(true);
   const [tfaEnabled, setTfaEnabled] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
@@ -123,8 +126,21 @@ export default function Settings() {
     toast({ title: "General preferences updated" });
   };
 
-  // Account management actions
-  const handleChangePassword = async (e: React.FormEvent) => {
+  // Account management actions — all three call real backend endpoints.
+  const { patchUser } = useAuthStore();
+
+  const changePasswordMutation = useMutation({
+    mutationFn: () => authService.changePassword(currentPassword, newPassword),
+    onSuccess: () => {
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      toast({ title: "Password updated successfully! 🔐" });
+    },
+    onError: (err) => toast({ variant: "destructive", title: "Couldn't update password", description: apiErrorMessage(err, "Try again.") }),
+  });
+
+  const handleChangePassword = (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentPassword || !newPassword || !confirmPassword) {
       toast({ variant: "destructive", title: "Fill all password fields" });
@@ -134,54 +150,45 @@ export default function Settings() {
       toast({ variant: "destructive", title: "Passwords mismatch", description: "New password and confirm password do not match." });
       return;
     }
-
-    setLoadingAction("password");
-    // Mock request
-    setTimeout(() => {
-      setLoadingAction(null);
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      toast({ title: "Password updated successfully! 🔐" });
-    }, 1500);
+    changePasswordMutation.mutate();
   };
 
-  const handleChangeEmail = async (e: React.FormEvent) => {
+  const changeEmailMutation = useMutation({
+    mutationFn: () => authService.updateEmail(newEmail),
+    onSuccess: (data) => {
+      patchUser({ email: data.user.email });
+      setNewEmail("");
+      toast({ title: "Email updated successfully!", description: `Your account email is now ${data.user.email}.` });
+    },
+    onError: (err) => toast({ variant: "destructive", title: "Couldn't update email", description: apiErrorMessage(err, "Try again.") }),
+  });
+
+  const handleChangeEmail = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEmail) {
       toast({ variant: "destructive", title: "Email is required" });
       return;
     }
-
-    setLoadingAction("email");
-    // Mock request
-    setTimeout(() => {
-      setLoadingAction(null);
-      setNewEmail("");
-      setIsEmailVerified(false);
-      toast({ title: "Verification email sent! ✉️", description: "Please check your inbox to confirm the change." });
-    }, 1500);
+    changeEmailMutation.mutate();
   };
 
-  const handleVerifyEmailStatus = () => {
-    if (isEmailVerified) return;
-    setLoadingAction("verifyEmail");
-    setTimeout(() => {
-      setLoadingAction(null);
-      setIsEmailVerified(true);
-      toast({ title: "Email verified successfully!" });
-    }, 1200);
-  };
+  const deleteAccountMutation = useMutation({
+    mutationFn: () => authService.deleteAccount(),
+    onSuccess: () => {
+      setIsDeleteModalOpen(false);
+      logout();
+      toast({ title: "Account deleted permanently." });
+      navigate("/");
+    },
+    onError: (err) => toast({ variant: "destructive", title: "Couldn't delete account", description: apiErrorMessage(err, "Try again.") }),
+  });
 
   const handleDeleteAccount = () => {
     if (deleteConfirmText !== "DELETE") {
       toast({ variant: "destructive", title: "Confirmation mismatch", description: 'Please type "DELETE" to confirm.' });
       return;
     }
-    setIsDeleteModalOpen(false);
-    logout();
-    toast({ title: "Account deleted permanently." });
-    navigate("/");
+    deleteAccountMutation.mutate();
   };
 
   // Nav categories layout
@@ -236,42 +243,32 @@ export default function Settings() {
                 <div>
                   <div className="flex items-center justify-between text-[11px] uppercase tracking-wider text-muted-foreground">
                     <span className="inline-flex items-center gap-1"><Mail className="h-3 w-3" /> Email settings</span>
-                    {isEmailVerified ? (
-                      <span className="inline-flex items-center gap-1 border border-emerald-500/25 px-1.5 py-0.5 text-[9px] uppercase tracking-wider rounded-sm text-emerald-400 bg-emerald-500/5">
-                        <BadgeCheck className="h-3 w-3" /> Verified
-                      </span>
-                    ) : (
-                      <button 
-                        onClick={handleVerifyEmailStatus} 
-                        disabled={loadingAction === "verifyEmail"}
-                        className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 border border-yellow-500/25 text-yellow-500 hover:bg-yellow-500/10 rounded-sm"
-                      >
-                        {loadingAction === "verifyEmail" ? <Loader2 className="h-3 w-3 animate-spin" /> : "Verify email"}
-                      </button>
-                    )}
+                    <span className="inline-flex items-center gap-1 border border-emerald-500/25 px-1.5 py-0.5 text-[9px] uppercase tracking-wider rounded-sm text-emerald-400 bg-emerald-500/5">
+                      <BadgeCheck className="h-3 w-3" /> Verified
+                    </span>
                   </div>
-                  
+
                   <h3 className="mt-3 text-[14px] font-semibold">Email Address</h3>
                   <p className="mt-1 text-[12px] text-muted-foreground">Your primary communication address: <span className="font-semibold text-foreground">{user?.email}</span></p>
 
                   <form onSubmit={handleChangeEmail} className="mt-4 space-y-3">
                     <div className="space-y-1.5">
                       <Label className="text-[12px]">New email address</Label>
-                      <Input 
-                        type="email" 
+                      <Input
+                        type="email"
                         required
-                        value={newEmail} 
-                        onChange={(e) => setNewEmail(e.target.value)} 
-                        placeholder="new-email@example.com" 
-                        className="h-9 text-[13px] rounded-sm" 
+                        value={newEmail}
+                        onChange={(e) => setNewEmail(e.target.value)}
+                        placeholder="new-email@example.com"
+                        className="h-9 text-[13px] rounded-sm"
                       />
                     </div>
-                    <Button 
-                      type="submit" 
-                      disabled={loadingAction === "email"} 
+                    <Button
+                      type="submit"
+                      disabled={changeEmailMutation.isPending}
                       className="w-full h-8 text-[12px] rounded-sm bg-gradient-brand text-primary-foreground border-0 shadow-md hover:opacity-95"
                     >
-                      {loadingAction === "email" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Change Email"}
+                      {changeEmailMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Change Email"}
                     </Button>
                   </form>
                 </div>
@@ -322,12 +319,12 @@ export default function Settings() {
                         className="h-9 text-[13px] rounded-sm" 
                       />
                     </div>
-                    <Button 
-                      type="submit" 
-                      disabled={loadingAction === "password"} 
+                    <Button
+                      type="submit"
+                      disabled={changePasswordMutation.isPending}
                       className="w-full h-8 text-[12px] rounded-sm bg-gradient-brand text-primary-foreground border-0 shadow-md hover:opacity-95"
                     >
-                      {loadingAction === "password" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Update Password"}
+                      {changePasswordMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Update Password"}
                     </Button>
                   </form>
                 </div>
@@ -621,8 +618,8 @@ export default function Settings() {
             <Button variant="ghost" onClick={() => { setIsDeleteModalOpen(false); setDeleteConfirmText(""); }} className="h-9 text-xs rounded-sm hover:bg-zinc-800">
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteAccount} className="h-9 text-xs rounded-sm bg-red-600 hover:bg-red-500">
-              Confirm Delete
+            <Button variant="destructive" onClick={handleDeleteAccount} disabled={deleteAccountMutation.isPending} className="h-9 text-xs rounded-sm bg-red-600 hover:bg-red-500">
+              {deleteAccountMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Confirm Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

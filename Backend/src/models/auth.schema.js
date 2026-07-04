@@ -40,10 +40,24 @@ const resetPasswordSchema = z.object({
     .min(6, 'Password must be at least 6 characters long'),
 });
 
+const changePasswordSchema = z.object({
+  currentPassword: z.string({ required_error: 'Current password is required' })
+    .min(1, 'Current password is required'),
+  newPassword: z.string({ required_error: 'New password is required' })
+    .min(6, 'Password must be at least 6 characters long'),
+});
+
+const updateEmailSchema = z.object({
+  email: z.string({ required_error: 'Email is required' })
+    .email('Please enter a valid email address'),
+});
+
 module.exports = {
   registerSchema,
   loginSchema,
   verifyOtpSchema,
   resendOtpSchema,
   resetPasswordSchema,
+  changePasswordSchema,
+  updateEmailSchema,
 };

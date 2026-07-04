@@ -49,4 +49,17 @@ export const authService = {
     const { data } = await apiClient.post("/api/auth/reset-password", { email, otp, password });
     return unwrap<{ message: string }>(data);
   },
+  async changePassword(currentPassword: string, newPassword: string) {
+    const { data } = await apiClient.patch("/api/auth/password", { currentPassword, newPassword });
+    return unwrap<{ message: string }>(data);
+  },
+  async updateEmail(email: string) {
+    const { data } = await apiClient.patch("/api/auth/email", { email });
+    return unwrap<{ user: AuthUser; message: string }>(data);
+  },
+  async deleteAccount() {
+    const { data } = await apiClient.delete("/api/auth/account");
+    tokenStorage.set(null);
+    return unwrap<{ message: string }>(data);
+  },
 };

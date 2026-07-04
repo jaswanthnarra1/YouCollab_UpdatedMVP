@@ -738,6 +738,81 @@ const updateEmail = async (userId, newEmail) => {
   return user;
 };
 
+/**
+ * Change the logged-in user's password (requires knowing the current one).
+ */
+const changePassword = async (userId, currentPassword, newPassword) => {
+  const { data: user } = await supabase
+    .from('users')
+    .select('email, authId')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (!user) {
+    throw new AppError('User not found.', 404, 'NOT_FOUND');
+  }
+
+  // Re-use the same check login() does — Supabase Auth is the source of truth
+  // for credentials, public.users.passwordHash is just a placeholder.
+  const { error: authError } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: currentPassword,
+  });
+
+  if (authError) {
+    throw new AppError('Current password is incorrect.', 401, 'UNAUTHORIZED');
+  }
+
+  if (!user.authId || !supabaseAdmin) {
+    throw new AppError('Failed to update password.', 500, 'DATABASE_ERROR');
+  }
+
+  const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.authId, {
+    password: newPassword,
+  });
+
+  if (updateError) {
+    throw new AppError('Failed to update password.', 500, 'DATABASE_ERROR');
+  }
+
+  return { success: true };
+};
+
+/**
+ * Permanently delete the logged-in user's account.
+ * Deleting the public.users row cascades to every dependent table (brands/
+ * influencers, gigs, applications, messages, notifications, refresh_tokens,
+ * reviews all have ON DELETE CASCADE back to users) — the Supabase Auth user
+ * is a separate system and is deleted explicitly afterward.
+ */
+const deleteAccount = async (userId) => {
+  const { data: user } = await supabase
+    .from('users')
+    .select('authId')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (!user) {
+    throw new AppError('User not found.', 404, 'NOT_FOUND');
+  }
+
+  const { error } = await supabase.from('users').delete().eq('id', userId);
+
+  if (error) {
+    throw new AppError('Failed to delete account.', 500, 'DATABASE_ERROR');
+  }
+
+  if (user.authId && supabaseAdmin) {
+    try {
+      await supabaseAdmin.auth.admin.deleteUser(user.authId);
+    } catch (err) {
+      console.error(`Failed to delete Supabase Auth user during account deletion: ${err.message}`);
+    }
+  }
+
+  return { success: true };
+};
+
 module.exports = {
   register,
   login,
@@ -746,6 +821,8 @@ module.exports = {
   getMe,
   requestPasswordReset,
   updateEmail,
+  changePassword,
+  deleteAccount,
   verifyOtp,
   resendOtp,
   resetPassword,

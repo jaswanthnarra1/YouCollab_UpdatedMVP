@@ -174,6 +174,46 @@ const resetPassword = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Change password for the logged-in user.
+ */
+const changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  await authService.changePassword(req.user.id, currentPassword, newPassword);
+
+  res.status(200).json({
+    success: true,
+    data: { message: 'Password updated successfully.' },
+  });
+});
+
+/**
+ * Update email for the logged-in user.
+ */
+const updateEmail = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  const user = await authService.updateEmail(req.user.id, email);
+
+  res.status(200).json({
+    success: true,
+    data: { user, message: 'Email updated successfully.' },
+  });
+});
+
+/**
+ * Permanently delete the logged-in user's account.
+ */
+const deleteAccount = asyncHandler(async (req, res) => {
+  await authService.deleteAccount(req.user.id);
+
+  res.status(200).json({
+    success: true,
+    data: { message: 'Account deleted permanently.' },
+  });
+});
+
 module.exports = {
   register,
   login,
@@ -184,4 +224,7 @@ module.exports = {
   verifyOtp,
   resendOtp,
   resetPassword,
+  changePassword,
+  updateEmail,
+  deleteAccount,
 };
