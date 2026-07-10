@@ -1,4 +1,5 @@
 // Mirrors Backend/src/utils/credits.js — keep both in sync.
+export const TRIAL_CREDITS = 500;
 export const GIG_POST_COST = 250;
 export const TIER_COST = { NANO: 100, MICRO: 300 } as const;
 export type Tier = "NANO" | "MICRO" | "MID";

@@ -27,6 +27,7 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import { clerkErrorMessage } from "@/lib/clerkError";
+import { TRIAL_CREDITS, GIG_POST_COST, TIER_COST } from "@/lib/credits";
 
 function apiErrorMessage(err: unknown, fallback: string): string {
   const e = err as { response?: { data?: { error?: { message?: string } } } };
@@ -100,23 +101,32 @@ export default function Settings() {
   // Sync preference helpers — persist to the backend, not just localStorage,
   // so these actually survive across devices and logout/login.
   const updateNotif = (key: keyof typeof notifs, value: boolean) => {
+    const prev = notifs;
     const updated = { ...notifs, [key]: value };
     setNotifs(updated);
     patchUser({ notificationPrefs: updated });
-    authService.updatePreferences({ notificationPrefs: { [key]: value } }).catch(() => {
-      toast({ variant: "destructive", title: "Couldn't save that preference", description: "Try again." });
-    });
-    toast({ title: "Notification preference updated" });
+    authService.updatePreferences({ notificationPrefs: { [key]: value } })
+      .then(() => toast({ title: "Notification preference updated" }))
+      .catch(() => {
+        // Roll back the optimistic flip so the switch reflects what actually persisted.
+        setNotifs(prev);
+        patchUser({ notificationPrefs: prev });
+        toast({ variant: "destructive", title: "Couldn't save that preference", description: "Try again." });
+      });
   };
 
   const updatePrivacy = (key: keyof typeof privacy, value: boolean) => {
+    const prev = privacy;
     const updated = { ...privacy, [key]: value };
     setPrivacy(updated);
     patchUser({ privacyPrefs: updated });
-    authService.updatePreferences({ privacyPrefs: { [key]: value } }).catch(() => {
-      toast({ variant: "destructive", title: "Couldn't save that preference", description: "Try again." });
-    });
-    toast({ title: "Privacy preference updated" });
+    authService.updatePreferences({ privacyPrefs: { [key]: value } })
+      .then(() => toast({ title: "Privacy preference updated" }))
+      .catch(() => {
+        setPrivacy(prev);
+        patchUser({ privacyPrefs: prev });
+        toast({ variant: "destructive", title: "Couldn't save that preference", description: "Try again." });
+      });
   };
 
   const updatePref = (key: keyof typeof prefs, value: string) => {
@@ -593,6 +603,66 @@ export default function Settings() {
               <div className="border border-border rounded-sm p-5 bg-background md:col-span-2 space-y-4">
                 <h3 className="text-[14px] font-semibold">Frequently Asked Questions</h3>
                 <Accordion type="single" collapsible className="w-full">
+
+                  {/* Credit Q&A — brand vs creator, driven by the shared credit constants */}
+                  {user?.role === "BRAND" && (
+                    <>
+                      <AccordionItem value="credit-b1" className="border-border">
+                        <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">How do credits work for my brand?</AccordionTrigger>
+                        <AccordionContent className="text-[12px] text-muted-foreground leading-relaxed">
+                          You get a one-time trial pack of <strong className="text-foreground">{TRIAL_CREDITS} credits</strong> when you join. Credits are only spent on two actions — posting a collab brief and hiring a creator. Browsing creators, receiving pitches, and messaging are always free.
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="credit-b2" className="border-border">
+                        <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">How many credits does posting a collab cost?</AccordionTrigger>
+                        <AccordionContent className="text-[12px] text-muted-foreground leading-relaxed">
+                          Posting a brief costs <strong className="text-foreground">{GIG_POST_COST} credits</strong>, charged the moment it goes live. If the post fails to publish for any reason, those credits are automatically refunded to your balance.
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="credit-b3" className="border-border">
+                        <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">How much does hiring a creator cost?</AccordionTrigger>
+                        <AccordionContent className="text-[12px] text-muted-foreground leading-relaxed">
+                          Hiring (accepting a pitch) is priced by the creator's Instagram follower tier: <strong className="text-foreground">Nano</strong> (under 1,000 followers) costs <strong className="text-foreground">{TIER_COST.NANO} credits</strong>, and <strong className="text-foreground">Micro</strong> (1,000–10,000 followers) costs <strong className="text-foreground">{TIER_COST.MICRO} credits</strong>. Mid-tier creators (over 10,000 followers) are locked during the trial and can't be hired yet.
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="credit-b4" className="border-border">
+                        <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">What happens when I run out of credits?</AccordionTrigger>
+                        <AccordionContent className="text-[12px] text-muted-foreground leading-relaxed">
+                          Actions that cost credits are blocked once your balance is too low — you'll see an "insufficient credits" message when posting or hiring. Your existing briefs and past hires are unaffected. Paid credit packs to top up beyond the trial are coming soon.
+                        </AccordionContent>
+                      </AccordionItem>
+                    </>
+                  )}
+
+                  {user?.role === "INFLUENCER" && (
+                    <>
+                      <AccordionItem value="credit-c1" className="border-border">
+                        <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">How do I earn credits?</AccordionTrigger>
+                        <AccordionContent className="text-[12px] text-muted-foreground leading-relaxed">
+                          You start at <strong className="text-foreground">0 credits</strong> and earn them when a brand hires you — that is, accepts your pitch on one of their briefs. Browsing gigs and sending pitches is always free; nothing is deducted from you.
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="credit-c2" className="border-border">
+                        <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">How many credits do I earn per hire?</AccordionTrigger>
+                        <AccordionContent className="text-[12px] text-muted-foreground leading-relaxed">
+                          You earn exactly what the brand spends to hire you, based on your Instagram follower tier: <strong className="text-foreground">Nano</strong> (under 1,000 followers) earns <strong className="text-foreground">{TIER_COST.NANO} credits</strong>, and <strong className="text-foreground">Micro</strong> (1,000–10,000 followers) earns <strong className="text-foreground">{TIER_COST.MICRO} credits</strong> per accepted collab.
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="credit-c3" className="border-border">
+                        <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">When are earned credits added to my balance?</AccordionTrigger>
+                        <AccordionContent className="text-[12px] text-muted-foreground leading-relaxed">
+                          Instantly. The moment a brand accepts your pitch, the brand's spend and your earning happen together in a single transaction, so your balance updates the same second you're hired.
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="credit-c4" className="border-border">
+                        <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">Why can larger creators not be hired yet?</AccordionTrigger>
+                        <AccordionContent className="text-[12px] text-muted-foreground leading-relaxed">
+                          Mid-tier creators (over 10,000 followers) are locked during the trial period — there's no paid pack yet for brands to unlock those hires. This is temporary and opens up as paid tiers launch, so growing past 10,000 followers won't lock you out permanently.
+                        </AccordionContent>
+                      </AccordionItem>
+                    </>
+                  )}
+
                   <AccordionItem value="item-1" className="border-border">
                     <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">How do I verify my follower count?</AccordionTrigger>
                     <AccordionContent className="text-[12px] text-muted-foreground leading-relaxed">
