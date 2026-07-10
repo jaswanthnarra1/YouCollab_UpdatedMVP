@@ -1,4 +1,4 @@
-import { authService } from "@/services/auth";
+import { useClerk } from "@clerk/clerk-react";
 import { LayoutGrid, Compass, FileText, User, Settings, LogOut, PlusSquare, MessageSquare, Briefcase, Users, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Logo } from "@/components/ui/logo";
@@ -12,6 +12,7 @@ interface SidebarProps {
 
 export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: SidebarProps = {}) {
   const { user, logout } = useAuthStore();
+  const { signOut } = useClerk();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -19,9 +20,7 @@ export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: Sid
 
   const handleLogout = async () => {
     try {
-      await authService.logout();
-    } catch (err) {
-      console.warn("Logout failed on server, logging out locally:", err);
+      await signOut();
     } finally {
       logout();
       navigate("/");

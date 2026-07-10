@@ -1,13 +1,18 @@
 import { ArrowRight, Loader2 } from "lucide-react";
+import { useAuth, useSignIn, useSignUp } from "@clerk/clerk-react";
+import ReCAPTCHA from "react-google-recaptcha";
 import { authService } from "@/services/auth";
+import { verifyCaptchaToken } from "@/services/recaptcha";
 import { Button } from "@/components/common/button";
+import { Captcha } from "@/components/common/Captcha";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/common/label";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Logo } from "@/components/ui/logo";
 import { useAuthStore, type Role } from "@/stores/authStore";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { clerkErrorMessage } from "@/lib/clerkError";
 
 interface Props {
   mode: "login" | "register";
@@ -22,47 +27,113 @@ export default function AuthPage({ mode }: Props) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] = useState<Role>(initialRole);
   const [loading, setLoading] = useState(false);
-  const { setUser, setToken } = useAuthStore();
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<ReCAPTCHA>(null);
+  const { setUser } = useAuthStore();
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
+  const { signIn, setActive: setActiveSignIn, isLoaded: signInLoaded } = useSignIn();
+  const { signUp, isLoaded: signUpLoaded } = useSignUp();
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // reCAPTCHA v2 tokens are single-use and short-lived — reset the widget
+  // after every submit attempt (success or failure) so the next attempt
+  // always starts from a fresh, unconsumed token.
+  const resetCaptcha = () => {
+    captchaRef.current?.reset();
+    setCaptchaToken(null);
+  };
+
+  // A Clerk session can already be active here — a stale tab, browser back
+  // button after signing in, or a tab opened while signed in elsewhere.
+  // Calling authenticateWithRedirect (or signIn.create/signUp.create) while
+  // one exists throws Clerk's "You're already signed in" error, so bounce
+  // out to the same role-resolution page OAuth uses instead of rendering
+  // the form at all.
+  useEffect(() => {
+    if (authLoaded && isSignedIn) {
+      navigate("/oauth-role", { replace: true });
+    }
+  }, [authLoaded, isSignedIn, navigate]);
+
+  const continueWithGoogle = async () => {
+    if (isSignedIn) {
+      navigate("/oauth-role", { replace: true });
+      return;
+    }
+    try {
+      if (mode === "register") {
+        sessionStorage.setItem("yc.oauth.role", role);
+        sessionStorage.setItem("yc.oauth.name", name || "");
+        if (!signUpLoaded) return;
+        await signUp.authenticateWithRedirect({
+          strategy: "oauth_google",
+          redirectUrl: "/sso-callback",
+          redirectUrlComplete: "/oauth-role",
+        });
+      } else {
+        if (!signInLoaded) return;
+        await signIn.authenticateWithRedirect({
+          strategy: "oauth_google",
+          redirectUrl: "/sso-callback",
+          redirectUrlComplete: "/oauth-role",
+        });
+      }
+    } catch (err) {
+      toast({ variant: "destructive", title: "Google sign-in failed", description: clerkErrorMessage(err) });
+    }
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSignedIn) {
+      navigate("/oauth-role", { replace: true });
+      return;
+    }
+    if (mode === "register" && password !== confirmPassword) {
+      toast({ variant: "destructive", title: "Passwords mismatch", description: "Password and Confirm Password do not match." });
+      return;
+    }
+    if (!captchaToken) {
+      toast({ variant: "destructive", title: "Verification required", description: "Please complete the \"I'm not a robot\" check." });
+      return;
+    }
     setLoading(true);
     try {
+      await verifyCaptchaToken(captchaToken);
       if (mode === "login") {
-        const res = await authService.login(email, password);
+        if (!signInLoaded) return;
+        const result = await signIn.create({ identifier: email, password });
+        if (result.status !== "complete") throw new Error("Additional verification required.");
+        await setActiveSignIn({ session: result.createdSessionId });
+
+        const res = await authService.me();
         if (!res?.user) throw new Error("Auth failed");
         setUser(res.user);
-        if (res.accessToken) setToken(res.accessToken);
         const dest = !res.user.isOnboarded
           ? res.user.role === "BRAND" ? "/onboarding/brand" : "/onboarding/influencer"
           : res.user.role === "BRAND" ? "/dashboard/brand" : "/dashboard/influencer";
         navigate(dest);
       } else {
-        if (password !== confirmPassword) {
-          toast({ variant: "destructive", title: "Passwords mismatch", description: "Password and Confirm Password do not match." });
-          setLoading(false);
-          return;
-        }
-        const res = await authService.register(name, email, password, role);
-        const devOtp = res?.dev_otp ?? "";
-        toast({
-          title: "OTP Code Sent! ✉️",
-          description: devOtp
-            ? `Dev mode: your code is ${devOtp}`
-            : "Please check your inbox for a 6-digit verification code.",
+        if (!signUpLoaded) return;
+        await signUp.create({
+          emailAddress: email,
+          password,
+          unsafeMetadata: { role, name },
         });
-        navigate(`/verify-otp?email=${encodeURIComponent(email)}${devOtp ? `&dev_otp=${devOtp}` : ""}`);
+        await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+        toast({ title: "Verification code sent! ✉️", description: "Please check your inbox for a 6-digit code." });
+        navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
       }
     } catch (err) {
-      const msg =
-        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ||
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        (err as Error).message ||
-        "Something went wrong";
-      toast({ variant: "destructive", title: mode === "login" ? "Login failed" : "Sign up failed", description: msg });
+      const backendMsg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message;
+      toast({
+        variant: "destructive",
+        title: mode === "login" ? "Login failed" : "Sign up failed",
+        description: backendMsg || clerkErrorMessage(err),
+      });
     } finally {
+      resetCaptcha();
       setLoading(false);
     }
   };
@@ -121,6 +192,28 @@ export default function AuthPage({ mode }: Props) {
               ))}
             </div>
           )}
+
+          {/* Google OAuth */}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={continueWithGoogle}
+            className="w-full h-9 text-[13px] rounded-sm gap-2"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+              <path fill="#4285F4" d="M23.49 12.27c0-.82-.07-1.6-.2-2.36H12v4.47h6.47a5.55 5.55 0 0 1-2.4 3.64v3.02h3.88c2.27-2.09 3.54-5.17 3.54-8.77Z" />
+              <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.9l-3.88-3.02c-1.08.72-2.46 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.26v3.11A12 12 0 0 0 12 24Z" />
+              <path fill="#FBBC05" d="M5.27 14.27a7.2 7.2 0 0 1 0-4.54V6.62H1.26a12 12 0 0 0 0 10.76l4.01-3.11Z" />
+              <path fill="#EA4335" d="M12 4.75c1.76 0 3.34.61 4.58 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.69 1.26 6.62l4.01 3.11C6.22 6.86 8.87 4.75 12 4.75Z" />
+            </svg>
+            Continue with Google
+          </Button>
+
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-[11px] text-muted-foreground uppercase tracking-wider">or</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
 
           {/* Form */}
           <form className="space-y-3" onSubmit={submit}>
@@ -184,9 +277,12 @@ export default function AuthPage({ mode }: Props) {
                 />
               </div>
             )}
+
+            <Captcha ref={captchaRef} onChange={setCaptchaToken} />
+
             <Button
               type="submit"
-              disabled={loading}
+              disabled={loading || !captchaToken}
               className="w-full h-9 text-[13px] rounded-sm gap-1.5"
             >
               {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : (

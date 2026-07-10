@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
+import { ClerkProvider } from "@clerk/clerk-react";
 import { Suspense, lazy } from "react";
 import { AuthBootstrap } from "@/features/auth/AuthBootstrap";
 import { RoleRoute } from "@/features/auth/RoleRoute";
@@ -30,11 +31,19 @@ const GigDetail = lazy(() => import("@/features/gigs/GigDetail"));
 const InstagramCallback = lazy(() => import("@/features/auth/InstagramCallback"));
 const Settings = lazy(() => import("@/features/dashboard/Settings"));
 const VerifyOtpPage = lazy(() => import("@/features/auth/VerifyOtpPage"));
+const SsoCallback = lazy(() => import("@/features/auth/SsoCallback"));
+const OAuthRole = lazy(() => import("@/features/auth/OAuthRole"));
+const Contact = lazy(() => import("@/features/marketplace/Contact"));
 const NotFound = lazy(() => import("@/components/layout/NotFound"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
 });
+
+const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string;
+if (!CLERK_PUBLISHABLE_KEY) {
+  throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY environment variable");
+}
 
 const RouteFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
@@ -43,6 +52,7 @@ const RouteFallback = () => (
 );
 
 const App = () => (
+  <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} afterSignOutUrl="/login">
   <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -57,7 +67,10 @@ const App = () => (
                 <Route path="/register" element={<AuthPage mode="register" />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/verify-otp" element={<VerifyOtpPage />} />
+                <Route path="/sso-callback" element={<SsoCallback />} />
+                <Route path="/oauth-role" element={<OAuthRole />} />
                 <Route path="/instagram/callback" element={<InstagramCallback />} />
+                <Route path="/contact" element={<Contact />} />
 
                 {/* Protected Sidebar Routes */}
                 <Route element={<SidebarLayout />}>
@@ -113,6 +126,7 @@ const App = () => (
       </TooltipProvider>
     </QueryClientProvider>
   </ThemeProvider>
+  </ClerkProvider>
 );
 
 export default App;

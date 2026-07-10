@@ -1,5 +1,7 @@
 const TRIAL_CREDITS = 500;
 
+const GIG_POST_COST = 250;
+
 const TIER_COST = {
   NANO: 100,
   MICRO: 300,
@@ -16,4 +18,4 @@ const getTier = (followerCount = 0) => {
   return 'NANO';
 };
 
-module.exports = { TRIAL_CREDITS, TIER_COST, getTier };
+module.exports = { TRIAL_CREDITS, GIG_POST_COST, TIER_COST, getTier };

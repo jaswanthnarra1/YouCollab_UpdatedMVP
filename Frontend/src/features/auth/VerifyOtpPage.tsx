@@ -1,4 +1,5 @@
-import { ArrowRight, Loader2, Mail, FlaskConical } from "lucide-react";
+import { ArrowRight, Loader2, Mail } from "lucide-react";
+import { useSignUp } from "@clerk/clerk-react";
 import { authService } from "@/services/auth";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
@@ -8,22 +9,18 @@ import { Logo } from "@/components/ui/logo";
 import { useAuthStore } from "@/stores/authStore";
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { clerkErrorMessage } from "@/lib/clerkError";
 
 export default function VerifyOtpPage() {
   const [params] = useSearchParams();
   const email = params.get("email") || "";
-  const devOtpParam = params.get("dev_otp") || "";
 
-  const [otpVals, setOtpVals] = useState<string[]>(
-    devOtpParam.length === 6
-      ? devOtpParam.split("")
-      : Array(6).fill("")
-  );
+  const [otpVals, setOtpVals] = useState<string[]>(Array(6).fill(""));
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [countdown, setCountdown] = useState(60);
-  const [devOtp, setDevOtp] = useState(devOtpParam);
-  const { setUser, setToken } = useAuthStore();
+  const { setUser } = useAuthStore();
+  const { signUp, setActive, isLoaded } = useSignUp();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -31,12 +28,9 @@ export default function VerifyOtpPage() {
 
   const otp = otpVals.join("");
 
-  // Autofocus first input on mount if no dev_otp
   useEffect(() => {
-    if (!devOtpParam && inputRefs.current[0]) {
-      inputRefs.current[0].focus();
-    }
-  }, [devOtpParam]);
+    inputRefs.current[0]?.focus();
+  }, []);
 
   // Timer countdown logic for Resend
   useEffect(() => {
@@ -92,10 +86,7 @@ export default function VerifyOtpPage() {
 
   const submitVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) {
-      toast({ variant: "destructive", title: "Missing email", description: "Verification email is missing." });
-      return;
-    }
+    if (!isLoaded) return;
     if (otp.length !== 6) {
       toast({ variant: "destructive", title: "Invalid code length", description: "The verification code must be exactly 6 digits." });
       return;
@@ -103,11 +94,13 @@ export default function VerifyOtpPage() {
 
     setLoading(true);
     try {
-      const res = await authService.verifyOtp(email, otp);
-      if (!res?.user) throw new Error("Verification failed");
+      const result = await signUp.attemptEmailAddressVerification({ code: otp });
+      if (result.status !== "complete") throw new Error("Verification incomplete. Try again.");
+      await setActive({ session: result.createdSessionId });
 
+      const res = await authService.me();
+      if (!res?.user) throw new Error("Verification failed");
       setUser(res.user);
-      if (res.accessToken) setToken(res.accessToken);
 
       toast({ title: "Account verified successfully! ✨", description: "Welcome to YouCollab." });
 
@@ -116,41 +109,21 @@ export default function VerifyOtpPage() {
         : res.user.role === "BRAND" ? "/dashboard/brand" : "/dashboard/influencer";
       navigate(dest);
     } catch (err) {
-      const msg =
-        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ||
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        (err as Error).message ||
-        "Verification failed. Try again.";
-      toast({ variant: "destructive", title: "Verification failed", description: msg });
+      toast({ variant: "destructive", title: "Verification failed", description: clerkErrorMessage(err, "Verification failed. Try again.") });
     } finally {
       setLoading(false);
     }
   };
 
   const handleResend = async () => {
-    if (countdown > 0) return;
+    if (countdown > 0 || !isLoaded) return;
     setResending(true);
     try {
-      const res = await authService.resendOtp(email);
-      const newDevOtp = res?.dev_otp ?? "";
-      if (newDevOtp) {
-        setDevOtp(newDevOtp);
-        setOtpVals(newDevOtp.split(""));
-      }
-      toast({
-        title: "OTP Code Resent! ✉️",
-        description: newDevOtp
-          ? `Dev mode: your new code is ${newDevOtp}`
-          : "A new 6-digit code has been sent to your email.",
-      });
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      toast({ title: "Code resent! ✉️", description: "A new 6-digit code has been sent to your email." });
       setCountdown(60);
     } catch (err) {
-      const msg =
-        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ||
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        (err as Error).message ||
-        "Failed to resend code.";
-      toast({ variant: "destructive", title: "Resend failed", description: msg });
+      toast({ variant: "destructive", title: "Resend failed", description: clerkErrorMessage(err, "Failed to resend code.") });
     } finally {
       setResending(false);
     }
@@ -175,20 +148,6 @@ export default function VerifyOtpPage() {
       {/* Main card */}
       <main className="mx-auto flex w-full max-w-[440px] flex-col px-4 pt-16 pb-20">
         <div className="border border-border rounded-md p-8 space-y-6 bg-background">
-
-          {/* Dev mode banner */}
-          {devOtp && (
-            <div className="flex items-start gap-2 rounded-sm border border-amber-500/40 bg-amber-500/10 px-3 py-2.5">
-              <FlaskConical className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-[12px] font-semibold text-amber-600 dark:text-amber-400">Dev mode — OTP auto-filled</p>
-                <p className="text-[11px] text-amber-700/80 dark:text-amber-300/70 mt-0.5">
-                  Code <span className="font-mono font-bold tracking-widest">{devOtp}</span> has been filled in automatically.
-                </p>
-              </div>
-            </div>
-          )}
-
           <div className="flex flex-col items-start gap-2">
             <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 mb-1">
               <Mail className="h-5 w-5" />

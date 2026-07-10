@@ -1,6 +1,7 @@
 const { supabase, supabaseAdmin } = require('./supabase');
 const AppError = require('../utils/AppError');
 const { parsePagination, paginateResults } = require('../utils/pagination');
+const { GIG_POST_COST } = require('../utils/credits');
 
 /**
  * Helper to retrieve brand associated with userId.
@@ -29,8 +30,20 @@ const getBrandByUserId = async (userId) => {
  * Create a new Gig.
  */
 const createGig = async (userId, data) => {
-  
+
   const brand = await getBrandByUserId(userId);
+
+  // Posting a collab spends trial credits — atomic DB-side decrement so two
+  // concurrent posts from the same brand can't both slip past a stale JS
+  // balance check (same pattern as the hire-credit debit).
+  const { data: debitRows, error: debitError } = await supabaseAdmin.rpc('debit_brand_credits', {
+    p_brand_id: brand.id,
+    p_amount: GIG_POST_COST,
+  });
+
+  if (debitError || !debitRows?.length) {
+    throw new AppError(`Not enough trial credits to post a collab — this costs ${GIG_POST_COST} credits.`, 402, 'INSUFFICIENT_CREDITS');
+  }
 
   const payload = {
     brandId: brand.id,
@@ -57,6 +70,8 @@ const createGig = async (userId, data) => {
 
   if (error) {
     console.error(`[Create Gig Debug] Supabase error:`, error);
+    // Refund — the credits were spent but no gig actually got created.
+    await supabaseAdmin.rpc('credit_brand_credits', { p_brand_id: brand.id, p_amount: GIG_POST_COST });
     throw new AppError(`Failed to create gig: ${error.message}`, 500, 'DATABASE_ERROR');
   }
 
@@ -73,7 +88,7 @@ const getGigs = async (filters) => {
 
   let query = supabaseAdmin
     .from('gigs')
-    .select('*, brand:brands(id, businessName, category, logoUrl, user:users(lastActiveAt)), applications(count)', { count: 'exact' })
+    .select('*, brand:brands(id, businessName, category, logoUrl, user:users(lastActiveAt:last_active_at)), applications(count)', { count: 'exact' })
     .eq('status', 'OPEN')
     .eq('city', 'Pune');
 
@@ -157,7 +172,7 @@ const getGigs = async (filters) => {
 const getGigById = async (id, userId) => {
   const { data: gig, error } = await supabaseAdmin
     .from('gigs')
-    .select('*, brand:brands(id, userId, businessName, category, location, bio, logoUrl, website, user:users(lastActiveAt)), applications(count)')
+    .select('*, brand:brands(id, userId, businessName, category, location, bio, logoUrl, website, user:users(lastActiveAt:last_active_at)), applications(count)')
     .eq('id', id)
     .maybeSingle();
 

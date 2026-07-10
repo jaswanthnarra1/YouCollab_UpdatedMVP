@@ -19,8 +19,8 @@ const getProfile = async (userId) => {
     id: user.id,
     email: user.email,
     role: user.role,
-    avatarUrl: user.avatarUrl,
-    isOnboarded: user.isOnboarded,
+    avatarUrl: user.avatar_url,
+    isOnboarded: user.is_onboarded,
     brand: user.brand,
     influencer: user.influencer,
   };
@@ -63,7 +63,7 @@ const updateBrandProfile = async (userId, data) => {
   if (data.logoUrl !== undefined) {
     await supabase
       .from('users')
-      .update({ avatarUrl: data.logoUrl || null })
+      .update({ avatar_url: data.logoUrl || null })
       .eq('id', userId);
   }
 
@@ -107,7 +107,7 @@ const updateInfluencerProfile = async (userId, data) => {
   if (data.profileImageUrl !== undefined) {
     await supabase
       .from('users')
-      .update({ avatarUrl: data.profileImageUrl || null })
+      .update({ avatar_url: data.profileImageUrl || null })
       .eq('id', userId);
   }
 

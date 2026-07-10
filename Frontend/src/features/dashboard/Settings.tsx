@@ -22,9 +22,11 @@ import {
 import { Switch } from "@/components/common/switch";
 import { useAuthStore } from "@/stores/authStore";
 import { authService } from "@/services/auth";
+import { useUser, useClerk } from "@clerk/clerk-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
+import { clerkErrorMessage } from "@/lib/clerkError";
 
 function apiErrorMessage(err: unknown, fallback: string): string {
   const e = err as { response?: { data?: { error?: { message?: string } } } };
@@ -42,6 +44,8 @@ export default function Settings() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, logout, patchUser } = useAuthStore();
+  const { user: clerkUser } = useUser();
+  const { signOut } = useClerk();
   const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<TabType>("account");
 
@@ -50,6 +54,8 @@ export default function Settings() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [newEmail, setNewEmail] = useState("");
+  const [emailOtp, setEmailOtp] = useState("");
+  const [pendingEmailId, setPendingEmailId] = useState<string | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
@@ -120,16 +126,18 @@ export default function Settings() {
     toast({ title: "General preferences updated" });
   };
 
-  // Account management actions — all three call real backend endpoints.
+  // Account management actions — password/email are managed by Clerk
+  // directly from the client; account deletion goes through the backend so
+  // it can also delete the Clerk user (admin-only operation).
   const changePasswordMutation = useMutation({
-    mutationFn: () => authService.changePassword(currentPassword, newPassword),
+    mutationFn: () => clerkUser!.updatePassword({ currentPassword, newPassword }),
     onSuccess: () => {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
       toast({ title: "Password updated successfully! 🔐" });
     },
-    onError: (err) => toast({ variant: "destructive", title: "Couldn't update password", description: apiErrorMessage(err, "Try again.") }),
+    onError: (err) => toast({ variant: "destructive", title: "Couldn't update password", description: clerkErrorMessage(err, "Try again.") }),
   });
 
   const handleChangePassword = (e: React.FormEvent) => {
@@ -145,29 +153,61 @@ export default function Settings() {
     changePasswordMutation.mutate();
   };
 
-  const changeEmailMutation = useMutation({
-    mutationFn: () => authService.updateEmail(newEmail),
-    onSuccess: (data) => {
-      patchUser({ email: data.user.email });
-      setNewEmail("");
-      toast({ title: "Email updated successfully!", description: `Your account email is now ${data.user.email}.` });
+  // Email change is two-step in Clerk: add the address, then verify it with
+  // a code before it can become primary.
+  const startEmailChangeMutation = useMutation({
+    mutationFn: async () => {
+      const emailAddress = await clerkUser!.createEmailAddress({ email: newEmail });
+      await emailAddress.prepareVerification({ strategy: "email_code" });
+      return emailAddress.id;
     },
-    onError: (err) => toast({ variant: "destructive", title: "Couldn't update email", description: apiErrorMessage(err, "Try again.") }),
+    onSuccess: (id) => {
+      setPendingEmailId(id);
+      toast({ title: "Verification code sent! ✉️", description: `Enter the code sent to ${newEmail}.` });
+    },
+    onError: (err) => toast({ variant: "destructive", title: "Couldn't start email change", description: clerkErrorMessage(err, "Try again.") }),
+  });
+
+  const confirmEmailChangeMutation = useMutation({
+    mutationFn: async () => {
+      const emailAddress = clerkUser!.emailAddresses.find((e) => e.id === pendingEmailId);
+      if (!emailAddress) throw new Error("Verification session expired. Start again.");
+      await emailAddress.attemptVerification({ code: emailOtp });
+      await clerkUser!.update({ primaryEmailAddressId: emailAddress.id });
+      return emailAddress.emailAddress;
+    },
+    onSuccess: (email) => {
+      patchUser({ email });
+      setNewEmail("");
+      setEmailOtp("");
+      setPendingEmailId(null);
+      toast({ title: "Email updated successfully!", description: `Your account email is now ${email}.` });
+    },
+    onError: (err) => toast({ variant: "destructive", title: "Couldn't verify email", description: clerkErrorMessage(err, "Try again.") }),
   });
 
   const handleChangeEmail = (e: React.FormEvent) => {
     e.preventDefault();
+    if (pendingEmailId) {
+      if (emailOtp.length !== 6) {
+        toast({ variant: "destructive", title: "Invalid code", description: "The verification code must be exactly 6 digits." });
+        return;
+      }
+      confirmEmailChangeMutation.mutate();
+      return;
+    }
     if (!newEmail) {
       toast({ variant: "destructive", title: "Email is required" });
       return;
     }
-    changeEmailMutation.mutate();
+    startEmailChangeMutation.mutate();
   };
 
   const deleteAccountMutation = useMutation({
     mutationFn: () => authService.deleteAccount(),
-    onSuccess: () => {
+    onSuccess: async () => {
       setIsDeleteModalOpen(false);
+      await signOut();
       logout();
       toast({ title: "Account deleted permanently." });
       navigate("/");
@@ -244,23 +284,47 @@ export default function Settings() {
                   <p className="mt-1 text-[12px] text-muted-foreground">Your primary communication address: <span className="font-semibold text-foreground">{user?.email}</span></p>
 
                   <form onSubmit={handleChangeEmail} className="mt-4 space-y-3">
-                    <div className="space-y-1.5">
-                      <Label className="text-[12px]">New email address</Label>
-                      <Input
-                        type="email"
-                        required
-                        value={newEmail}
-                        onChange={(e) => setNewEmail(e.target.value)}
-                        placeholder="new-email@example.com"
-                        className="h-9 text-[13px] rounded-sm"
-                      />
-                    </div>
+                    {!pendingEmailId ? (
+                      <div className="space-y-1.5">
+                        <Label className="text-[12px]">New email address</Label>
+                        <Input
+                          type="email"
+                          required
+                          value={newEmail}
+                          onChange={(e) => setNewEmail(e.target.value)}
+                          placeholder="new-email@example.com"
+                          className="h-9 text-[13px] rounded-sm"
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <Label className="text-[12px]">Verification code sent to {newEmail}</Label>
+                        <Input
+                          type="text"
+                          required
+                          maxLength={6}
+                          value={emailOtp}
+                          onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                          placeholder="6-digit code"
+                          className="h-9 text-[13px] rounded-sm font-bold tracking-[0.2em] text-center"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => { setPendingEmailId(null); setEmailOtp(""); }}
+                          className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          Use a different email
+                        </button>
+                      </div>
+                    )}
                     <Button
                       type="submit"
-                      disabled={changeEmailMutation.isPending}
+                      disabled={startEmailChangeMutation.isPending || confirmEmailChangeMutation.isPending}
                       className="w-full h-8 text-[12px] rounded-sm bg-gradient-brand text-primary-foreground border-0 shadow-md hover:opacity-95"
                     >
-                      {changeEmailMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Change Email"}
+                      {(startEmailChangeMutation.isPending || confirmEmailChangeMutation.isPending) ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : pendingEmailId ? "Verify & Update Email" : "Change Email"}
                     </Button>
                   </form>
                 </div>

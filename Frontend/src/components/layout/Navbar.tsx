@@ -1,4 +1,4 @@
-import { authService } from "@/services/auth";
+import { useClerk } from "@clerk/clerk-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Logo } from "@/components/ui/logo";
 import { LogOut } from "lucide-react";
@@ -6,14 +6,13 @@ import { useAuthStore } from "@/stores/authStore";
 
 export function Navbar() {
   const { user, logout } = useAuthStore();
+  const { signOut } = useClerk();
   const navigate = useNavigate();
   const location = useLocation();
 
   const handleLogout = async () => {
     try {
-      await authService.logout();
-    } catch (err) {
-      console.warn("Backend logout failed, logging out locally:", err);
+      await signOut();
     } finally {
       logout();
       navigate("/");

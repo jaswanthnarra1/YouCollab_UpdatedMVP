@@ -49,9 +49,10 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS "privacyPrefs" JSONB NOT NULL DEFAULT
 
 ALTER TABLE brands ADD COLUMN IF NOT EXISTS credits INTEGER NOT NULL DEFAULT 500;
 
--- Creators earn credits from the same hire transaction that debits the
--- brand's balance — starts at 0, there's no trial pack on this side.
+-- Creators also get a 500-credit trial pack on signup (same as brands),
+-- on top of whatever they later earn from being hired.
 ALTER TABLE influencers ADD COLUMN IF NOT EXISTS credits INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE influencers ALTER COLUMN credits SET DEFAULT 500;
 
 -- Atomic credit debit/credit — the UPDATE reads and writes the balance in a
 -- single statement, so two concurrent hires for the same brand/creator can't
@@ -67,6 +68,15 @@ CREATE OR REPLACE FUNCTION credit_influencer_earnings(p_influencer_id UUID, p_am
 RETURNS TABLE(credits INTEGER) AS $$
   UPDATE influencers SET credits = credits + p_amount
   WHERE id = p_influencer_id
+  RETURNING credits;
+$$ LANGUAGE sql;
+
+-- Refund path for debit_brand_credits (e.g. gig posting charged but the gig
+-- insert itself then failed) — symmetric to credit_influencer_earnings.
+CREATE OR REPLACE FUNCTION credit_brand_credits(p_brand_id UUID, p_amount INTEGER)
+RETURNS TABLE(credits INTEGER) AS $$
+  UPDATE brands SET credits = credits + p_amount
+  WHERE id = p_brand_id
   RETURNING credits;
 $$ LANGUAGE sql;
 
@@ -214,3 +224,35 @@ END;
 $$ LANGUAGE plpgsql;
 
 GRANT EXECUTE ON FUNCTION get_user_stats(UUID) TO anon, authenticated;
+
+-- ============================================
+-- 9. Clerk authentication linkage
+-- ============================================
+-- Auth moved from Supabase Auth + app JWTs to Clerk. passwordHash/authId are
+-- no longer written on new signups (Clerk owns credentials) but are kept for
+-- any rows created under the old system. clerk_user_id/full_name already
+-- existed on the live DB from an earlier, never-committed Clerk attempt —
+-- reused here rather than adding a duplicate camelCase column.
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS clerk_user_id TEXT UNIQUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name TEXT;
+CREATE INDEX IF NOT EXISTS idx_users_clerk_user_id ON users(clerk_user_id);
+ALTER TABLE users ALTER COLUMN "passwordHash" DROP NOT NULL;
+
+-- Pre-existing bug found while wiring Clerk: the live `users` table (created
+-- outside migration.sql, see note above) uses snake_case timestamp columns,
+-- but its updated-at trigger reused the shared update_updated_at_column()
+-- function, which sets the camelCase "updatedAt" — so every UPDATE on users
+-- errored with 42703 "record new has no field updatedAt". Give users its own
+-- trigger function targeting the column it actually has.
+CREATE OR REPLACE FUNCTION update_users_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+  FOR EACH ROW EXECUTE FUNCTION update_users_updated_at_column();

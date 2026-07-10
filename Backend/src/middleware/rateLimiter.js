@@ -21,7 +21,18 @@ const generalLimiter = rateLimit({
   },
 });
 
+const contactLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 messages per IP per window — generous for a real visitor, tight for spam
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res, next) => {
+    next(new AppError('Too many messages sent. Please try again in a bit.', 429, 'RATE_LIMITED'));
+  },
+});
+
 module.exports = {
   authLimiter,
   generalLimiter,
+  contactLimiter,
 };

@@ -1,25 +1,28 @@
+import { useAuth } from "@clerk/clerk-react";
 import { authService } from "@/services/auth";
-import { tokenStorage } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import { useEffect } from "react";
 
 export function AuthBootstrap({ children }: { children: React.ReactNode }) {
-  const { setUser, setToken, setHydrated, hydrated } = useAuthStore();
+  const { isLoaded, isSignedIn } = useAuth();
+  const { setUser, setHydrated, hydrated } = useAuthStore();
 
   useEffect(() => {
+    if (!isLoaded) return;
     let mounted = true;
     (async () => {
+      if (!isSignedIn) {
+        if (mounted) {
+          setUser(null);
+          setHydrated(true);
+        }
+        return;
+      }
       try {
-        const res = await authService.refresh();
-        if (mounted && res?.user) {
-          setUser(res.user);
-          if (res.accessToken) setToken(res.accessToken);
-        }
+        const res = await authService.me();
+        if (mounted && res?.user) setUser(res.user);
       } catch {
-        const t = tokenStorage.get();
-        if (!t && mounted) {
-          // not logged in
-        }
+        if (mounted) setUser(null);
       } finally {
         if (mounted) setHydrated(true);
       }
@@ -28,7 +31,7 @@ export function AuthBootstrap({ children }: { children: React.ReactNode }) {
       mounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isLoaded, isSignedIn]);
 
   if (!hydrated) {
     return (

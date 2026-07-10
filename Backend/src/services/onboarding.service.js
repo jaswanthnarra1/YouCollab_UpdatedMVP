@@ -19,7 +19,7 @@ const onboardBrand = async (userId, data) => {
     throw new AppError('Only brands can onboard here.', 403, 'FORBIDDEN');
   }
 
-  if (user.isOnboarded) {
+  if (user.is_onboarded) {
     throw new AppError('You have already completed onboarding!', 400, 'BAD_REQUEST');
   }
 
@@ -46,8 +46,8 @@ const onboardBrand = async (userId, data) => {
   const { data: updatedUser, error: updateError } = await supabase
     .from('users')
     .update({
-      isOnboarded: true,
-      avatarUrl: data.logoUrl || null,
+      is_onboarded: true,
+      avatar_url: data.logoUrl || null,
     })
     .eq('id', userId)
     .select('*')
@@ -63,8 +63,8 @@ const onboardBrand = async (userId, data) => {
     id: updatedUser.id,
     email: updatedUser.email,
     role: updatedUser.role,
-    avatarUrl: updatedUser.avatarUrl,
-    isOnboarded: updatedUser.isOnboarded,
+    avatarUrl: updatedUser.avatar_url,
+    isOnboarded: updatedUser.is_onboarded,
     brand,
   };
 };
@@ -87,7 +87,7 @@ const onboardInfluencer = async (userId, data) => {
     throw new AppError('Only creators can onboard here.', 403, 'FORBIDDEN');
   }
 
-  if (user.isOnboarded) {
+  if (user.is_onboarded) {
     throw new AppError('You have already completed onboarding!', 400, 'BAD_REQUEST');
   }
 
@@ -114,8 +114,8 @@ const onboardInfluencer = async (userId, data) => {
   const { data: updatedUser, error: updateError } = await supabase
     .from('users')
     .update({
-      isOnboarded: true,
-      avatarUrl: data.profileImageUrl || null,
+      is_onboarded: true,
+      avatar_url: data.profileImageUrl || null,
     })
     .eq('id', userId)
     .select('*')
@@ -131,8 +131,8 @@ const onboardInfluencer = async (userId, data) => {
     id: updatedUser.id,
     email: updatedUser.email,
     role: updatedUser.role,
-    avatarUrl: updatedUser.avatarUrl,
-    isOnboarded: updatedUser.isOnboarded,
+    avatarUrl: updatedUser.avatar_url,
+    isOnboarded: updatedUser.is_onboarded,
     influencer,
   };
 };

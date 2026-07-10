@@ -119,7 +119,7 @@ const getGigApplications = async (gigId, userId, filters) => {
 
   let query = supabase
     .from('applications')
-    .select('*, influencer:influencers(id, name, instagramHandle, niche, bio, profileImageUrl, followerCount, user:users(lastActiveAt, email))', { count: 'exact' })
+    .select('*, influencer:influencers(id, name, instagramHandle, niche, bio, profileImageUrl, followerCount, user:users(lastActiveAt:last_active_at, email))', { count: 'exact' })
     .eq('gigId', gigId);
 
   if (cursor) {

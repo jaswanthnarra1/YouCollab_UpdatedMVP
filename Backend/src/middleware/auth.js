@@ -1,31 +1,25 @@
-const jwt = require('jsonwebtoken');
-const config = require('../config');
+const { getAuth } = require('@clerk/express');
+const authService = require('../services/auth.service');
 const AppError = require('../utils/AppError');
 
 /**
- * Middleware to authenticate requests via JWT access token.
+ * Middleware to authenticate requests via Clerk session token.
+ * Lazily provisions the local `users` row (+ role profile) on first sight
+ * of a Clerk identity — see authService.findOrCreateByClerkId.
  */
-const authenticate = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+const authenticate = async (req, res, next) => {
+  const { userId: clerkUserId } = getAuth(req);
+
+  if (!clerkUserId) {
     return next(new AppError('Join YouCollab or sign in to view this.', 401, 'UNAUTHORIZED'));
   }
 
-  const token = authHeader.split(' ')[1];
-
   try {
-    const payload = jwt.verify(token, config.JWT.SECRET);
-    req.user = {
-      id: payload.id,
-      role: payload.role,
-    };
+    const user = await authService.findOrCreateByClerkId(clerkUserId);
+    req.user = { id: user.id, role: user.role, clerkId: clerkUserId };
     next();
   } catch (error) {
-    if (error.name === 'TokenExpiredError') {
-      return next(new AppError('Your session has expired. Just refresh or sign in again.', 401, 'UNAUTHORIZED'));
-    }
-    return next(new AppError('Oops, your credentials look invalid. Try signing in again.', 401, 'UNAUTHORIZED'));
+    next(error);
   }
 };
 

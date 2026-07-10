@@ -216,7 +216,7 @@ const CreditCalculatorSection = () => {
         </motion.div>
 
         <div className="mt-8 flex justify-center">
-          <Link to="/register">
+          <Link to="/register?role=BRAND">
             <button className="group bg-[#2353E9] text-white rounded-full px-7 py-3 font-semibold text-[13px] shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/30 hover:scale-[1.03] active:scale-[0.98] transition-all duration-300 flex items-center gap-2">
               Claim your 500 credits
               <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
@@ -971,9 +971,14 @@ const Landing = () => {
               YouCollab
             </span>
           </div>
-          <span className="text-[12px] text-muted-foreground">
-            © {new Date().getFullYear()} YouCollab
-          </span>
+          <div className="flex items-center gap-4">
+            <Link to="/contact" className="text-[12px] text-muted-foreground hover:text-foreground transition-colors">
+              Contact
+            </Link>
+            <span className="text-[12px] text-muted-foreground">
+              © {new Date().getFullYear()} YouCollab
+            </span>
+          </div>
         </div>
       </footer>
     </div>

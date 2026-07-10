@@ -1,12 +1,16 @@
-import { ArrowLeft, ArrowRight, Loader2, CheckCircle2 } from "lucide-react";
-import { authService } from "@/services/auth";
+import { ArrowRight, Loader2 } from "lucide-react";
+import { useSignIn } from "@clerk/clerk-react";
+import ReCAPTCHA from "react-google-recaptcha";
 import { Button } from "@/components/common/button";
+import { Captcha } from "@/components/common/Captcha";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/common/label";
 import { Link, useNavigate } from "react-router-dom";
 import { Logo } from "@/components/ui/logo";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { clerkErrorMessage } from "@/lib/clerkError";
+import { verifyCaptchaToken } from "@/services/recaptcha";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -15,29 +19,38 @@ export default function ForgotPassword() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<ReCAPTCHA>(null);
+  const { signIn, setActive, isLoaded } = useSignIn();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const submitEmail = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isLoaded) return;
+    if (!captchaToken) {
+      toast({ variant: "destructive", title: "Verification required", description: "Please complete the \"I'm not a robot\" check." });
+      return;
+    }
     setLoading(true);
     try {
-      await authService.forgotPassword(email);
-      toast({ title: "OTP Code Sent! ✉️", description: "If an account exists, a 6-digit password reset code has been sent." });
+      await verifyCaptchaToken(captchaToken);
+      await signIn.create({ strategy: "reset_password_email_code", identifier: email });
+      toast({ title: "Code Sent! ✉️", description: "A 6-digit password reset code has been sent to your email." });
       setStep(2);
     } catch (err) {
-      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
-        || (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-        || (err as Error).message
-        || "Request failed. Try again.";
-      toast({ variant: "destructive", title: "Request failed", description: msg });
+      const backendMsg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message;
+      toast({ variant: "destructive", title: "Request failed", description: backendMsg || clerkErrorMessage(err, "Request failed. Try again.") });
     } finally {
+      captchaRef.current?.reset();
+      setCaptchaToken(null);
       setLoading(false);
     }
   };
 
   const submitReset = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isLoaded) return;
     if (password !== confirmPassword) {
       toast({ variant: "destructive", title: "Passwords mismatch", description: "Password and Confirm Password do not match." });
       return;
@@ -49,15 +62,17 @@ export default function ForgotPassword() {
 
     setLoading(true);
     try {
-      await authService.resetPassword(email, otp, password);
-      toast({ title: "Password Reset Successful! ✨", description: "You can now sign in with your new password." });
-      navigate("/login");
+      const result = await signIn.attemptFirstFactor({
+        strategy: "reset_password_email_code",
+        code: otp,
+        password,
+      });
+      if (result.status !== "complete") throw new Error("Reset incomplete. Try again.");
+      await setActive({ session: result.createdSessionId });
+      toast({ title: "Password Reset Successful! ✨", description: "You're signed in with your new password." });
+      navigate("/");
     } catch (err) {
-      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
-        || (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-        || (err as Error).message
-        || "Password reset failed. Try again.";
-      toast({ variant: "destructive", title: "Reset failed", description: msg });
+      toast({ variant: "destructive", title: "Reset failed", description: clerkErrorMessage(err, "Password reset failed. Try again.") });
     } finally {
       setLoading(false);
     }
@@ -112,9 +127,12 @@ export default function ForgotPassword() {
                   className="h-9 text-[13px] rounded-sm"
                 />
               </div>
+
+              <Captcha ref={captchaRef} onChange={setCaptchaToken} />
+
               <Button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !captchaToken}
                 className="w-full h-9 text-[13px] rounded-sm gap-1.5"
               >
                 {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : (
