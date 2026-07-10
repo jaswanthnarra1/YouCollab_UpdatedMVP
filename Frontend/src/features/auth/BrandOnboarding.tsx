@@ -48,52 +48,51 @@ export default function BrandOnboarding() {
   const valid = businessName && category && location && countWords(bio) >= 3;
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      <div className="absolute inset-0 neon-grid pointer-events-none" />
+    <div className="relative min-h-screen bg-background text-foreground">
       <Navbar />
-      <main className="relative mx-auto max-w-2xl px-4 pt-8 pb-20">
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-          <div className="chip mb-3">Brand setup</div>
-          <h1 className="text-3xl font-semibold">Tell us about your brand</h1>
-          <p className="text-sm text-muted-foreground mt-1">Creators will see this on every gig you post.</p>
+      <main className="mx-auto max-w-2xl px-6 py-10 space-y-6">
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
+          <span className="inline-block border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground rounded-sm mb-3">Brand setup</span>
+          <h1 className="text-3xl font-semibold tracking-tight">Tell us about your brand</h1>
+          <p className="text-[13px] text-muted-foreground mt-1">Creators will see this on every gig you post.</p>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-strong rounded-3xl p-6 space-y-5">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="border border-border rounded-sm p-6 bg-background space-y-5">
           <div className="space-y-1.5">
-            <Label>Business name</Label>
-            <Input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Koregaon Coffee Co." className="glass" />
+            <Label className="text-[12px]">Business name</Label>
+            <Input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Koregaon Coffee Co." className="h-9 text-[13px] rounded-sm" />
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Category</Label>
+              <Label className="text-[12px]">Category</Label>
               <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger className="glass"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 text-[13px] rounded-sm bg-background border-border"><SelectValue /></SelectTrigger>
                 <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Location</Label>
-              <Input value={location} onChange={(e) => setLocation(e.target.value)} className="glass" />
+              <Label className="text-[12px]">Location</Label>
+              <Input value={location} onChange={(e) => setLocation(e.target.value)} className="h-9 text-[13px] rounded-sm" />
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label>Bio <span className="text-muted-foreground">(min 3 words)</span></Label>
-            <Textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="What does your brand stand for?" className="glass min-h-[110px]" />
+            <Label className="text-[12px]">Bio <span className="text-muted-foreground">(min 3 words)</span></Label>
+            <Textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="What does your brand stand for?" className="text-[13px] rounded-sm min-h-[110px]" />
             <p className="text-xs text-muted-foreground">{countWords(bio)}/3 words</p>
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Website (optional)</Label>
-              <Input type="url" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." className="glass" />
+              <Label className="text-[12px]">Website (optional)</Label>
+              <Input type="url" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." className="h-9 text-[13px] rounded-sm" />
             </div>
             <div className="space-y-1.5">
-              <Label>Logo URL (optional)</Label>
-              <Input value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..." className="glass" />
+              <Label className="text-[12px]">Logo URL (optional)</Label>
+              <Input value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..." className="h-9 text-[13px] rounded-sm" />
             </div>
           </div>
 
           <div className="flex justify-end pt-2">
-            <Button disabled={!valid || save.isPending} onClick={() => save.mutate()} className="bg-gradient-brand text-primary-foreground border-0">
+            <Button disabled={!valid || save.isPending} onClick={() => save.mutate()} className="h-9 text-[13px] rounded-sm bg-gradient-brand text-primary-foreground border-0 shadow-md hover:opacity-95">
               {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Launch brand"}
             </Button>
           </div>
