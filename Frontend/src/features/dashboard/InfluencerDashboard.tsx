@@ -143,7 +143,7 @@ function GigCard({ gig, hasApplied, status, onClick }: { gig: Gig; hasApplied: b
             Applied ({status})
           </Button>
         ) : (
-          <Button onClick={onClick} className="flex-1 h-8 text-[12px] rounded-sm bg-gradient-brand text-primary-foreground border-0">
+          <Button onClick={onClick} className="flex-1 h-8 text-[12px] rounded-sm bg-[#2453E9] hover:bg-[#1e47c9] text-primary-foreground border-0">
             Pitch now
           </Button>
         )}
