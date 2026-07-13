@@ -29,8 +29,7 @@ export default function InfluencerOnboarding() {
 
   const save = useMutation({
     mutationFn: () => onboardingService.influencer({
-      name, niche, bio,
-      pincode: pincode || undefined,
+      name, niche, bio, pincode,
       followerCount: Number(followers || 0),
       instagramHandle: handle || undefined,
       profileImageUrl: profileImageUrl || undefined,
@@ -56,7 +55,7 @@ export default function InfluencerOnboarding() {
   });
 
   const countWords = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
-  const valid = name && countWords(bio) >= 3 && niche;
+  const valid = name && countWords(bio) >= 3 && niche && /^\d{6}$/.test(pincode);
 
   return (
     <div className="relative min-h-screen overflow-hidden">
@@ -90,7 +89,7 @@ export default function InfluencerOnboarding() {
           </div>
 
           <div className="space-y-1.5">
-            <Label>PIN code (optional)</Label>
+            <Label>PIN code</Label>
             <Input
               value={pincode}
               onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}

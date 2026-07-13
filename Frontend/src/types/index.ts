@@ -41,7 +41,7 @@ export interface BrandProfilePayload {
   businessName?: string;
   category?: string;
   location?: string;
-  pincode?: string;
+  pincode: string;
   bio?: string;
   website?: string;
   logoUrl?: string;
@@ -51,7 +51,7 @@ export interface CreatorProfilePayload {
   name?: string;
   instagramHandle?: string;
   niche?: string;
-  pincode?: string;
+  pincode: string;
   bio?: string;
   profileImageUrl?: string;
   followerCount?: number;
@@ -61,7 +61,7 @@ export interface InfluencerOnboardingPayload {
   name: string;
   instagramHandle?: string;
   niche: string;
-  pincode?: string;
+  pincode: string;
   bio: string;
   followerCount: number;
   profileImageUrl?: string;
@@ -71,7 +71,7 @@ export interface BrandOnboardingPayload {
   businessName: string;
   category: string;
   location: string;
-  pincode?: string;
+  pincode: string;
   bio: string;
   website?: string;
   logoUrl?: string;

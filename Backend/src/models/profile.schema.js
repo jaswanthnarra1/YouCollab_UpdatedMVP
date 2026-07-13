@@ -1,9 +1,7 @@
 const { z } = require('zod');
 
-const pincodeSchema = z.string()
-  .regex(/^\d{6}$/, 'PIN code must be 6 digits')
-  .optional()
-  .or(z.literal(''));
+const pincodeSchema = z.string({ required_error: 'PIN code is required' })
+  .regex(/^\d{6}$/, 'PIN code must be 6 digits');
 
 const updateBrandProfileSchema = z.object({
   businessName: z.string().min(2, 'Business name must be at least 2 characters').max(100).optional(),

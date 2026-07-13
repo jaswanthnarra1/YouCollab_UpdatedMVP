@@ -48,7 +48,7 @@ export default function BrandProfile() {
   const update = useMutation({
     mutationFn: () => profileService.updateProfile({
       businessName, category, location, bio,
-      pincode: pincode || undefined,
+      pincode,
       website: website || undefined,
       logoUrl: logoUrl || undefined,
     }),
@@ -89,7 +89,7 @@ export default function BrandProfile() {
   };
 
   const countWords = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
-  const valid = businessName && category && location && countWords(bio) >= 3;
+  const valid = businessName && category && location && /^\d{6}$/.test(pincode) && countWords(bio) >= 3;
 
   if (isLoading) {
     return (
@@ -174,7 +174,7 @@ export default function BrandProfile() {
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-[12px]">PIN code (optional)</Label>
+            <Label className="text-[12px]">PIN code</Label>
             <Input
               value={pincode}
               onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}

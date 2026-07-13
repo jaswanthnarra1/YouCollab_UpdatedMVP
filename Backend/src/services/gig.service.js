@@ -120,12 +120,19 @@ const getGigs = async (filters, user) => {
   const { cursor, limit } = parsePagination(filters, 12);
   const { search, category, sort } = filters;
 
+  const { latitude, longitude } = await getRequesterCoords(user);
+  const hasCoords = latitude != null && longitude != null;
+  // No explicit sort requested: default to nearest-first for a creator who
+  // has coordinates, otherwise fall back to the newest-first default.
+  const effectiveSort = sort || (hasCoords ? 'nearest' : null);
+
   let cursorBudgetMin = null;
   let cursorCreatedAt = null;
+  let cursorDistanceKm = null;
   let cursorId = null;
 
   if (cursor) {
-    if (sort === 'budget_high' || sort === 'budget_low') {
+    if (effectiveSort === 'budget_high' || effectiveSort === 'budget_low') {
       const { data: cursorItem } = await supabaseAdmin
         .from('gigs')
         .select('budgetMin, id')
@@ -134,6 +141,25 @@ const getGigs = async (filters, user) => {
       if (cursorItem) {
         cursorBudgetMin = cursorItem.budgetMin;
         cursorId = cursorItem.id;
+      }
+    } else if (effectiveSort === 'nearest') {
+      const { data: cursorItem } = await supabaseAdmin
+        .from('gigs')
+        .select('id, brand:brands(latitude, longitude)')
+        .eq('id', cursor)
+        .maybeSingle();
+      if (cursorItem) {
+        cursorId = cursorItem.id;
+        const brandLat = cursorItem.brand?.latitude;
+        const brandLng = cursorItem.brand?.longitude;
+        if (hasCoords && brandLat != null && brandLng != null) {
+          const { data: dist } = await supabaseAdmin.rpc('haversine_km', {
+            lat1: brandLat, lng1: brandLng, lat2: latitude, lng2: longitude,
+          });
+          cursorDistanceKm = typeof dist === 'number' ? Math.round(dist * 2) / 2 : 999999;
+        } else {
+          cursorDistanceKm = 999999;
+        }
       }
     } else {
       const { data: cursorItem } = await supabaseAdmin
@@ -148,15 +174,14 @@ const getGigs = async (filters, user) => {
     }
   }
 
-  const { latitude, longitude } = await getRequesterCoords(user);
-
   // Fetch limit + 1 rows to know if there's a next page.
   const { data: rows, error } = await supabaseAdmin.rpc('list_gigs_in_radius', {
     p_category: category || null,
     p_search: search || null,
-    p_sort: sort || null,
+    p_sort: effectiveSort,
     p_cursor_budget_min: cursorBudgetMin,
     p_cursor_created_at: cursorCreatedAt,
+    p_cursor_distance_km: cursorDistanceKm,
     p_cursor_id: cursorId,
     p_lat: latitude,
     p_lng: longitude,

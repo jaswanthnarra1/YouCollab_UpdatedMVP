@@ -48,7 +48,7 @@ export default function CreatorProfile() {
   const update = useMutation({
     mutationFn: () => profileService.updateProfile({
       name, instagramHandle, niche, bio,
-      pincode: pincode || undefined,
+      pincode,
       profileImageUrl: profileImageUrl || undefined,
       followerCount: Number(followerCount || 0),
     }),
@@ -89,7 +89,7 @@ export default function CreatorProfile() {
   };
 
   const countWords = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
-  const valid = name && instagramHandle && niche && countWords(bio) >= 3 && Number(followerCount) >= 0;
+  const valid = name && instagramHandle && niche && /^\d{6}$/.test(pincode) && countWords(bio) >= 3 && Number(followerCount) >= 0;
 
   if (isLoading) {
     return (
@@ -184,7 +184,7 @@ export default function CreatorProfile() {
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-[12px]">PIN code (optional)</Label>
+            <Label className="text-[12px]">PIN code</Label>
             <Input
               value={pincode}
               onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}

@@ -28,8 +28,7 @@ export default function BrandOnboarding() {
 
   const save = useMutation({
     mutationFn: () => onboardingService.brand({
-      businessName, category, location, bio,
-      pincode: pincode || undefined,
+      businessName, category, location, bio, pincode,
       website: website || undefined,
       logoUrl: logoUrl || undefined,
     }),
@@ -47,7 +46,7 @@ export default function BrandOnboarding() {
   });
 
   const countWords = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
-  const valid = businessName && category && location && countWords(bio) >= 3;
+  const valid = businessName && category && location && /^\d{6}$/.test(pincode) && countWords(bio) >= 3;
 
   return (
     <div className="relative min-h-screen bg-background text-foreground">
@@ -78,7 +77,7 @@ export default function BrandOnboarding() {
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-[12px]">PIN code (optional)</Label>
+            <Label className="text-[12px]">PIN code</Label>
             <Input
               value={pincode}
               onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}
@@ -86,7 +85,7 @@ export default function BrandOnboarding() {
               maxLength={6}
               className="h-9 text-[13px] rounded-sm max-w-[160px]"
             />
-            <p className="text-xs text-muted-foreground">Unlocks radius matching for your collabs. We currently support Pune PIN codes.</p>
+            <p className="text-xs text-muted-foreground">Powers radius matching for your collabs. We currently support Pune PIN codes.</p>
           </div>
           <div className="space-y-1.5">
             <Label className="text-[12px]">Bio <span className="text-muted-foreground">(min 3 words)</span></Label>

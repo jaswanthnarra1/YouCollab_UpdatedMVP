@@ -363,7 +363,7 @@ END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 -- Marketplace feed with radius matching baked in. Mirrors gig.service.js's
--- getGigs exactly: same status/city/category/search filters, same 3 sort
+-- getGigs exactly: same status/city/category/search filters, same sort
 -- modes and keyset cursor semantics (caller resolves the cursor row's sort
 -- value in JS first, same as today, and just passes it in here), same
 -- LIMIT n+1 has-more convention. The only addition is the radius visibility
@@ -374,12 +374,20 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 --   brand has no coordinates      -> degrades to NULL-radius (visible to all)
 --   creator has no coordinates    -> radius-restricted gigs are excluded
 --   otherwise                     -> visible iff haversine_km(...) <= radiusKm
+--
+-- p_sort = 'nearest' orders by distance_km ascending (closest first); rows
+-- with no computable distance (brand has no coordinates) sort last via the
+-- 999999 sentinel, used in both the ORDER BY and the cursor comparison so
+-- keyset pagination doesn't hit NULL-tuple comparison pitfalls.
+DROP FUNCTION IF EXISTS list_gigs_in_radius(TEXT, TEXT, TEXT, INTEGER, TIMESTAMPTZ, UUID, DOUBLE PRECISION, DOUBLE PRECISION, INTEGER);
+
 CREATE OR REPLACE FUNCTION list_gigs_in_radius(
   p_category TEXT,
   p_search TEXT,
   p_sort TEXT,
   p_cursor_budget_min INTEGER,
   p_cursor_created_at TIMESTAMPTZ,
+  p_cursor_distance_km DOUBLE PRECISION,
   p_cursor_id UUID,
   p_lat DOUBLE PRECISION,
   p_lng DOUBLE PRECISION,
@@ -452,18 +460,21 @@ BEGIN
     CASE
       WHEN p_sort = 'budget_high' THEN (p_cursor_id IS NULL OR (f."budgetMin", f.id) < (p_cursor_budget_min, p_cursor_id))
       WHEN p_sort = 'budget_low' THEN (p_cursor_id IS NULL OR (f."budgetMin", f.id) > (p_cursor_budget_min, p_cursor_id))
+      WHEN p_sort = 'nearest' THEN (p_cursor_id IS NULL OR (COALESCE(f.distance_km, 999999), f.id) > (COALESCE(p_cursor_distance_km, 999999), p_cursor_id))
       ELSE (p_cursor_id IS NULL OR (f."createdAt", f.id) < (p_cursor_created_at, p_cursor_id))
     END
   ORDER BY
     CASE WHEN p_sort = 'budget_high' THEN f."budgetMin" END DESC NULLS LAST,
     CASE WHEN p_sort = 'budget_low' THEN f."budgetMin" END ASC NULLS LAST,
-    CASE WHEN p_sort IS NULL OR p_sort NOT IN ('budget_high', 'budget_low') THEN f."createdAt" END DESC NULLS LAST,
+    CASE WHEN p_sort = 'nearest' THEN COALESCE(f.distance_km, 999999) END ASC NULLS LAST,
+    CASE WHEN p_sort IS NULL OR p_sort NOT IN ('budget_high', 'budget_low', 'nearest') THEN f."createdAt" END DESC NULLS LAST,
     CASE WHEN p_sort = 'budget_high' THEN f.id END DESC,
     CASE WHEN p_sort = 'budget_low' THEN f.id END ASC,
+    CASE WHEN p_sort = 'nearest' THEN f.id END ASC,
     f.id DESC
   LIMIT p_limit;
 END;
 $$ LANGUAGE plpgsql STABLE;
 
-GRANT EXECUTE ON FUNCTION list_gigs_in_radius(TEXT, TEXT, TEXT, INTEGER, TIMESTAMPTZ, UUID, DOUBLE PRECISION, DOUBLE PRECISION, INTEGER) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION list_gigs_in_radius(TEXT, TEXT, TEXT, INTEGER, TIMESTAMPTZ, DOUBLE PRECISION, UUID, DOUBLE PRECISION, DOUBLE PRECISION, INTEGER) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION haversine_km(DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION) TO anon, authenticated;
