@@ -33,6 +33,12 @@ const createGig = async (userId, data) => {
 
   const brand = await getBrandByUserId(userId);
 
+  // A radius gig needs the brand's own coordinates to measure distance from
+  // — guard here rather than let it silently degrade to "Anywhere" later.
+  if (data.radiusKm && (brand.latitude == null || brand.longitude == null)) {
+    throw new AppError('Add your PIN code to your brand profile before setting a collab radius.', 400, 'LOCATION_REQUIRED');
+  }
+
   // Posting a collab spends trial credits — atomic DB-side decrement so two
   // concurrent posts from the same brand can't both slip past a stale JS
   // balance check (same pattern as the hire-credit debit).
@@ -59,6 +65,7 @@ const createGig = async (userId, data) => {
     category: data.category,
     city: data.city || 'Pune',
     status: data.status || 'OPEN',
+    radiusKm: data.radiusKm ?? null,
   };
   console.log(`[Create Gig Debug] Submitting payload to Supabase:`, JSON.stringify(payload));
 
@@ -79,89 +86,123 @@ const createGig = async (userId, data) => {
 };
 
 /**
- * Get all open gigs with filters, search, and cursor-based pagination.
+ * Looks up the requesting influencer's own stored coordinates. Coordinates
+ * never leave the server — this is only ever used to filter the feed
+ * server-side, never returned to the client as lat/lng.
  */
-const getGigs = async (filters) => {
+const getRequesterCoords = async (user) => {
+  if (!user || user.role !== 'INFLUENCER') {
+    return { latitude: null, longitude: null };
+  }
+
+  const { data: influencer } = await supabaseAdmin
+    .from('influencers')
+    .select('latitude, longitude')
+    .eq('userId', user.id)
+    .maybeSingle();
+
+  return {
+    latitude: influencer?.latitude ?? null,
+    longitude: influencer?.longitude ?? null,
+  };
+};
+
+/**
+ * Get all open gigs with filters, search, radius matching, and cursor-based
+ * pagination. Delegates the actual filter/sort/radius SQL to the
+ * list_gigs_in_radius RPC (Backend/supabase/migrations/schema.sql) — this
+ * function's job is just resolving the cursor row (same lookup pattern as
+ * before) and reshaping the RPC's flat rows back into the response shape
+ * consumers already expect.
+ */
+const getGigs = async (filters, user) => {
   console.log(`[getGigs] Start. Filters:`, JSON.stringify(filters));
   const { cursor, limit } = parsePagination(filters, 12);
   const { search, category, sort } = filters;
 
-  let query = supabaseAdmin
-    .from('gigs')
-    .select('*, brand:brands(id, businessName, category, logoUrl, user:users(lastActiveAt:last_active_at)), applications(count)', { count: 'exact' })
-    .eq('status', 'OPEN')
-    .eq('city', 'Pune');
+  let cursorBudgetMin = null;
+  let cursorCreatedAt = null;
+  let cursorId = null;
 
-  if (category) {
-    query = query.eq('category', category);
-  }
-
-  if (search) {
-    query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
-  }
-
-  // Handle ordering and cursor-based filtering
-  if (sort === 'budget_high') {
-    if (cursor) {
+  if (cursor) {
+    if (sort === 'budget_high' || sort === 'budget_low') {
       const { data: cursorItem } = await supabaseAdmin
         .from('gigs')
         .select('budgetMin, id')
         .eq('id', cursor)
         .maybeSingle();
       if (cursorItem) {
-        query = query.or(`budgetMin.lt.${cursorItem.budgetMin},and(budgetMin.eq.${cursorItem.budgetMin},id.lt.${cursorItem.id})`);
+        cursorBudgetMin = cursorItem.budgetMin;
+        cursorId = cursorItem.id;
       }
-    }
-    query = query.order('budgetMin', { ascending: false }).order('id', { ascending: false });
-  } else if (sort === 'budget_low') {
-    if (cursor) {
-      const { data: cursorItem } = await supabaseAdmin
-        .from('gigs')
-        .select('budgetMin, id')
-        .eq('id', cursor)
-        .maybeSingle();
-      if (cursorItem) {
-        query = query.or(`budgetMin.gt.${cursorItem.budgetMin},and(budgetMin.eq.${cursorItem.budgetMin},id.gt.${cursorItem.id})`);
-      }
-    }
-    query = query.order('budgetMin', { ascending: true }).order('id', { ascending: true });
-  } else {
-    // Default: Sort by createdAt desc
-    if (cursor) {
+    } else {
       const { data: cursorItem } = await supabaseAdmin
         .from('gigs')
         .select('createdAt, id')
         .eq('id', cursor)
         .maybeSingle();
       if (cursorItem) {
-        query = query.or(`createdAt.lt.${cursorItem.createdAt},and(createdAt.eq.${cursorItem.createdAt},id.lt.${cursorItem.id})`);
+        cursorCreatedAt = cursorItem.createdAt;
+        cursorId = cursorItem.id;
       }
     }
-    query = query.order('createdAt', { ascending: false }).order('id', { ascending: false });
   }
 
-  // Fetch limit + 1 items to see if there is a next page
-  const { data: gigs, error, count: total } = await query.limit(limit + 1);
+  const { latitude, longitude } = await getRequesterCoords(user);
+
+  // Fetch limit + 1 rows to know if there's a next page.
+  const { data: rows, error } = await supabaseAdmin.rpc('list_gigs_in_radius', {
+    p_category: category || null,
+    p_search: search || null,
+    p_sort: sort || null,
+    p_cursor_budget_min: cursorBudgetMin,
+    p_cursor_created_at: cursorCreatedAt,
+    p_cursor_id: cursorId,
+    p_lat: latitude,
+    p_lng: longitude,
+    p_limit: limit + 1,
+  });
 
   if (error) {
-    console.error(`[getGigs] Supabase select error:`, error);
+    console.error(`[getGigs] RPC error:`, error);
     throw new AppError(`Failed to fetch collabs: ${error.message}`, 500, 'DATABASE_ERROR');
   }
 
-
-  const formattedGigs = (gigs || []).map(gig => {
-    const appCount = gig.applications && gig.applications[0] ? gig.applications[0].count : 0;
-    const { applications, ...rest } = gig;
-    return {
-      ...rest,
-      _count: {
-        applications: appCount
-      }
-    };
-  });
+  const formattedGigs = (rows || []).map(row => ({
+    id: row.id,
+    brandId: row.brandId,
+    title: row.title,
+    description: row.description,
+    budgetMin: row.budgetMin,
+    budgetMax: row.budgetMax,
+    deliverables: row.deliverables,
+    creatorRequirements: row.creatorRequirements,
+    platform: row.platform,
+    campaignType: row.campaignType,
+    deadline: row.deadline,
+    status: row.status,
+    city: row.city,
+    category: row.category,
+    radiusKm: row.radiusKm,
+    viewCount: row.viewCount,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    distanceKm: row.distance_km,
+    brand: {
+      id: row.brand_id,
+      businessName: row.brand_business_name,
+      category: row.brand_category,
+      logoUrl: row.brand_logo_url,
+      user: { lastActiveAt: row.brand_last_active_at },
+    },
+    _count: {
+      applications: row.applications_count,
+    },
+  }));
 
   const paginated = paginateResults(formattedGigs, limit);
-  paginated.pagination.total = total || 0;
+  paginated.pagination.total = rows && rows.length > 0 ? Number(rows[0].total_count) : 0;
+  paginated.meta = { locationEnabled: latitude != null && longitude != null };
 
   return paginated;
 };
@@ -249,6 +290,10 @@ const updateGig = async (id, userId, data) => {
     throw new AppError("You don't have permission to edit this collab.", 403, 'FORBIDDEN');
   }
 
+  if (data.radiusKm && (brand.latitude == null || brand.longitude == null)) {
+    throw new AppError('Add your PIN code to your brand profile before setting a collab radius.', 400, 'LOCATION_REQUIRED');
+  }
+
   const updateData = {};
   if (data.title !== undefined) updateData.title = data.title;
   if (data.description !== undefined) updateData.description = data.description;
@@ -261,6 +306,7 @@ const updateGig = async (id, userId, data) => {
   if (data.deadline !== undefined) updateData.deadline = data.deadline;
   if (data.category !== undefined) updateData.category = data.category;
   if (data.status !== undefined) updateData.status = data.status;
+  if (data.radiusKm !== undefined) updateData.radiusKm = data.radiusKm;
 
   const { data: updatedGig, error: updateError } = await supabaseAdmin
     .from('gigs')

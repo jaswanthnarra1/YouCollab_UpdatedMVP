@@ -22,6 +22,7 @@ export default function CreatorProfile() {
   const [name, setName] = useState("");
   const [instagramHandle, setInstagramHandle] = useState("");
   const [niche, setNiche] = useState("Lifestyle");
+  const [pincode, setPincode] = useState("");
   const [bio, setBio] = useState("");
   const [profileImageUrl, setProfileImageUrl] = useState("");
   const [followerCount, setFollowerCount] = useState<number | "">("");
@@ -37,6 +38,7 @@ export default function CreatorProfile() {
       setName(profile.influencer.name || "");
       setInstagramHandle(profile.influencer.instagramHandle || "");
       setNiche(profile.influencer.niche || "Lifestyle");
+      setPincode(profile.influencer.pincode || "");
       setBio(profile.influencer.bio || "");
       setProfileImageUrl(profile.influencer.profileImageUrl || "");
       setFollowerCount(profile.influencer.followerCount ?? 0);
@@ -46,6 +48,7 @@ export default function CreatorProfile() {
   const update = useMutation({
     mutationFn: () => profileService.updateProfile({
       name, instagramHandle, niche, bio,
+      pincode: pincode || undefined,
       profileImageUrl: profileImageUrl || undefined,
       followerCount: Number(followerCount || 0),
     }),
@@ -178,6 +181,18 @@ export default function CreatorProfile() {
               <SelectTrigger className="h-9 text-[13px] rounded-sm bg-background border-border"><SelectValue /></SelectTrigger>
               <SelectContent>{NICHES.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}</SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-[12px]">PIN code (optional)</Label>
+            <Input
+              value={pincode}
+              onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="411001"
+              maxLength={6}
+              className="h-9 text-[13px] rounded-sm max-w-[160px]"
+            />
+            <p className="text-xs text-muted-foreground">See collabs near you. We currently support Pune PIN codes.</p>
           </div>
 
           <div className="space-y-1.5">

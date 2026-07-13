@@ -1,5 +1,10 @@
 const { z } = require('zod');
 
+const pincodeSchema = z.string()
+  .regex(/^\d{6}$/, 'PIN code must be 6 digits')
+  .optional()
+  .or(z.literal(''));
+
 const brandOnboardingSchema = z.object({
   businessName: z.string({ required_error: 'Business name is required' })
     .min(2, 'Business name must be at least 2 characters long')
@@ -7,6 +12,7 @@ const brandOnboardingSchema = z.object({
   category: z.string({ required_error: 'Category is required' })
     .min(2, 'Category must be at least 2 characters long'),
   location: z.string().default('Pune'),
+  pincode: pincodeSchema,
   bio: z.string({ required_error: 'A short bio helps creators know your vibe' })
     .max(1000)
     .refine((val) => val.trim().split(/\s+/).filter(Boolean).length >= 3, {
@@ -27,6 +33,7 @@ const influencerOnboardingSchema = z.object({
     }),
   niche: z.string({ required_error: 'Niche is required' })
     .min(2, 'Niche is required'),
+  pincode: pincodeSchema,
   bio: z.string({ required_error: 'A short bio helps brands know your style' })
     .max(1000)
     .refine((val) => val.trim().split(/\s+/).filter(Boolean).length >= 3, {

@@ -1,5 +1,19 @@
 const supabase = require('./supabase');
 const AppError = require('../utils/AppError');
+const { geocodePincode } = require('./geo.service');
+
+/**
+ * Resolves an optional pincode into the {pincode, latitude, longitude}
+ * fields to merge into a brand/influencer insert — empty/omitted PIN yields
+ * all-null coordinates (the "skipped PIN" state), not a rejected request.
+ */
+const resolveLocationFields = async (pincode) => {
+  if (!pincode) {
+    return { pincode: null, latitude: null, longitude: null };
+  }
+  const resolved = await geocodePincode(pincode);
+  return { pincode: resolved.pincode, latitude: resolved.latitude, longitude: resolved.longitude };
+};
 
 /**
  * Onboard a Brand profile.
@@ -23,6 +37,8 @@ const onboardBrand = async (userId, data) => {
     throw new AppError('You have already completed onboarding!', 400, 'BAD_REQUEST');
   }
 
+  const locationFields = await resolveLocationFields(data.pincode);
+
   // Create brand record
   const { data: brand, error: brandError } = await supabase
     .from('brands')
@@ -31,6 +47,7 @@ const onboardBrand = async (userId, data) => {
       businessName: data.businessName,
       category: data.category,
       location: data.location || 'Pune',
+      ...locationFields,
       bio: data.bio,
       logoUrl: data.logoUrl || null,
       website: data.website || null,
@@ -91,6 +108,8 @@ const onboardInfluencer = async (userId, data) => {
     throw new AppError('You have already completed onboarding!', 400, 'BAD_REQUEST');
   }
 
+  const locationFields = await resolveLocationFields(data.pincode);
+
   // Create influencer record
   const { data: influencer, error: influencerError } = await supabase
     .from('influencers')
@@ -99,6 +118,7 @@ const onboardInfluencer = async (userId, data) => {
       name: data.name,
       instagramHandle: data.instagramHandle,
       niche: data.niche,
+      ...locationFields,
       bio: data.bio,
       profileImageUrl: data.profileImageUrl || null,
       followerCount: data.followerCount || 0,

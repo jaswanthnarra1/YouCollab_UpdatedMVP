@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 export default function InfluencerOnboarding() {
   const [name, setName] = useState("");
   const [niche, setNiche] = useState<string>("Fashion");
+  const [pincode, setPincode] = useState("");
   const [bio, setBio] = useState("");
   const [handle, setHandle] = useState("");
   const [followers, setFollowers] = useState<number | "">("");
@@ -29,6 +30,7 @@ export default function InfluencerOnboarding() {
   const save = useMutation({
     mutationFn: () => onboardingService.influencer({
       name, niche, bio,
+      pincode: pincode || undefined,
       followerCount: Number(followers || 0),
       instagramHandle: handle || undefined,
       profileImageUrl: profileImageUrl || undefined,
@@ -85,6 +87,18 @@ export default function InfluencerOnboarding() {
               <Label>Instagram handle (optional)</Label>
               <Input value={handle} onChange={(e) => setHandle(e.target.value)} placeholder="@yourhandle" className="glass" />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>PIN code (optional)</Label>
+            <Input
+              value={pincode}
+              onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="411001"
+              maxLength={6}
+              className="glass max-w-[160px]"
+            />
+            <p className="text-xs text-muted-foreground">See gigs near you. We currently support Pune PIN codes.</p>
           </div>
 
           <div className="space-y-1.5">

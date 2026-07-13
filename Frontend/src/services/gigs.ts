@@ -1,12 +1,19 @@
 import { apiClient, unwrap } from "@/lib/api";
 import type { Gig, CreateGigPayload } from "@/types";
 
+export type { Gig };
+
+export interface GigListResult {
+  gigs: Gig[];
+  locationEnabled: boolean;
+}
+
 export const gigsService = {
-  list: async (): Promise<Gig[]> => {
-    const { data } = await apiClient.get("/api/gigs");
+  list: async (params?: { category?: string; search?: string }): Promise<GigListResult> => {
+    const { data } = await apiClient.get("/api/gigs", { params });
     const payload = unwrap<Gig[] | { gigs?: Gig[] }>(data);
-    if (Array.isArray(payload)) return payload;
-    return payload?.gigs ?? [];
+    const gigs = Array.isArray(payload) ? payload : payload?.gigs ?? [];
+    return { gigs, locationEnabled: Boolean(data?.meta?.locationEnabled) };
   },
   get: async (id: string): Promise<Gig> => {
     const { data } = await apiClient.get(`/api/gigs/${id}`);

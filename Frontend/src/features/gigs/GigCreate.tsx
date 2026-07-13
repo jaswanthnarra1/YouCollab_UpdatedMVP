@@ -30,6 +30,7 @@ export default function GigCreate() {
   const [budgetMax, setBudgetMax] = useState<number | "">("");
   const [deadline, setDeadline] = useState("");
   const [city, setCity] = useState("Pune");
+  const [radiusKm, setRadiusKm] = useState<string>("ANYWHERE");
 
   // Inline validation errors state
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -48,6 +49,7 @@ export default function GigCreate() {
         deadline,
         budgetMin: budgetMin !== "" ? Number(budgetMin) : 0,
         budgetMax: budgetMax !== "" ? Number(budgetMax) : 0,
+        radiusKm: radiusKm === "ANYWHERE" ? null : Number(radiusKm),
         status,
       };
 
@@ -256,26 +258,41 @@ export default function GigCreate() {
             </div>
           </div>
 
-          {/* Location & Deadline */}
-          <div className="grid sm:grid-cols-2 gap-4">
+          {/* Location, Radius & Deadline */}
+          <div className="grid sm:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <Label className="text-[12px]">Location (Optional)</Label>
-              <Input 
-                value={city} 
-                onChange={(e) => { setCity(e.target.value); if (errors.city) setErrors(prev => ({ ...prev, city: "" })); }} 
-                placeholder="Pune" 
-                className="h-9 text-[13px] rounded-sm" 
+              <Input
+                value={city}
+                onChange={(e) => { setCity(e.target.value); if (errors.city) setErrors(prev => ({ ...prev, city: "" })); }}
+                placeholder="Pune"
+                className="h-9 text-[13px] rounded-sm"
               />
               {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
             </div>
 
             <div className="space-y-1.5">
+              <Label className="text-[12px]">Match radius (Optional)</Label>
+              <Select value={radiusKm} onValueChange={setRadiusKm}>
+                <SelectTrigger className="h-9 text-[13px] rounded-sm bg-background border-border"><SelectValue placeholder="Anywhere in Pune" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ANYWHERE">Anywhere in Pune</SelectItem>
+                  <SelectItem value="2">Within 2 km</SelectItem>
+                  <SelectItem value="5">Within 5 km</SelectItem>
+                  <SelectItem value="10">Within 10 km</SelectItem>
+                  <SelectItem value="20">Within 20 km</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Requires a PIN code on your brand profile.</p>
+            </div>
+
+            <div className="space-y-1.5">
               <Label className="text-[12px]">Deadline</Label>
-              <Input 
-                type="date" 
-                value={deadline} 
-                onChange={(e) => { setDeadline(e.target.value); if (errors.deadline) setErrors(prev => ({ ...prev, deadline: "" })); }} 
-                className={`h-9 text-[13px] rounded-sm cursor-pointer ${errors.deadline ? "border-red-500 focus-visible:ring-red-500" : ""}`} 
+              <Input
+                type="date"
+                value={deadline}
+                onChange={(e) => { setDeadline(e.target.value); if (errors.deadline) setErrors(prev => ({ ...prev, deadline: "" })); }}
+                className={`h-9 text-[13px] rounded-sm cursor-pointer ${errors.deadline ? "border-red-500 focus-visible:ring-red-500" : ""}`}
               />
               {errors.deadline && <p className="text-red-500 text-xs mt-1">{errors.deadline}</p>}
             </div>

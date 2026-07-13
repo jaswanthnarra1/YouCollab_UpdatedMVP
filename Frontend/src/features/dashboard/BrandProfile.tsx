@@ -22,6 +22,7 @@ export default function BrandProfile() {
   const [businessName, setBusinessName] = useState("");
   const [category, setCategory] = useState("Cafe");
   const [location, setLocation] = useState("Pune");
+  const [pincode, setPincode] = useState("");
   const [bio, setBio] = useState("");
   const [website, setWebsite] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
@@ -37,6 +38,7 @@ export default function BrandProfile() {
       setBusinessName(profile.brand.businessName || "");
       setCategory(profile.brand.category || "Cafe");
       setLocation(profile.brand.location || "Pune");
+      setPincode(profile.brand.pincode || "");
       setBio(profile.brand.bio || "");
       setWebsite(profile.brand.website || "");
       setLogoUrl(profile.brand.logoUrl || "");
@@ -46,6 +48,7 @@ export default function BrandProfile() {
   const update = useMutation({
     mutationFn: () => profileService.updateProfile({
       businessName, category, location, bio,
+      pincode: pincode || undefined,
       website: website || undefined,
       logoUrl: logoUrl || undefined,
     }),
@@ -168,6 +171,18 @@ export default function BrandProfile() {
               <Label className="text-[12px]">Location</Label>
               <Input value={location} onChange={(e) => setLocation(e.target.value)} className="h-9 text-[13px] rounded-sm" />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-[12px]">PIN code (optional)</Label>
+            <Input
+              value={pincode}
+              onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="411001"
+              maxLength={6}
+              className="h-9 text-[13px] rounded-sm max-w-[160px]"
+            />
+            <p className="text-xs text-muted-foreground">Unlocks radius matching for your collabs. We currently support Pune PIN codes.</p>
           </div>
 
           <div className="space-y-1.5">

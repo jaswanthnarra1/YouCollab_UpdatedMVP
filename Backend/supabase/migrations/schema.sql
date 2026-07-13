@@ -256,3 +256,214 @@ $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
   FOR EACH ROW EXECUTE FUNCTION update_users_updated_at_column();
+
+-- ============================================
+-- 10. Location Radius Matching
+-- ============================================
+-- PIN-code-derived coordinates for brands/creators, an optional radius on
+-- gigs, and a Postgres-side haversine RPC to filter+rank the feed by
+-- distance. No PostGIS/earthdistance extension — plain great-circle math is
+-- accurate enough at city scale and keeps this dependency-free.
+
+-- Offline PIN -> coordinates lookup (MVP scope: Pune 411xxx only). A real
+-- geocoding provider can replace this table's role later without touching
+-- call sites — see geocodePincode() in Backend/src/services/geo.service.js.
+CREATE TABLE IF NOT EXISTS pincodes (
+  pincode TEXT PRIMARY KEY,
+  city TEXT NOT NULL,
+  latitude DOUBLE PRECISION NOT NULL,
+  longitude DOUBLE PRECISION NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_pincodes_city ON pincodes(city);
+
+INSERT INTO pincodes (pincode, city, latitude, longitude) VALUES
+  ('411001', 'Pune', 18.5196, 73.8553),
+  ('411002', 'Pune', 18.5157, 73.8560),
+  ('411003', 'Pune', 18.5310, 73.8446),
+  ('411004', 'Pune', 18.5089, 73.8258),
+  ('411005', 'Pune', 18.5304, 73.8567),
+  ('411006', 'Pune', 18.5089, 73.8515),
+  ('411007', 'Pune', 18.5590, 73.8080),
+  ('411008', 'Pune', 18.5062, 73.8298),
+  ('411009', 'Pune', 18.5245, 73.8397),
+  ('411011', 'Pune', 18.4870, 73.8890),
+  ('411013', 'Pune', 18.5000, 73.8890),
+  ('411014', 'Pune', 18.5470, 73.9020),
+  ('411016', 'Pune', 18.5162, 73.8455),
+  ('411017', 'Pune', 18.4700, 73.8600),
+  ('411018', 'Pune', 18.5560, 73.8850),
+  ('411021', 'Pune', 18.5810, 73.8180),
+  ('411027', 'Pune', 18.4780, 73.7930),
+  ('411028', 'Pune', 18.4640, 73.8930),
+  ('411029', 'Pune', 18.4890, 73.8150),
+  ('411030', 'Pune', 18.5074, 73.8077),
+  ('411032', 'Pune', 18.4990, 73.7950),
+  ('411033', 'Pune', 18.5760, 73.8940),
+  ('411036', 'Pune', 18.5089, 73.9260),
+  ('411037', 'Pune', 18.5350, 73.9330),
+  ('411038', 'Pune', 18.5590, 73.7868),
+  ('411040', 'Pune', 18.5220, 73.7770),
+  ('411041', 'Pune', 18.5780, 73.9720),
+  ('411042', 'Pune', 18.4590, 73.9070),
+  ('411043', 'Pune', 18.4630, 73.8930),
+  ('411044', 'Pune', 18.4530, 73.8670),
+  ('411045', 'Pune', 18.5670, 73.9143),
+  ('411046', 'Pune', 18.5362, 73.8938),
+  ('411048', 'Pune', 18.4610, 73.8790),
+  ('411052', 'Pune', 18.6280, 73.8010),
+  ('411057', 'Pune', 18.5980, 73.7630),
+  ('411058', 'Pune', 18.5910, 73.7380)
+ON CONFLICT (pincode) DO NOTHING;
+
+-- Denormalized coordinates on brands/influencers, resolved once at
+-- onboarding/profile-edit time via geo.service.js rather than per query.
+ALTER TABLE brands ADD COLUMN IF NOT EXISTS pincode TEXT;
+ALTER TABLE brands ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+ALTER TABLE brands ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+
+ALTER TABLE influencers ADD COLUMN IF NOT EXISTS pincode TEXT;
+ALTER TABLE influencers ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+ALTER TABLE influencers ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+
+CREATE INDEX IF NOT EXISTS idx_brands_lat_lng ON brands(latitude, longitude);
+CREATE INDEX IF NOT EXISTS idx_influencers_lat_lng ON influencers(latitude, longitude);
+
+-- Optional match radius on a gig. NULL means "Anywhere in Pune" — every
+-- pre-existing gig defaults to this, so nothing that worked before changes.
+ALTER TABLE gigs ADD COLUMN IF NOT EXISTS "radiusKm" INTEGER;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'gigs_radiuskm_check'
+  ) THEN
+    ALTER TABLE gigs ADD CONSTRAINT gigs_radiuskm_check
+      CHECK ("radiusKm" IS NULL OR "radiusKm" IN (2, 5, 10, 20));
+  END IF;
+END $$;
+
+-- Great-circle distance in km between two lat/lng points. Plain formula, no
+-- extension required — accurate to well within city-block scale at Pune's
+-- latitude, which is all this feature needs.
+CREATE OR REPLACE FUNCTION haversine_km(
+  lat1 DOUBLE PRECISION, lng1 DOUBLE PRECISION,
+  lat2 DOUBLE PRECISION, lng2 DOUBLE PRECISION
+)
+RETURNS DOUBLE PRECISION AS $$
+DECLARE
+  r DOUBLE PRECISION := 6371;
+  dlat DOUBLE PRECISION := radians(lat2 - lat1);
+  dlng DOUBLE PRECISION := radians(lng2 - lng1);
+  a DOUBLE PRECISION;
+BEGIN
+  a := sin(dlat / 2) ^ 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng / 2) ^ 2;
+  RETURN r * 2 * asin(sqrt(a));
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+-- Marketplace feed with radius matching baked in. Mirrors gig.service.js's
+-- getGigs exactly: same status/city/category/search filters, same 3 sort
+-- modes and keyset cursor semantics (caller resolves the cursor row's sort
+-- value in JS first, same as today, and just passes it in here), same
+-- LIMIT n+1 has-more convention. The only addition is the radius visibility
+-- rule and a rounded distanceKm per row.
+--
+-- Null-handling matrix (see PRD):
+--   radiusKm IS NULL              -> visible to everyone ("Anywhere in Pune")
+--   brand has no coordinates      -> degrades to NULL-radius (visible to all)
+--   creator has no coordinates    -> radius-restricted gigs are excluded
+--   otherwise                     -> visible iff haversine_km(...) <= radiusKm
+CREATE OR REPLACE FUNCTION list_gigs_in_radius(
+  p_category TEXT,
+  p_search TEXT,
+  p_sort TEXT,
+  p_cursor_budget_min INTEGER,
+  p_cursor_created_at TIMESTAMPTZ,
+  p_cursor_id UUID,
+  p_lat DOUBLE PRECISION,
+  p_lng DOUBLE PRECISION,
+  p_limit INTEGER
+)
+RETURNS TABLE (
+  id UUID,
+  "brandId" UUID,
+  title TEXT,
+  description TEXT,
+  "budgetMin" INTEGER,
+  "budgetMax" INTEGER,
+  deliverables TEXT,
+  "creatorRequirements" TEXT,
+  platform TEXT,
+  "campaignType" TEXT,
+  deadline TIMESTAMPTZ,
+  status TEXT,
+  city TEXT,
+  category TEXT,
+  "radiusKm" INTEGER,
+  "viewCount" INTEGER,
+  "createdAt" TIMESTAMPTZ,
+  "updatedAt" TIMESTAMPTZ,
+  brand_id UUID,
+  brand_business_name TEXT,
+  brand_category TEXT,
+  brand_logo_url TEXT,
+  brand_last_active_at TIMESTAMPTZ,
+  applications_count INTEGER,
+  distance_km DOUBLE PRECISION,
+  total_count BIGINT
+) AS $$
+BEGIN
+  RETURN QUERY
+  WITH filtered AS (
+    SELECT
+      g.id, g."brandId", g.title, g.description, g."budgetMin", g."budgetMax",
+      g.deliverables, g."creatorRequirements", g.platform, g."campaignType", g.deadline,
+      g.status, g.city, g.category, g."radiusKm", g."viewCount", g."createdAt", g."updatedAt",
+      b.id AS brand_id, b."businessName" AS brand_business_name, b.category AS brand_category,
+      b."logoUrl" AS brand_logo_url, u.last_active_at AS brand_last_active_at,
+      COALESCE(a.cnt, 0)::INTEGER AS applications_count,
+      CASE
+        WHEN p_lat IS NOT NULL AND p_lng IS NOT NULL AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL
+        THEN ROUND((haversine_km(b.latitude, b.longitude, p_lat, p_lng) * 2)::numeric)::double precision / 2
+        ELSE NULL
+      END AS distance_km
+    FROM gigs g
+    JOIN brands b ON b.id = g."brandId"
+    JOIN users u ON u.id = b."userId"
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*) AS cnt FROM applications ap WHERE ap."gigId" = g.id
+    ) a ON true
+    WHERE g.status = 'OPEN' AND g.city = 'Pune'
+      AND (p_category IS NULL OR g.category = p_category)
+      AND (p_search IS NULL OR g.title ILIKE '%' || p_search || '%' OR g.description ILIKE '%' || p_search || '%')
+      AND (
+        g."radiusKm" IS NULL
+        OR b.latitude IS NULL OR b.longitude IS NULL
+        OR (p_lat IS NOT NULL AND p_lng IS NOT NULL AND haversine_km(b.latitude, b.longitude, p_lat, p_lng) <= g."radiusKm")
+      )
+  ),
+  counted AS (
+    SELECT COUNT(*) AS total FROM filtered
+  )
+  SELECT f.*, counted.total
+  FROM filtered f, counted
+  WHERE
+    CASE
+      WHEN p_sort = 'budget_high' THEN (p_cursor_id IS NULL OR (f."budgetMin", f.id) < (p_cursor_budget_min, p_cursor_id))
+      WHEN p_sort = 'budget_low' THEN (p_cursor_id IS NULL OR (f."budgetMin", f.id) > (p_cursor_budget_min, p_cursor_id))
+      ELSE (p_cursor_id IS NULL OR (f."createdAt", f.id) < (p_cursor_created_at, p_cursor_id))
+    END
+  ORDER BY
+    CASE WHEN p_sort = 'budget_high' THEN f."budgetMin" END DESC NULLS LAST,
+    CASE WHEN p_sort = 'budget_low' THEN f."budgetMin" END ASC NULLS LAST,
+    CASE WHEN p_sort IS NULL OR p_sort NOT IN ('budget_high', 'budget_low') THEN f."createdAt" END DESC NULLS LAST,
+    CASE WHEN p_sort = 'budget_high' THEN f.id END DESC,
+    CASE WHEN p_sort = 'budget_low' THEN f.id END ASC,
+    f.id DESC
+  LIMIT p_limit;
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+GRANT EXECUTE ON FUNCTION list_gigs_in_radius(TEXT, TEXT, TEXT, INTEGER, TIMESTAMPTZ, UUID, DOUBLE PRECISION, DOUBLE PRECISION, INTEGER) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION haversine_km(DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION) TO anon, authenticated;

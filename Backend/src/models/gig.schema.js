@@ -29,6 +29,7 @@ const createGigSchema = z.object({
     .min(2, 'Please select a category'),
   status: z.enum(['OPEN', 'CLOSED', 'DRAFT']).optional().nullable(),
   city: z.string().optional().nullable(),
+  radiusKm: z.union([z.literal(2), z.literal(5), z.literal(10), z.literal(20)]).optional().nullable(),
 }).refine((data) => {
   return data.budgetMax > data.budgetMin;
 }, {
@@ -53,6 +54,7 @@ const updateGigSchema = z.object({
   category: z.string().min(2).optional(),
   status: z.enum(['OPEN', 'CLOSED', 'DRAFT']).optional(),
   city: z.string().optional().nullable(),
+  radiusKm: z.union([z.literal(2), z.literal(5), z.literal(10), z.literal(20)]).optional().nullable(),
 }).refine((data) => {
   if (data.budgetMin && data.budgetMax && data.budgetMax <= data.budgetMin) {
     return false;

@@ -31,6 +31,7 @@ export default function GigEdit() {
   const [budgetMax, setBudgetMax] = useState<number | "">("");
   const [deadline, setDeadline] = useState("");
   const [city, setCity] = useState("Pune");
+  const [radiusKm, setRadiusKm] = useState<string>("ANYWHERE");
 
   // Inline errors state
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -56,6 +57,7 @@ export default function GigEdit() {
         setDeadline(new Date(gig.deadline).toISOString().split("T")[0]);
       }
       setCity(gig.city || "Pune");
+      setRadiusKm(gig.radiusKm != null ? String(gig.radiusKm) : "ANYWHERE");
     }
   }, [gig]);
 
@@ -73,6 +75,7 @@ export default function GigEdit() {
         deadline,
         budgetMin: budgetMin !== "" ? Number(budgetMin) : 0,
         budgetMax: budgetMax !== "" ? Number(budgetMax) : null,
+        radiusKm: radiusKm === "ANYWHERE" ? null : Number(radiusKm),
       };
       console.log("[Edit Gig Debug] Session user:", user);
       console.log("[Edit Gig Debug] Submitting Update Payload:", JSON.stringify(payload));
@@ -265,15 +268,30 @@ export default function GigEdit() {
             </div>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid sm:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <Label className="text-[12px]">Location (Optional)</Label>
-              <Input 
-                value={city} 
-                onChange={(e) => { setCity(e.target.value); if (errors.city) setErrors(prev => ({ ...prev, city: "" })); }} 
-                className="h-9 text-[13px] rounded-sm" 
+              <Input
+                value={city}
+                onChange={(e) => { setCity(e.target.value); if (errors.city) setErrors(prev => ({ ...prev, city: "" })); }}
+                className="h-9 text-[13px] rounded-sm"
               />
               {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-[12px]">Match radius (Optional)</Label>
+              <Select value={radiusKm} onValueChange={setRadiusKm}>
+                <SelectTrigger className="h-9 text-[13px] rounded-sm bg-background border-border"><SelectValue placeholder="Anywhere in Pune" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ANYWHERE">Anywhere in Pune</SelectItem>
+                  <SelectItem value="2">Within 2 km</SelectItem>
+                  <SelectItem value="5">Within 5 km</SelectItem>
+                  <SelectItem value="10">Within 10 km</SelectItem>
+                  <SelectItem value="20">Within 20 km</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Requires a PIN code on your brand profile.</p>
             </div>
 
             <div className="space-y-1.5">

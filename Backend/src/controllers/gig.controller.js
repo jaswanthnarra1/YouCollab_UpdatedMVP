@@ -18,12 +18,13 @@ const create = asyncHandler(async (req, res) => {
  * Get all open collabs with search, filters, and cursor pagination.
  */
 const list = asyncHandler(async (req, res) => {
-  const result = await gigService.getGigs(req.query);
+  const result = await gigService.getGigs(req.query, req.user);
 
   res.status(200).json({
     success: true,
     data: result.data,
     pagination: result.pagination,
+    meta: result.meta,
   });
 });
 

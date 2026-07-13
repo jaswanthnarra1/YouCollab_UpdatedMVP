@@ -1,5 +1,6 @@
 const supabase = require('./supabase');
 const AppError = require('../utils/AppError');
+const { geocodePincode } = require('./geo.service');
 
 /**
  * Get current user's profile (brand or influencer based on role).
@@ -47,6 +48,18 @@ const updateBrandProfile = async (userId, data) => {
   if (data.bio !== undefined) updateData.bio = data.bio;
   if (data.website !== undefined) updateData.website = data.website || null;
   if (data.logoUrl !== undefined) updateData.logoUrl = data.logoUrl || null;
+  if (data.pincode !== undefined) {
+    if (data.pincode) {
+      const resolved = await geocodePincode(data.pincode);
+      updateData.pincode = resolved.pincode;
+      updateData.latitude = resolved.latitude;
+      updateData.longitude = resolved.longitude;
+    } else {
+      updateData.pincode = null;
+      updateData.latitude = null;
+      updateData.longitude = null;
+    }
+  }
 
   const { data: updatedBrand, error: updateError } = await supabase
     .from('brands')
@@ -91,6 +104,18 @@ const updateInfluencerProfile = async (userId, data) => {
   if (data.bio !== undefined) updateData.bio = data.bio;
   if (data.profileImageUrl !== undefined) updateData.profileImageUrl = data.profileImageUrl || null;
   if (data.followerCount !== undefined) updateData.followerCount = data.followerCount;
+  if (data.pincode !== undefined) {
+    if (data.pincode) {
+      const resolved = await geocodePincode(data.pincode);
+      updateData.pincode = resolved.pincode;
+      updateData.latitude = resolved.latitude;
+      updateData.longitude = resolved.longitude;
+    } else {
+      updateData.pincode = null;
+      updateData.latitude = null;
+      updateData.longitude = null;
+    }
+  }
 
   const { data: updatedInfluencer, error: updateError } = await supabase
     .from('influencers')

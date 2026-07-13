@@ -304,17 +304,18 @@ export default function InfluencerDashboard() {
     });
   };
 
-  const { data: gigs = [] } = useQuery({ queryKey: ["gigs"], queryFn: gigsService.list });
+  const { data: gigsResult } = useQuery({ queryKey: ["gigs"], queryFn: () => gigsService.list() });
   const { data: myApps = [] } = useQuery({ queryKey: ["myApplications"], queryFn: applicationsService.mine, retry: false });
   const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: profileService.getProfile });
   const credits: number | null = (profile?.influencer as { credits?: number } | undefined)?.credits ?? null;
 
   const filtered = useMemo(() => {
+    const gigs = gigsResult?.gigs ?? [];
     return gigs.filter((g) =>
       (active ? g.category === active : true) &&
       (query ? (g.title + g.description).toLowerCase().includes(query.toLowerCase()) : true)
     );
-  }, [gigs, active, query]);
+  }, [gigsResult, active, query]);
 
   const accepted = myApps.filter((a) => a.status === "ACCEPTED").length;
   const pending = myApps.filter((a) => a.status === "PENDING").length;

@@ -1,9 +1,10 @@
 import { Button } from "@/components/common/button";
 import { CATEGORIES } from "@/constants";
-import { gigsService, type Gig } from "@/services/gigs";
+import { gigsService } from "@/services/gigs";
 import { Input } from "@/components/common/input";
 import { Link } from "react-router-dom";
 import { Search, MapPin, IndianRupee, Calendar } from "lucide-react";
+import { useAuthStore } from "@/stores/authStore";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -23,28 +24,32 @@ export default function Marketplace() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [activeLocation, setActiveLocation] = useState<string>("All Areas");
   const [searchQuery, setSearchQuery] = useState("");
+  const { user } = useAuthStore();
+  const [dismissedNudge, setDismissedNudge] = useState(false);
 
-  const { data: gigs = [], isLoading } = useQuery({ 
-    queryKey: ["gigs"], 
-    queryFn: gigsService.list 
+  const { data, isLoading } = useQuery({
+    queryKey: ["gigs"],
+    queryFn: () => gigsService.list(),
   });
+  const locationEnabled = data?.locationEnabled ?? false;
 
   const filteredGigs = useMemo(() => {
+    const gigs = data?.gigs ?? [];
     return gigs.filter((g) => {
       const matchCategory = activeCategory ? g.category === activeCategory : true;
-      
+
       const brandLoc = (g as any).brand?.location || "";
-      const matchLocation = activeLocation === "All Areas" 
-        ? true 
+      const matchLocation = activeLocation === "All Areas"
+        ? true
         : brandLoc.toLowerCase().includes(activeLocation.toLowerCase()) || g.city.toLowerCase().includes(activeLocation.toLowerCase());
-      
+
       const matchSearch = searchQuery
         ? (g.title + g.description + ((g as any).brand?.businessName || "")).toLowerCase().includes(searchQuery.toLowerCase())
         : true;
-      
+
       return matchCategory && matchLocation && matchSearch && g.status === "OPEN";
     });
-  }, [gigs, activeCategory, activeLocation, searchQuery]);
+  }, [data, activeCategory, activeLocation, searchQuery]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -56,6 +61,19 @@ export default function Marketplace() {
           <h1 className="text-3xl font-semibold tracking-tight">Browse briefs in Pune</h1>
           <p className="text-[13px] text-muted-foreground mt-1">Connect directly with Pune brands. Pitch in seconds.</p>
         </div>
+
+        {!isLoading && user?.role === "INFLUENCER" && !locationEnabled && !dismissedNudge && (
+          <div className="flex items-center justify-between gap-3 border border-border rounded-sm px-4 py-2.5 bg-muted/30 text-[12px]">
+            <span className="inline-flex items-center gap-2 text-muted-foreground">
+              <MapPin className="h-3.5 w-3.5 shrink-0" />
+              Add your PIN code to your profile to see collabs near you and unlock radius-matched gigs.
+            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              <Link to="/profile/creator" className="text-foreground font-medium hover:underline">Add PIN</Link>
+              <button onClick={() => setDismissedNudge(true)} className="text-muted-foreground hover:text-foreground">Dismiss</button>
+            </div>
+          </div>
+        )}
 
         {/* Filter Toolbar matching Dashboard layout (no glass card wrappers) */}
         <div className="space-y-4">
@@ -134,7 +152,10 @@ export default function Marketplace() {
               <div key={g.id} className="border border-border rounded-sm p-5 bg-background flex flex-col justify-between hover:border-zinc-500/50 transition-colors">
                 <div>
                   <div className="flex items-center justify-between text-[11px] uppercase tracking-wider text-muted-foreground">
-                    <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> {g.city || "Pune"}</span>
+                    <span className="inline-flex items-center gap-1">
+                      <MapPin className="h-3 w-3" /> {g.city || "Pune"}
+                      {g.distanceKm != null && <span className="text-foreground">· {g.distanceKm} km away</span>}
+                    </span>
                     <span className="text-foreground font-medium">{g.category}</span>
                   </div>
                   <h3 className="mt-3 text-[14px] font-semibold line-clamp-2">{g.title}</h3>

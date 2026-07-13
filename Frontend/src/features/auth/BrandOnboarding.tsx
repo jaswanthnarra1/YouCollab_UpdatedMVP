@@ -18,6 +18,7 @@ export default function BrandOnboarding() {
   const [businessName, setBusinessName] = useState("");
   const [category, setCategory] = useState<string>("Cafe");
   const [location, setLocation] = useState("Pune");
+  const [pincode, setPincode] = useState("");
   const [bio, setBio] = useState("");
   const [website, setWebsite] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
@@ -28,6 +29,7 @@ export default function BrandOnboarding() {
   const save = useMutation({
     mutationFn: () => onboardingService.brand({
       businessName, category, location, bio,
+      pincode: pincode || undefined,
       website: website || undefined,
       logoUrl: logoUrl || undefined,
     }),
@@ -74,6 +76,17 @@ export default function BrandOnboarding() {
               <Label className="text-[12px]">Location</Label>
               <Input value={location} onChange={(e) => setLocation(e.target.value)} className="h-9 text-[13px] rounded-sm" />
             </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-[12px]">PIN code (optional)</Label>
+            <Input
+              value={pincode}
+              onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="411001"
+              maxLength={6}
+              className="h-9 text-[13px] rounded-sm max-w-[160px]"
+            />
+            <p className="text-xs text-muted-foreground">Unlocks radius matching for your collabs. We currently support Pune PIN codes.</p>
           </div>
           <div className="space-y-1.5">
             <Label className="text-[12px]">Bio <span className="text-muted-foreground">(min 3 words)</span></Label>
