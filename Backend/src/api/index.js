@@ -9,6 +9,7 @@ const instagramRoutes = require('./instagram.routes');
 const profileRoutes = require('./profile.routes');
 const recaptchaRoutes = require('./recaptcha.routes');
 const contactRoutes = require('./contact.routes');
+const discoveryRoutes = require('./discovery.routes');
 
 const router = express.Router();
 
@@ -22,6 +23,7 @@ router.use('/instagram', instagramRoutes);
 router.use('/profile', profileRoutes);
 router.use('/recaptcha', recaptchaRoutes);
 router.use('/contact', contactRoutes);
+router.use('/discovery', discoveryRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {

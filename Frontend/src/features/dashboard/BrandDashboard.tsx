@@ -5,6 +5,7 @@ import { NotificationBell } from "@/components/layout/NotificationBell";
 import { Button } from "@/components/common/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/common/dialog";
 import { gigsService, type Gig } from "@/services/gigs";
+import NearbySection from "./NearbySection";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   Plus,
@@ -411,6 +412,8 @@ export default function BrandDashboard() {
               </div>
 
             </div>
+
+            <NearbySection />
 
           </div>
         )}

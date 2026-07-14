@@ -5,6 +5,7 @@ import { Button } from "@/components/common/button";
 import { CATEGORIES } from "@/constants";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/common/dialog";
 import { gigsService, type Gig } from "@/services/gigs";
+import NearbySection from "./NearbySection";
 import { Input } from "@/components/common/input";
 import type { Application } from "@/types";
 import {
@@ -352,6 +353,8 @@ export default function InfluencerDashboard() {
         </div>
 
         <InstagramCard />
+
+        <NearbySection />
 
         <section className="space-y-6">
           {/* Dynamic Tabs */}
