@@ -72,12 +72,14 @@ const updateBrandProfile = async (userId, data) => {
     throw new AppError('Failed to update brand profile.', 500, 'DATABASE_ERROR');
   }
 
-  // Sync avatar if logo changed
-  if (data.logoUrl !== undefined) {
-    await supabase
-      .from('users')
-      .update({ avatar_url: data.logoUrl || null })
-      .eq('id', userId);
+  // Sync avatar/display name to the users row — it's the source of truth
+  // for user.name on login (see auth.service.js toProfile), so a save here
+  // that skipped this would revert to the old name on next sign-in.
+  const usersSync = {};
+  if (data.logoUrl !== undefined) usersSync.avatar_url = data.logoUrl || null;
+  if (data.businessName !== undefined) usersSync.full_name = data.businessName;
+  if (Object.keys(usersSync).length > 0) {
+    await supabase.from('users').update(usersSync).eq('id', userId);
   }
 
   return updatedBrand;
@@ -128,12 +130,14 @@ const updateInfluencerProfile = async (userId, data) => {
     throw new AppError('Failed to update creator profile.', 500, 'DATABASE_ERROR');
   }
 
-  // Sync avatar if profile image changed
-  if (data.profileImageUrl !== undefined) {
-    await supabase
-      .from('users')
-      .update({ avatar_url: data.profileImageUrl || null })
-      .eq('id', userId);
+  // Sync avatar/display name to the users row — it's the source of truth
+  // for user.name on login (see auth.service.js toProfile), so a save here
+  // that skipped this would revert to the old name on next sign-in.
+  const usersSync = {};
+  if (data.profileImageUrl !== undefined) usersSync.avatar_url = data.profileImageUrl || null;
+  if (data.name !== undefined) usersSync.full_name = data.name;
+  if (Object.keys(usersSync).length > 0) {
+    await supabase.from('users').update(usersSync).eq('id', userId);
   }
 
   return updatedInfluencer;

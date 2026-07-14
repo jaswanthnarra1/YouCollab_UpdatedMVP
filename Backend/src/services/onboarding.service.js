@@ -65,6 +65,7 @@ const onboardBrand = async (userId, data) => {
     .update({
       is_onboarded: true,
       avatar_url: data.logoUrl || null,
+      full_name: data.businessName,
     })
     .eq('id', userId)
     .select('*')
@@ -136,6 +137,7 @@ const onboardInfluencer = async (userId, data) => {
     .update({
       is_onboarded: true,
       avatar_url: data.profileImageUrl || null,
+      full_name: data.name,
     })
     .eq('id', userId)
     .select('*')
