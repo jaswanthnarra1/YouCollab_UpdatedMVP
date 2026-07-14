@@ -308,6 +308,7 @@ export default function InfluencerDashboard() {
   const { data: myApps = [] } = useQuery({ queryKey: ["myApplications"], queryFn: applicationsService.mine, retry: false });
   const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: profileService.getProfile });
   const credits: number | null = (profile?.influencer as { credits?: number } | undefined)?.credits ?? null;
+  const pincode: string | null = (profile?.influencer as { pincode?: string } | undefined)?.pincode ?? null;
 
   const filtered = useMemo(() => {
     const gigs = gigsResult?.gigs ?? [];
@@ -329,7 +330,18 @@ export default function InfluencerDashboard() {
             <h1 className="text-3xl font-semibold tracking-tight">Hey {user?.name?.split(" ")[0] ?? "creator"}.</h1>
             <p className="text-[13px] text-muted-foreground mt-1">Pune brands looking to collab — fresh today.</p>
           </div>
-          <NotificationBell />
+          <div className="flex items-center gap-3">
+            {pincode && (
+              <span
+                title="Your PIN code"
+                className="h-8 px-2.5 inline-flex items-center gap-1.5 rounded-full border border-border text-muted-foreground text-[12px] shrink-0"
+              >
+                <MapPin className="h-3.5 w-3.5" />
+                {pincode}
+              </span>
+            )}
+            <NotificationBell />
+          </div>
         </div>
 
         <div className="grid sm:grid-cols-4 gap-3">

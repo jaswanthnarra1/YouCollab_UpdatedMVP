@@ -53,6 +53,7 @@ export default function BrandDashboard() {
 
   const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: profileService.getProfile });
   const credits: number | null = (profile?.brand as { credits?: number } | undefined)?.credits ?? null;
+  const pincode: string | null = (profile?.brand as { pincode?: string } | undefined)?.pincode ?? null;
 
   // Fetch applications for all gigs
   const [apps, setApps] = useState<Application[]>([]);
@@ -305,6 +306,15 @@ export default function BrandDashboard() {
                 <p className="text-[13px] text-muted-foreground mt-1">Review applicant portfolios and coordinate campaigns.</p>
               </div>
               <div className="flex items-center gap-3">
+                {pincode && (
+                  <span
+                    title="Your PIN code"
+                    className="h-8 px-2.5 inline-flex items-center gap-1.5 rounded-full border border-border text-muted-foreground text-[12px] shrink-0"
+                  >
+                    <MapPin className="h-3.5 w-3.5" />
+                    {pincode}
+                  </span>
+                )}
                 <NotificationBell />
                 <Button asChild className="h-9 text-[13px] rounded-sm bg-gradient-brand text-primary-foreground border-0 shadow-md">
                   <Link to="/gigs/new"><Plus className="h-4 w-4 mr-1" /> Post New Gig</Link>
