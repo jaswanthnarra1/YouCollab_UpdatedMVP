@@ -5,12 +5,12 @@ import { Button } from "@/components/common/button";
 import { CATEGORIES } from "@/constants";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/common/dialog";
 import { gigsService, type Gig } from "@/services/gigs";
-import NearbySection from "./NearbySection";
 import { Input } from "@/components/common/input";
 import type { Application } from "@/types";
 import {
   Instagram, BadgeCheck, RefreshCw, Unlink, IndianRupee, Calendar,
-  MapPin, Send, Loader2, Search, TrendingUp, Sparkles, MessageSquare, Coins, Clock, CheckCircle2
+  MapPin, Send, Loader2, Search, TrendingUp, Sparkles, MessageSquare, Coins, Clock, CheckCircle2,
+  ArrowUpNarrowWide, ArrowDownWideNarrow, ArrowUpDown
 } from "lucide-react";
 import { instagramService } from "@/services/instagram";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -119,6 +119,7 @@ function GigCard({ gig, hasApplied, status, onClick }: { gig: Gig; hasApplied: b
         {gig.brand?.businessName && (
           <p className="mt-2 text-[11px] text-muted-foreground">
             Brand: <span className="text-foreground font-medium">{gig.brand.businessName}</span>
+            {gig.distanceKm != null && <span> · {gig.distanceKm} km away</span>}
           </p>
         )}
 
@@ -291,6 +292,9 @@ export default function InfluencerDashboard() {
   const [openGig, setOpenGig] = useState<Gig | null>(null);
   const [messagingApp, setMessagingApp] = useState<Application | null>(null);
   const [query, setQuery] = useState("");
+  const [distanceSort, setDistanceSort] = useState<"nearest" | "farthest" | null>(null);
+  const cycleDistanceSort = () =>
+    setDistanceSort((prev) => (prev === null ? "nearest" : prev === "nearest" ? "farthest" : null));
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = (searchParams.get("tab") as "gigs" | "pitches") === "pitches" ? "pitches" : "gigs";
   const setTab = (t: "gigs" | "pitches") => {
@@ -313,11 +317,17 @@ export default function InfluencerDashboard() {
 
   const filtered = useMemo(() => {
     const gigs = gigsResult?.gigs ?? [];
-    return gigs.filter((g) =>
+    const list = gigs.filter((g) =>
       (active ? g.category === active : true) &&
       (query ? (g.title + g.description).toLowerCase().includes(query.toLowerCase()) : true)
     );
-  }, [gigsResult, active, query]);
+    if (!distanceSort) return list;
+    return [...list].sort((a, b) => {
+      const da = a.distanceKm ?? Infinity;
+      const db = b.distanceKm ?? Infinity;
+      return distanceSort === "nearest" ? da - db : db - da;
+    });
+  }, [gigsResult, active, query, distanceSort]);
 
   const accepted = myApps.filter((a) => a.status === "ACCEPTED").length;
   const pending = myApps.filter((a) => a.status === "PENDING").length;
@@ -354,8 +364,6 @@ export default function InfluencerDashboard() {
 
         <InstagramCard />
 
-        <NearbySection />
-
         <section className="space-y-6">
           {/* Dynamic Tabs */}
           <div className="flex border-b border-border overflow-x-auto whitespace-nowrap scrollbar-none">
@@ -384,9 +392,33 @@ export default function InfluencerDashboard() {
                   <h2 className="text-xl font-semibold tracking-tight">Browse gigs</h2>
                   <p className="text-[12px] text-muted-foreground">Filter by category or search the brief.</p>
                 </div>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input placeholder="Search briefs..." value={query} onChange={(e) => setQuery(e.target.value)} className="h-9 text-[13px] pl-9 w-64 rounded-sm" />
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input placeholder="Search briefs..." value={query} onChange={(e) => setQuery(e.target.value)} className="h-9 text-[13px] pl-9 w-64 rounded-sm" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={cycleDistanceSort}
+                    title={
+                      distanceSort === "nearest"
+                        ? "Sorted nearest brand first — click for farthest first"
+                        : distanceSort === "farthest"
+                        ? "Sorted farthest brand first — click to clear"
+                        : "Sort by distance to brand"
+                    }
+                    className={`h-9 w-9 shrink-0 inline-flex items-center justify-center rounded-sm border transition-colors ${
+                      distanceSort ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {distanceSort === "nearest" ? (
+                      <ArrowUpNarrowWide className="h-3.5 w-3.5" />
+                    ) : distanceSort === "farthest" ? (
+                      <ArrowDownWideNarrow className="h-3.5 w-3.5" />
+                    ) : (
+                      <ArrowUpDown className="h-3.5 w-3.5" />
+                    )}
+                  </button>
                 </div>
               </div>
 

@@ -2,6 +2,7 @@ const supabase = require('./supabase');
 const AppError = require('../utils/AppError');
 const { parsePagination, paginateResults } = require('../utils/pagination');
 const { TIER_COST, getTier } = require('../utils/credits');
+const { haversineKm } = require('./geo.service');
 
 /**
  * Helper to retrieve influencer associated with userId.
@@ -93,7 +94,7 @@ const apply = async (userId, gigId, coverNote) => {
 const getGigApplications = async (gigId, userId, filters) => {
   const { data: brand } = await supabase
     .from('brands')
-    .select('id')
+    .select('id, latitude, longitude')
     .eq('userId', userId)
     .maybeSingle();
 
@@ -119,7 +120,7 @@ const getGigApplications = async (gigId, userId, filters) => {
 
   let query = supabase
     .from('applications')
-    .select('*, influencer:influencers(id, name, instagramHandle, niche, bio, profileImageUrl, followerCount, user:users(lastActiveAt:last_active_at, email))', { count: 'exact' })
+    .select('*, influencer:influencers(id, name, instagramHandle, niche, bio, profileImageUrl, followerCount, latitude, longitude, user:users(lastActiveAt:last_active_at, email))', { count: 'exact' })
     .eq('gigId', gigId);
 
   if (cursor) {
@@ -143,6 +144,18 @@ const getGigApplications = async (gigId, userId, filters) => {
 
   const paginated = paginateResults(applications || [], limit);
   paginated.pagination.total = total || 0;
+
+  // Coordinates never leave the server — attach the rounded distance to the
+  // brand and strip lat/lng off the nested influencer before returning.
+  const hasBrandCoords = brand.latitude != null && brand.longitude != null;
+  paginated.data = paginated.data.map((app) => {
+    const { latitude, longitude, ...influencer } = app.influencer || {};
+    const distanceKm =
+      hasBrandCoords && latitude != null && longitude != null
+        ? haversineKm(brand.latitude, brand.longitude, latitude, longitude)
+        : null;
+    return { ...app, influencer, distanceKm };
+  });
 
   return paginated;
 };

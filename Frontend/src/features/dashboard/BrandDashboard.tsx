@@ -5,7 +5,6 @@ import { NotificationBell } from "@/components/layout/NotificationBell";
 import { Button } from "@/components/common/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/common/dialog";
 import { gigsService, type Gig } from "@/services/gigs";
-import NearbySection from "./NearbySection";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   Plus,
@@ -29,6 +28,9 @@ import {
   Send,
   UserCheck,
   Coins,
+  ArrowUpNarrowWide,
+  ArrowDownWideNarrow,
+  ArrowUpDown,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/common/select";
 import { useAuthStore } from "@/stores/authStore";
@@ -173,6 +175,9 @@ export default function BrandDashboard() {
   const [myGigsSubTab, setMyGigsSubTab] = useState<MyGigsTab>("active");
   const [appFilterSubTab, setAppFilterSubTab] = useState<AppFilterTab>("new");
   const [selectedGigFilter, setSelectedGigFilter] = useState<string>("all");
+  const [distanceSort, setDistanceSort] = useState<"nearest" | "farthest" | null>(null);
+  const cycleDistanceSort = () =>
+    setDistanceSort((prev) => (prev === null ? "nearest" : prev === "nearest" ? "farthest" : null));
 
   // Collaboration DMs
   const [selectedChatPartner, setSelectedChatPartner] = useState<Application | null>(null);
@@ -413,8 +418,6 @@ export default function BrandDashboard() {
 
             </div>
 
-            <NearbySection />
-
           </div>
         )}
 
@@ -577,21 +580,45 @@ export default function BrandDashboard() {
                 <p className="text-[12px] text-muted-foreground mt-0.5">Filter applications by specific brief postings.</p>
               </div>
 
-              {/* Selector dropdown */}
-              <div className="relative flex items-center gap-1.5 border border-border rounded-sm px-2.5 bg-background h-9">
-                <Briefcase className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                <select
-                  value={selectedGigFilter}
-                  onChange={(e) => setSelectedGigFilter(e.target.value)}
-                  className="bg-transparent text-[12px] text-foreground focus:outline-none cursor-pointer pr-1 max-w-[200px]"
+              <div className="flex items-center gap-2">
+                {/* Selector dropdown */}
+                <div className="relative flex items-center gap-1.5 border border-border rounded-sm px-2.5 bg-background h-9">
+                  <Briefcase className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <select
+                    value={selectedGigFilter}
+                    onChange={(e) => setSelectedGigFilter(e.target.value)}
+                    className="bg-transparent text-[12px] text-foreground focus:outline-none cursor-pointer pr-1 max-w-[200px]"
+                  >
+                    <option value="all" className="bg-background text-foreground">All Campaigns</option>
+                    {gigs.map(g => (
+                      <option key={g.id} value={g.id} className="bg-background text-foreground truncate">
+                        {g.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={cycleDistanceSort}
+                  title={
+                    distanceSort === "nearest"
+                      ? "Sorted nearest creator first — click for farthest first"
+                      : distanceSort === "farthest"
+                      ? "Sorted farthest creator first — click to clear"
+                      : "Sort by distance to creator"
+                  }
+                  className={`h-9 w-9 shrink-0 inline-flex items-center justify-center rounded-sm border transition-colors ${
+                    distanceSort ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"
+                  }`}
                 >
-                  <option value="all" className="bg-background text-foreground">All Campaigns</option>
-                  {gigs.map(g => (
-                    <option key={g.id} value={g.id} className="bg-background text-foreground truncate">
-                      {g.title}
-                    </option>
-                  ))}
-                </select>
+                  {distanceSort === "nearest" ? (
+                    <ArrowUpNarrowWide className="h-3.5 w-3.5" />
+                  ) : distanceSort === "farthest" ? (
+                    <ArrowDownWideNarrow className="h-3.5 w-3.5" />
+                  ) : (
+                    <ArrowUpDown className="h-3.5 w-3.5" />
+                  )}
+                </button>
               </div>
             </div>
 
@@ -633,6 +660,15 @@ export default function BrandDashboard() {
                   if (appFilterSubTab === "shortlisted") return shortlistedIds.includes(a.id);
                   return true;
                 });
+
+                // Sort by distance to creator
+                if (distanceSort) {
+                  filtered = [...filtered].sort((a, b) => {
+                    const da = a.distanceKm ?? Infinity;
+                    const db = b.distanceKm ?? Infinity;
+                    return distanceSort === "nearest" ? da - db : db - da;
+                  });
+                }
 
                 if (filtered.length === 0) {
                   return (
@@ -678,6 +714,7 @@ export default function BrandDashboard() {
 
                                 <p className="text-[11px] text-muted-foreground mt-0.5">
                                   @{ig?.instagramHandle || "handle"} · Niche: {ig?.niche || "Lifestyle"}
+                                  {a.distanceKm != null && <> · {a.distanceKm} km away</>}
                                 </p>
                               </div>
                             </div>

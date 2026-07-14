@@ -24,6 +24,22 @@ const geocodePincode = async (pincode) => {
   return data;
 };
 
+/**
+ * Great-circle distance in km, rounded to the nearest 0.5. JS mirror of the
+ * haversine_km Postgres function (migrations/schema.sql) for call sites
+ * that already have both points in hand and don't need a DB round-trip.
+ */
+const haversineKm = (lat1, lng1, lat2, lng2) => {
+  const r = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return Math.round(r * 2 * Math.asin(Math.sqrt(a)) * 2) / 2;
+};
+
 module.exports = {
   geocodePincode,
+  haversineKm,
 };

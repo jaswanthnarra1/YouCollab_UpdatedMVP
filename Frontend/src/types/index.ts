@@ -19,6 +19,7 @@ export interface Application {
   coverNote: string;
   status: AppStatus;
   createdAt?: string;
+  distanceKm?: number | null;
   gig?: { id: string; title: string; category?: string };
   influencer?: {
     id: string;
