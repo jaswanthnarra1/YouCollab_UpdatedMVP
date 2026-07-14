@@ -30,6 +30,10 @@ export const applicationsService = {
     const { data } = await apiClient.patch(`/api/applications/${id}/status`, { status });
     return unwrap<Application>(data);
   },
+  withdraw: async (id: string): Promise<{ message: string }> => {
+    const { data } = await apiClient.delete(`/api/applications/${id}`);
+    return unwrap<{ message: string }>(data);
+  },
   getMessages: async (applicationId: string): Promise<Message[]> => {
     const { data } = await apiClient.get(`/api/applications/${applicationId}/messages`);
     return unwrap<Message[]>(data);

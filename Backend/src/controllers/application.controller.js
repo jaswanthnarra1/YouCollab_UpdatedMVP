@@ -89,6 +89,18 @@ const sendMessage = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Influencer withdraws their own pending pitch.
+ */
+const withdraw = asyncHandler(async (req, res) => {
+  await applicationService.withdrawApplication(req.params.id, req.user.id);
+
+  res.status(200).json({
+    success: true,
+    data: { message: 'Pitch withdrawn.' },
+  });
+});
+
 module.exports = {
   apply,
   listApplicants,
@@ -96,4 +108,5 @@ module.exports = {
   updateStatus,
   listMessages,
   sendMessage,
+  withdraw,
 };

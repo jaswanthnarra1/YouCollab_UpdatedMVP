@@ -10,7 +10,7 @@ import type { Application } from "@/types";
 import {
   Instagram, BadgeCheck, RefreshCw, Unlink, IndianRupee, Calendar,
   MapPin, Send, Loader2, Search, TrendingUp, Sparkles, MessageSquare, Coins, Clock, CheckCircle2,
-  ArrowUpNarrowWide, ArrowDownWideNarrow, ArrowUpDown
+  ArrowUpNarrowWide, ArrowDownWideNarrow, ArrowUpDown, X
 } from "lucide-react";
 import { instagramService } from "@/services/instagram";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -288,6 +288,8 @@ function MessageDialog({ application, onClose }: { application: Application | nu
 export default function InfluencerDashboard() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  const { toast } = useToast();
   const [active, setActive] = useState<string | null>(null);
   const [openGig, setOpenGig] = useState<Gig | null>(null);
   const [messagingApp, setMessagingApp] = useState<Application | null>(null);
@@ -314,6 +316,26 @@ export default function InfluencerDashboard() {
   const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: profileService.getProfile });
   const credits: number | null = (profile?.influencer as { credits?: number } | undefined)?.credits ?? null;
   const pincode: string | null = (profile?.influencer as { pincode?: string } | undefined)?.pincode ?? null;
+
+  const withdrawPitch = useMutation({
+    mutationFn: (id: string) => applicationsService.withdraw(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["myApplications"] });
+      toast({ title: "Pitch withdrawn." });
+    },
+    onError: (e: { response?: { data?: { error?: { message?: string } } } }) =>
+      toast({
+        variant: "destructive",
+        title: "Couldn't withdraw pitch",
+        description: e?.response?.data?.error?.message,
+      }),
+  });
+
+  const handleWithdraw = (id: string) => {
+    if (confirm("Withdraw this pitch? You can pitch again later if you change your mind.")) {
+      withdrawPitch.mutate(id);
+    }
+  };
 
   const filtered = useMemo(() => {
     const gigs = gigsResult?.gigs ?? [];
@@ -513,6 +535,17 @@ export default function InfluencerDashboard() {
                             className="h-8 text-[12px] rounded-sm bg-gradient-brand text-primary-foreground border-0"
                           >
                             <MessageSquare className="h-3.5 w-3.5 mr-1" /> Message
+                          </Button>
+                        )}
+                        {a.status === "PENDING" && (
+                          <Button
+                            onClick={() => handleWithdraw(a.id)}
+                            disabled={withdrawPitch.isPending}
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-[12px] rounded-sm border-red-500/25 text-red-400 hover:bg-red-500/10 hover:text-red-400"
+                          >
+                            <X className="h-3.5 w-3.5 mr-1" /> Withdraw Pitch
                           </Button>
                         )}
                       </div>

@@ -383,6 +383,43 @@ const sendMessage = async (applicationId, userId, content) => {
   return message;
 };
 
+/**
+ * Influencer withdraws their own pending pitch. Hard delete — only PENDING
+ * pitches qualify (nothing's been spent or messaged yet), and it frees the
+ * (gigId, influencerId) unique slot so they can pitch again later.
+ */
+const withdrawApplication = async (applicationId, userId) => {
+  const influencer = await getInfluencerByUserId(userId);
+
+  const { data: application, error: findError } = await supabase
+    .from('applications')
+    .select('id, influencerId, status')
+    .eq('id', applicationId)
+    .maybeSingle();
+
+  if (findError || !application) {
+    throw new AppError('Pitch not found.', 404, 'NOT_FOUND');
+  }
+
+  if (application.influencerId !== influencer.id) {
+    throw new AppError("You don't have permission to withdraw this pitch.", 403, 'FORBIDDEN');
+  }
+
+  if (application.status !== 'PENDING') {
+    throw new AppError('Only pending pitches can be withdrawn.', 400, 'BAD_REQUEST');
+  }
+
+  const { error: deleteError } = await supabase
+    .from('applications')
+    .delete()
+    .eq('id', applicationId)
+    .eq('status', 'PENDING');
+
+  if (deleteError) {
+    throw new AppError('Failed to withdraw pitch.', 500, 'DATABASE_ERROR');
+  }
+};
+
 module.exports = {
   apply,
   getGigApplications,
@@ -390,4 +427,5 @@ module.exports = {
   updateStatus,
   getMessages,
   sendMessage,
+  withdrawApplication,
 };

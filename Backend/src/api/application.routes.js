@@ -10,6 +10,7 @@ router.post('/', authenticate, requireRole('INFLUENCER'), validate(applySchema),
 router.get('/me', authenticate, requireRole('INFLUENCER'), applicationController.listMyApplications);
 router.get('/gig/:gigId', authenticate, requireRole('BRAND'), applicationController.listApplicants);
 router.patch('/:id/status', authenticate, requireRole('BRAND'), validate(updateApplicationStatusSchema), applicationController.updateStatus);
+router.delete('/:id', authenticate, requireRole('INFLUENCER'), applicationController.withdraw);
 router.get('/:id/messages', authenticate, applicationController.listMessages);
 router.post('/:id/messages', authenticate, validate(sendMessageSchema), applicationController.sendMessage);
 
