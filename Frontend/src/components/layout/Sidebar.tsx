@@ -1,3 +1,4 @@
+import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { useClerk } from "@clerk/clerk-react";
 import { LayoutGrid, Compass, FileText, User, Settings, LogOut, PlusSquare, MessageSquare, Briefcase, Users, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -25,6 +26,13 @@ export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: Sid
       logout();
       navigate("/");
     }
+  };
+
+  const logoutConfirmProps = {
+    title: "Log out of You Collab?",
+    description: "Are you sure you want to log out?",
+    confirmLabel: "Log Out",
+    onConfirm: handleLogout,
   };
 
   const isBrand = user.role === "BRAND";
@@ -199,24 +207,32 @@ export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: Sid
         </div>
 
         {!collapsed && (
-          <button
-            onClick={handleLogout}
-            className="h-8 w-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-zinc-800/30 transition-colors rounded-sm shrink-0"
-            title="Sign out"
-          >
-            <LogOut className="h-4.5 w-4.5" />
-          </button>
+          <ConfirmDialog
+            {...logoutConfirmProps}
+            trigger={
+              <button
+                className="h-8 w-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-zinc-800/30 transition-colors rounded-sm shrink-0"
+                title="Sign out"
+              >
+                <LogOut className="h-4.5 w-4.5" />
+              </button>
+            }
+          />
         )}
       </div>
 
       {collapsed && (
-        <button
-          onClick={handleLogout}
-          className="h-9 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-zinc-800/30 transition-colors border-t border-border/40 bg-[#080A10]"
-          title="Sign out"
-        >
-          <LogOut className="h-4 w-4" />
-        </button>
+        <ConfirmDialog
+          {...logoutConfirmProps}
+          trigger={
+            <button
+              className="h-9 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-zinc-800/30 transition-colors border-t border-border/40 bg-[#080A10]"
+              title="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          }
+        />
       )}
     </aside>
   );

@@ -9,6 +9,7 @@ const config = require('./config');
 const logger = require('./utils/logger');
 const routes = require('./api');
 const errorHandler = require('./middleware/errorHandler');
+const scheduler = require('./jobs/scheduler');
 const { generalLimiter } = require('./middleware/rateLimiter');
 const AppError = require('./utils/AppError');
 
@@ -113,4 +114,7 @@ app.use(errorHandler);
 // Start Server
 app.listen(config.PORT, () => {
   logger.info(`YouCollab server is buzzing on port ${config.PORT} in ${config.NODE_ENV} mode! 🐝🚀`);
+  // Background gig-expiry sweep. Expiry is also enforced on read and on apply,
+  // so this keeps statuses truthful rather than being the gate itself.
+  scheduler.start();
 });

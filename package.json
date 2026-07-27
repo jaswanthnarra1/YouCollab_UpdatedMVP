@@ -12,7 +12,8 @@
     "dev:frontend": "npm run dev --prefix Frontend",
     "dev": "npx concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "db:migrate": "node Backend/supabase/migrate.js",
-    "db:seed": "node Backend/supabase/seed.js"
+    "db:seed": "node Backend/supabase/seed.js",
+    "verify:lifecycle": "node Backend/scripts/verify-lifecycle.js"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

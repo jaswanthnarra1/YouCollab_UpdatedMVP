@@ -1,4 +1,5 @@
 const supabase = require('./supabase');
+const { supabaseAdmin } = require('./supabase');
 const AppError = require('../utils/AppError');
 const { parsePagination, paginateResults } = require('../utils/pagination');
 const { TIER_COST, getTier } = require('../utils/credits');
@@ -28,7 +29,7 @@ const apply = async (userId, gigId, coverNote) => {
 
   const { data: gig, error: gigError } = await supabase
     .from('gigs')
-    .select('*, brand:brands(id, userId, businessName)')
+    .select('*, brand:brands(id, userId, businessName, latitude, longitude)')
     .eq('id', gigId)
     .maybeSingle();
 
@@ -36,11 +37,40 @@ const apply = async (userId, gigId, coverNote) => {
     throw new AppError('This collab does not exist or has been deleted.', 404, 'NOT_FOUND');
   }
 
-  if (gig.status !== 'OPEN') {
+  // Expiry is evaluated here as well as by the scheduler, so a gig that lapsed
+  // since the last sweep still rejects applications.
+  if (gig.status === 'EXPIRED' || (gig.status === 'ACTIVE' && gig.expiresAt && new Date(gig.expiresAt) <= new Date())) {
+    throw new AppError('Applications for this collab have closed.', 400, 'GIG_EXPIRED');
+  }
+
+  if (gig.status !== 'ACTIVE') {
     throw new AppError('This collab is closed for applications.', 400, 'BAD_REQUEST');
   }
 
-  // Check for duplicate application
+  // Radius eligibility. Discovery already hides out-of-radius gigs, but hiding
+  // is not authorization — without this check a creator holding a shared gig
+  // link or hitting the API directly could still apply from anywhere.
+  if (gig.radiusKm) {
+    const { latitude: bLat, longitude: bLng } = gig.brand || {};
+    if (bLat == null || bLng == null) {
+      throw new AppError('This collab has no location set, so applications are paused.', 400, 'GIG_LOCATION_MISSING');
+    }
+    if (influencer.latitude == null || influencer.longitude == null) {
+      throw new AppError('Add your PIN code to your profile to apply to location-based collabs.', 400, 'LOCATION_REQUIRED');
+    }
+    const distanceKm = haversineKm(bLat, bLng, influencer.latitude, influencer.longitude);
+    if (distanceKm > gig.radiusKm) {
+      throw new AppError(
+        `This collaboration is currently available only to Creators within ${gig.radiusKm} km of the Brand's location.`,
+        403,
+        'OUTSIDE_RADIUS',
+      );
+    }
+  }
+
+  // Check for duplicate application. The DB also has UNIQUE(gigId,
+  // influencerId), which is what actually holds under concurrency — this check
+  // exists to return a friendly 409 instead of a raw constraint error.
   const { data: existingApplication } = await supabase
     .from('applications')
     .select('id')
@@ -52,21 +82,40 @@ const apply = async (userId, gigId, coverNote) => {
     throw new AppError("You've already applied to this collab! Sit tight.", 409, 'CONFLICT');
   }
 
-  // Create application
-  const { data: appRecord, error: appError } = await supabase
+  // Capacity: applications received must stay under the gig's allocated slots.
+  const { count: received } = await supabase
     .from('applications')
-    .insert({
-      gigId,
-      influencerId: influencer.id,
-      coverNote,
-      status: 'PENDING',
-    })
-    .select('*')
-    .single();
+    .select('id', { count: 'exact', head: true })
+    .eq('gigId', gigId);
+
+  const slots = gig.applicationSlots ?? 1;
+  if ((received || 0) >= slots) {
+    throw new AppError('This collaboration has reached its application limit.', 409, 'CAPACITY_REACHED');
+  }
+
+  // Create the application through the capacity-checked RPC: it locks the gig
+  // row, re-counts, and only then inserts, so two concurrent applicants can't
+  // both slip past the JS check above and overfill the campaign.
+  const { data: inserted, error: appError } = await supabaseAdmin.rpc('insert_application_with_capacity', {
+    p_gig_id: gigId,
+    p_influencer_id: influencer.id,
+    p_cover_note: coverNote,
+  });
 
   if (appError) {
+    // The DB-level UNIQUE(gigId, influencerId) is the real duplicate guard;
+    // surface it as the same friendly 409 the pre-check returns.
+    if (appError.code === '23505') {
+      throw new AppError("You've already applied to this collab! Sit tight.", 409, 'CONFLICT');
+    }
     throw new AppError('Failed to apply for this collab.', 500, 'DATABASE_ERROR');
   }
+
+  if (!inserted?.length) {
+    throw new AppError('This collaboration has reached its application limit.', 409, 'CAPACITY_REACHED');
+  }
+
+  const appRecord = inserted[0];
 
   // Notify brand owner
   try {

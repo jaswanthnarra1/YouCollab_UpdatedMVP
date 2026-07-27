@@ -104,7 +104,31 @@ export interface Gig {
   distanceKm?: number | null;
   brand?: { businessName?: string; logoUrl?: string; location?: string };
   createdAt?: string;
-  status?: string;
+  status?: GigStatus;
+  publishedAt?: string | null;
+  expiresAt?: string | null;
+  applicationSlots?: number;
+  applicationsReceived?: number;
+}
+
+/** DRAFT/ACTIVE/EXPIRED/CLOSED replaced the old binary OPEN/CLOSED. */
+export type GigStatus = "DRAFT" | "ACTIVE" | "EXPIRED" | "CLOSED";
+
+export interface Plan {
+  id: string;
+  name: string;
+  price: number;
+  campaignLimit: number;
+  applicationSlotLimit: number;
+}
+
+export interface PlanUsage {
+  plan: Plan;
+  campaignsUsed: number;
+  campaignsRemaining: number;
+  slotsAllocated: number;
+  slotsRemaining: number;
+  applicationsReceived: number;
 }
 
 export interface CreateGigPayload {
@@ -117,4 +141,6 @@ export interface CreateGigPayload {
   category: string;
   city: string;
   radiusKm?: number | null;
+  applicationSlots?: number;
+  status?: "ACTIVE" | "DRAFT";
 }

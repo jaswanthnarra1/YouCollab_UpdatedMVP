@@ -1,3 +1,4 @@
+import { plansService } from "@/services/plans";
 import { Button } from "@/components/common/button";
 import { CATEGORIES } from "@/constants";
 import { gigsService } from "@/services/gigs";
@@ -7,7 +8,7 @@ import { Loader2, ArrowLeft } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/common/select";
 import { Textarea } from "@/components/common/textarea";
 import { useAuthStore } from "@/stores/authStore";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -31,12 +32,15 @@ export default function GigCreate() {
   const [deadline, setDeadline] = useState("");
   const [city, setCity] = useState("Pune");
   const [radiusKm, setRadiusKm] = useState<string>("ANYWHERE");
+  const [applicationSlots, setApplicationSlots] = useState<number | "">(1);
+
+  const { data: planUsage } = useQuery({ queryKey: ["plans", "usage"], queryFn: plansService.usage });
 
   // Inline validation errors state
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const create = useMutation({
-    mutationFn: (status: "OPEN" | "CLOSED" = "OPEN") => {
+    mutationFn: (status: "ACTIVE" | "DRAFT" = "ACTIVE") => {
       const payload = {
         title, 
         description, 
@@ -50,6 +54,7 @@ export default function GigCreate() {
         budgetMin: budgetMin !== "" ? Number(budgetMin) : 0,
         budgetMax: budgetMax !== "" ? Number(budgetMax) : 0,
         radiusKm: radiusKm === "ANYWHERE" ? null : Number(radiusKm),
+        applicationSlots: applicationSlots === "" ? 1 : Number(applicationSlots),
         status,
       };
 
@@ -61,7 +66,8 @@ export default function GigCreate() {
     onSuccess: (data) => {
       console.log("[Create Gig Debug] Success Supabase response:", data);
       qc.invalidateQueries({ queryKey: ["gigs"] });
-      toast({ title: data.status === "CLOSED" ? "Gig saved as draft 📁" : "Gig published successfully! 🚀" });
+      qc.invalidateQueries({ queryKey: ["plans", "usage"] });
+      toast({ title: data.status === "DRAFT" ? "Gig saved as draft 📁" : "Gig published successfully! 🚀" });
       navigate("/dashboard/brand");
     },
     onError: (e: any) => {
@@ -95,7 +101,7 @@ export default function GigCreate() {
     },
   });
 
-  const handlePostGig = (status: "OPEN" | "CLOSED" = "OPEN") => {
+  const handlePostGig = (status: "ACTIVE" | "DRAFT" = "ACTIVE") => {
     // Step 6: Verify User and Brand Role
     console.log("[Create Gig Debug] Verifying Brand user authentication...");
     if (!user) {
@@ -363,11 +369,35 @@ export default function GigCreate() {
             </div>
           </div>
 
+          {/* Application slots — limits come from the brand's plan, fetched
+              from the API rather than hardcoded here. */}
+          <div className="space-y-1.5">
+            <Label className="text-[12px]">Application slots</Label>
+            <Input
+              type="number"
+              min={1}
+              max={planUsage?.slotsRemaining || undefined}
+              value={applicationSlots}
+              onChange={(e) => setApplicationSlots(e.target.value === "" ? "" : Number(e.target.value))}
+              className="h-9 text-[13px] rounded-sm max-w-[160px]"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              {planUsage
+                ? `How many creators can apply. ${planUsage.slotsRemaining} of ${planUsage.plan.applicationSlotLimit} slots left on your ${planUsage.plan.name} plan.`
+                : "How many creators can apply to this campaign. Minimum 1."}
+            </p>
+            {planUsage && planUsage.campaignsRemaining === 0 && (
+              <p className="text-[11px] text-amber-400">
+                You've used all {planUsage.plan.campaignLimit} campaigns on {planUsage.plan.name}. Close one or save this as a draft.
+              </p>
+            )}
+          </div>
+
           {/* Action Row */}
           <div className="flex justify-end gap-2.5 pt-2">
             <Button 
               disabled={create.isPending} 
-              onClick={() => handlePostGig("CLOSED")} 
+              onClick={() => handlePostGig("DRAFT")} 
               variant="outline"
               className="h-9 text-[13px] rounded-sm"
             >
@@ -376,7 +406,7 @@ export default function GigCreate() {
             
             <Button 
               disabled={create.isPending} 
-              onClick={() => handlePostGig("OPEN")} 
+              onClick={() => handlePostGig("ACTIVE")} 
               className="h-9 text-[13px] rounded-sm bg-gradient-brand text-primary-foreground border-0 shadow-md hover:opacity-95"
             >
               {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Publish"}

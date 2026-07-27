@@ -442,7 +442,12 @@ BEGIN
     LEFT JOIN LATERAL (
       SELECT COUNT(*) AS cnt FROM applications ap WHERE ap."gigId" = g.id
     ) a ON true
-    WHERE g.status = 'OPEN' AND g.city = 'Pune'
+    -- ACTIVE replaces the old OPEN status (see section 14). Expired gigs are
+    -- excluded from discovery here as well as by the scheduler, so a gig that
+    -- lapses between sweeps still disappears from the feed immediately.
+    WHERE g.status = 'ACTIVE'
+      AND (g."expiresAt" IS NULL OR g."expiresAt" > now())
+      AND g.city = 'Pune'
       AND (p_category IS NULL OR g.category = p_category)
       AND (p_search IS NULL OR g.title ILIKE '%' || p_search || '%' OR g.description ILIKE '%' || p_search || '%')
       AND (
@@ -478,3 +483,135 @@ $$ LANGUAGE plpgsql STABLE;
 
 GRANT EXECUTE ON FUNCTION list_gigs_in_radius(TEXT, TEXT, TEXT, INTEGER, TIMESTAMPTZ, DOUBLE PRECISION, UUID, DOUBLE PRECISION, DOUBLE PRECISION, INTEGER) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION haversine_km(DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION) TO anon, authenticated;
+
+-- ============================================
+-- 13. users.phone (currently unused)
+-- ============================================
+-- Added for a phone + SMS OTP auth attempt that was reverted — auth is back on
+-- Clerk email/password + email OTP, so nothing reads or writes `phone` today.
+-- Kept because it is already applied to the deployed database; removing it from
+-- this file alone would leave the schema drifting from what's live.
+-- To roll back fully, run against the DB *and* delete this section:
+--   DROP INDEX IF EXISTS idx_users_phone;
+--   ALTER TABLE users DROP COLUMN IF EXISTS phone;
+--   ALTER TABLE users ALTER COLUMN email SET NOT NULL;  -- only if no NULL emails
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE users ALTER COLUMN email DROP NOT NULL;
+
+-- Partial unique index rather than a UNIQUE constraint: pre-existing rows all
+-- have phone = NULL, and Postgres UNIQUE would otherwise be fine with that but
+-- this also documents that only non-null phones must be distinct.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone) WHERE phone IS NOT NULL;
+
+-- ============================================
+-- 14. Gig lifecycle + plans + application slots
+-- ============================================
+
+-- --- 14a. Gig lifecycle ---------------------------------------------------
+-- Statuses go from OPEN/CLOSED to DRAFT/ACTIVE/EXPIRED/CLOSED.
+ALTER TABLE gigs ADD COLUMN IF NOT EXISTS "publishedAt" TIMESTAMPTZ;
+ALTER TABLE gigs ADD COLUMN IF NOT EXISTS "expiresAt"   TIMESTAMPTZ;
+-- Per-campaign application capacity. 1 is the floor the PRD mandates for any
+-- active campaign, so it's also the safe default for rows created before slots.
+ALTER TABLE gigs ADD COLUMN IF NOT EXISTS "applicationSlots" INTEGER NOT NULL DEFAULT 1;
+
+-- Backfill existing rows: OPEN becomes ACTIVE, CLOSED stays CLOSED.
+UPDATE gigs SET status = 'ACTIVE' WHERE status = 'OPEN';
+
+-- Existing gigs get their original creation time as publishedAt, but a *fresh*
+-- 14 days of runway measured from now. Using createdAt + 14d would retroactively
+-- expire every historical gig the moment this migration lands, which is data
+-- loss in spirit even though no row is deleted.
+UPDATE gigs SET "publishedAt" = "createdAt" WHERE "publishedAt" IS NULL AND status <> 'DRAFT';
+UPDATE gigs SET "expiresAt" = now() + INTERVAL '14 days'
+  WHERE "expiresAt" IS NULL AND status = 'ACTIVE';
+
+-- Never leave an existing gig with fewer slots than applications it already
+-- received, or it would start life over capacity.
+UPDATE gigs g SET "applicationSlots" = GREATEST(1, (
+  SELECT COUNT(*) FROM applications a WHERE a."gigId" = g.id
+));
+
+ALTER TABLE gigs DROP CONSTRAINT IF EXISTS gigs_status_check;
+ALTER TABLE gigs ADD CONSTRAINT gigs_status_check
+  CHECK (status IN ('DRAFT', 'ACTIVE', 'EXPIRED', 'CLOSED'));
+ALTER TABLE gigs DROP CONSTRAINT IF EXISTS gigs_application_slots_check;
+ALTER TABLE gigs ADD CONSTRAINT gigs_application_slots_check
+  CHECK ("applicationSlots" >= 1);
+
+CREATE INDEX IF NOT EXISTS idx_gigs_status_expires ON gigs(status, "expiresAt");
+
+-- --- 14b. Subscription plans ----------------------------------------------
+CREATE TABLE IF NOT EXISTS plans (
+  id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name                   TEXT UNIQUE NOT NULL,
+  price                  INTEGER NOT NULL DEFAULT 0,
+  "campaignLimit"        INTEGER NOT NULL,
+  "applicationSlotLimit" INTEGER NOT NULL,
+  "createdAt"            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  "updatedAt"            TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO plans (name, price, "campaignLimit", "applicationSlotLimit") VALUES
+  ('FREE',    0,  2,  12),
+  ('STARTER', 99, 5,  36),
+  ('GROWTH',  299, 10, 64)
+ON CONFLICT (name) DO NOTHING;
+
+-- Every brand starts on FREE; plan values are read from this table, never
+-- hardcoded in app code.
+ALTER TABLE brands ADD COLUMN IF NOT EXISTS "planId" UUID REFERENCES plans(id);
+UPDATE brands SET "planId" = (SELECT id FROM plans WHERE name = 'FREE')
+  WHERE "planId" IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_brands_plan_id ON brands("planId");
+
+-- --- 14c. Atomic capacity-checked application insert -----------------------
+-- The JS-side capacity check in application.service.js is a read-then-write and
+-- cannot hold under concurrency: two simultaneous applications can both read
+-- "7 of 8 used" and both insert. Locking the gig row here serializes them, the
+-- same way debit_brand_credits serializes credit spends.
+-- Returns 0 rows when the gig is at capacity, so the caller can distinguish
+-- "full" from "inserted" without a second query.
+CREATE OR REPLACE FUNCTION insert_application_with_capacity(
+  p_gig_id        UUID,
+  p_influencer_id UUID,
+  p_cover_note    TEXT
+)
+RETURNS SETOF applications AS $$
+DECLARE
+  v_slots    INTEGER;
+  v_received INTEGER;
+BEGIN
+  -- FOR UPDATE makes concurrent applicants to the same gig queue up here.
+  SELECT "applicationSlots" INTO v_slots
+  FROM gigs WHERE id = p_gig_id FOR UPDATE;
+
+  IF v_slots IS NULL THEN
+    RETURN;
+  END IF;
+
+  SELECT COUNT(*) INTO v_received FROM applications WHERE "gigId" = p_gig_id;
+
+  IF v_received >= v_slots THEN
+    RETURN;
+  END IF;
+
+  RETURN QUERY
+  INSERT INTO applications ("gigId", "influencerId", "coverNote", status)
+  VALUES (p_gig_id, p_influencer_id, p_cover_note, 'PENDING')
+  RETURNING *;
+END;
+$$ LANGUAGE plpgsql;
+
+GRANT EXECUTE ON FUNCTION insert_application_with_capacity(UUID, UUID, TEXT) TO anon, authenticated;
+
+-- Plans are read through the anon key like every other table in this app, so
+-- they need the same grant the other tables get in section 5. RLS is on by
+-- default here, and with no policy the catalogue silently reads back *empty*
+-- rather than erroring — so the policy is what actually makes plans visible.
+-- Reads only: plan writes go through supabaseAdmin, which bypasses RLS.
+GRANT ALL ON plans TO anon, authenticated;
+ALTER TABLE plans ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "read_plans" ON plans FOR SELECT TO anon, authenticated USING (true);

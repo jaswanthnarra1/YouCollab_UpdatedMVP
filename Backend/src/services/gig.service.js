@@ -2,6 +2,20 @@ const { supabase, supabaseAdmin } = require('./supabase');
 const AppError = require('../utils/AppError');
 const { parsePagination, paginateResults } = require('../utils/pagination');
 const { GIG_POST_COST } = require('../utils/credits');
+const config = require('../config');
+const planService = require('./plan.service');
+
+/** Publication window for a newly published gig, from backend config. */
+const expiryFromNow = () =>
+  new Date(Date.now() + config.GIG.VALIDITY_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
+/**
+ * A gig is only open to applications while ACTIVE *and* inside its window.
+ * The scheduler flips lapsed rows to EXPIRED, but this covers the gap between
+ * sweeps so behaviour never depends on when the sweep last ran.
+ */
+const isGigOpenForApplications = (gig) =>
+  gig.status === 'ACTIVE' && (!gig.expiresAt || new Date(gig.expiresAt) > new Date());
 
 /**
  * Helper to retrieve brand associated with userId.
@@ -39,6 +53,17 @@ const createGig = async (userId, data) => {
     throw new AppError('Add your PIN code to your brand profile before setting a collab radius.', 400, 'LOCATION_REQUIRED');
   }
 
+  // DRAFT gigs are not published, so they consume neither a campaign nor slots.
+  const isPublishing = (data.status || 'ACTIVE') !== 'DRAFT';
+  const requestedSlots = data.applicationSlots ?? 1;
+
+  // Enforce plan limits *before* spending credits — otherwise a rejected
+  // publish would still bill the brand.
+  if (isPublishing) {
+    await planService.assertCanPublishCampaign(brand.id);
+    await planService.assertSlotsWithinPlan(brand.id, requestedSlots);
+  }
+
   // Posting a collab spends trial credits — atomic DB-side decrement so two
   // concurrent posts from the same brand can't both slip past a stale JS
   // balance check (same pattern as the hire-credit debit).
@@ -64,8 +89,11 @@ const createGig = async (userId, data) => {
     deadline: data.deadline,
     category: data.category,
     city: data.city || 'Pune',
-    status: data.status || 'OPEN',
+    status: isPublishing ? 'ACTIVE' : 'DRAFT',
     radiusKm: data.radiusKm ?? null,
+    applicationSlots: requestedSlots,
+    publishedAt: isPublishing ? new Date().toISOString() : null,
+    expiresAt: isPublishing ? expiryFromNow() : null,
   };
   console.log(`[Create Gig Debug] Submitting payload to Supabase:`, JSON.stringify(payload));
 
@@ -220,6 +248,7 @@ const getGigs = async (filters, user) => {
       logoUrl: row.brand_logo_url,
       user: { lastActiveAt: row.brand_last_active_at },
     },
+    applicationsReceived: row.applications_count,
     _count: {
       applications: row.applications_count,
     },
@@ -290,6 +319,8 @@ const getGigById = async (id, userId) => {
     _count: {
       applications: appCount,
     },
+    // Flat alias so the client can render capacity without reaching into _count.
+    applicationsReceived: appCount,
     hasApplied,
     application,
   };
@@ -408,7 +439,8 @@ const getMyGigs = async (userId) => {
       ...rest,
       _count: {
         applications: appCount
-      }
+      },
+      applicationsReceived: appCount
     };
   });
 };
@@ -465,11 +497,22 @@ const toggleGigStatus = async (id, userId) => {
     throw new AppError("You don't have permission to update this collab.", 403, 'FORBIDDEN');
   }
 
-  const newStatus = gig.status === 'OPEN' ? 'CLOSED' : 'OPEN';
+  // Re-opening a CLOSED or EXPIRED gig is a fresh publication: it has to fit
+  // the plan again and gets a new validity window, otherwise closing/reopening
+  // would be a way to sidestep campaign limits and keep a stale expiry.
+  const reopening = gig.status !== 'ACTIVE';
+  if (reopening) {
+    await planService.assertCanPublishCampaign(brand.id);
+    await planService.assertSlotsWithinPlan(brand.id, gig.applicationSlots || 1, gig.id);
+  }
+
+  const update = reopening
+    ? { status: 'ACTIVE', publishedAt: gig.publishedAt || new Date().toISOString(), expiresAt: expiryFromNow() }
+    : { status: 'CLOSED' };
 
   const { data: updatedGig, error: updateError } = await supabaseAdmin
     .from('gigs')
-    .update({ status: newStatus })
+    .update(update)
     .eq('id', id)
     .select('*')
     .single();
@@ -482,6 +525,100 @@ const toggleGigStatus = async (id, userId) => {
   return updatedGig;
 };
 
+/**
+ * Publish a DRAFT gig: ACTIVE + publishedAt + expiresAt (config-driven).
+ * Idempotent-ish — republishing an already-ACTIVE gig is rejected rather than
+ * silently extending its window.
+ */
+const publishGig = async (id, userId) => {
+  const brand = await getBrandByUserId(userId);
+
+  const { data: gig } = await supabaseAdmin.from('gigs').select('*').eq('id', id).maybeSingle();
+  if (!gig) throw new AppError('Collab not found.', 404, 'NOT_FOUND');
+  if (gig.brandId !== brand.id) {
+    throw new AppError("You don't have permission to publish this collab.", 403, 'FORBIDDEN');
+  }
+  if (gig.status === 'ACTIVE') {
+    throw new AppError('This collab is already live.', 400, 'ALREADY_ACTIVE');
+  }
+
+  await planService.assertCanPublishCampaign(brand.id);
+  await planService.assertSlotsWithinPlan(brand.id, gig.applicationSlots || 1, gig.id);
+
+  const { data: updated, error } = await supabaseAdmin
+    .from('gigs')
+    .update({
+      status: 'ACTIVE',
+      publishedAt: new Date().toISOString(),
+      expiresAt: expiryFromNow(),
+    })
+    .eq('id', id)
+    .select('*')
+    .single();
+
+  if (error) throw new AppError(`Failed to publish collab: ${error.message}`, 500, 'DATABASE_ERROR');
+  return updated;
+};
+
+/** Allocate application slots to one campaign, validated against the plan. */
+const allocateSlots = async (id, userId, slots) => {
+  const brand = await getBrandByUserId(userId);
+
+  const { data: gig } = await supabaseAdmin.from('gigs').select('*').eq('id', id).maybeSingle();
+  if (!gig) throw new AppError('Collab not found.', 404, 'NOT_FOUND');
+  if (gig.brandId !== brand.id) {
+    throw new AppError("You don't have permission to update this collab.", 403, 'FORBIDDEN');
+  }
+
+  // Can't allocate below what the gig has already received, or the capacity
+  // readout would show a negative remainder.
+  const { count: received } = await supabase
+    .from('applications')
+    .select('id', { count: 'exact', head: true })
+    .eq('gigId', id);
+
+  if (slots < (received || 0)) {
+    throw new AppError(
+      `This campaign already received ${received} applications — allocate at least that many slots.`,
+      400,
+      'SLOTS_BELOW_RECEIVED',
+    );
+  }
+
+  await planService.assertSlotsWithinPlan(brand.id, slots, id);
+
+  const { data: updated, error } = await supabaseAdmin
+    .from('gigs')
+    .update({ applicationSlots: slots })
+    .eq('id', id)
+    .select('*')
+    .single();
+
+  if (error) throw new AppError(`Failed to allocate slots: ${error.message}`, 500, 'DATABASE_ERROR');
+  return updated;
+};
+
+/**
+ * Flip every lapsed ACTIVE gig to EXPIRED. Runs on a schedule and is safe to
+ * call concurrently — the WHERE clause is the guard, so a double run is a no-op
+ * rather than a double write.
+ */
+const expireLapsedGigs = async () => {
+  const { data, error } = await supabaseAdmin
+    .from('gigs')
+    .update({ status: 'EXPIRED' })
+    .eq('status', 'ACTIVE')
+    .lte('expiresAt', new Date().toISOString())
+    .select('id');
+
+  if (error) {
+    console.error('[expireLapsedGigs] Failed:', error.message);
+    throw new AppError('Failed to expire gigs.', 500, 'DATABASE_ERROR');
+  }
+
+  return { expired: data?.length || 0, ids: (data || []).map((g) => g.id) };
+};
+
 module.exports = {
   createGig,
   getGigs,
@@ -491,4 +628,9 @@ module.exports = {
   getMyGigs,
   deleteGig,
   toggleGigStatus,
+  publishGig,
+  allocateSlots,
+  expireLapsedGigs,
+  isGigOpenForApplications,
+  expiryFromNow,
 };

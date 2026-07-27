@@ -7,6 +7,7 @@ import { ThemeProvider } from "next-themes";
 import { ClerkProvider } from "@clerk/clerk-react";
 import { Suspense, lazy } from "react";
 import { AuthBootstrap } from "@/features/auth/AuthBootstrap";
+import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import { RoleRoute } from "@/features/auth/RoleRoute";
 import { ProtectedRoute } from "@/features/auth/ProtectedRoute";
 import SidebarLayout from "@/components/layout/SidebarLayout";
@@ -60,6 +61,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthBootstrap>
+            <ErrorBoundary>
             <Suspense fallback={<RouteFallback />}>
               <Routes>
                 <Route path="/" element={<Landing />} />
@@ -121,6 +123,7 @@ const App = () => (
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
+            </ErrorBoundary>
           </AuthBootstrap>
         </BrowserRouter>
       </TooltipProvider>

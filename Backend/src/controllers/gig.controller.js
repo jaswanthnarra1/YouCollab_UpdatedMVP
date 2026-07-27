@@ -92,7 +92,7 @@ const destroy = asyncHandler(async (req, res) => {
 });
 
 /**
- * Toggle collab status (OPEN ↔ CLOSED).
+ * Toggle collab status (ACTIVE ↔ CLOSED).
  */
 const toggleStatus = asyncHandler(async (req, res) => {
   const gig = await gigService.toggleGigStatus(req.params.id, req.user.id);
@@ -100,7 +100,33 @@ const toggleStatus = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     data: gig,
-    message: gig.status === 'OPEN' ? 'Collab is now live! 🎉' : 'Collab paused.',
+    message: gig.status === 'ACTIVE' ? 'Collab is now live! 🎉' : 'Collab paused.',
+  });
+});
+
+/**
+ * Publish a DRAFT collab — sets ACTIVE, publishedAt and expiresAt.
+ */
+const publish = asyncHandler(async (req, res) => {
+  const gig = await gigService.publishGig(req.params.id, req.user.id);
+
+  res.status(200).json({
+    success: true,
+    data: gig,
+    message: 'Collab published! 🎉',
+  });
+});
+
+/**
+ * Allocate application slots to a collab.
+ */
+const allocateSlots = asyncHandler(async (req, res) => {
+  const gig = await gigService.allocateSlots(req.params.id, req.user.id, req.body.applicationSlots);
+
+  res.status(200).json({
+    success: true,
+    data: gig,
+    message: `Allocated ${gig.applicationSlots} application slot${gig.applicationSlots === 1 ? '' : 's'}.`,
   });
 });
 
@@ -113,4 +139,6 @@ module.exports = {
   mine,
   destroy,
   toggleStatus,
+  publish,
+  allocateSlots,
 };

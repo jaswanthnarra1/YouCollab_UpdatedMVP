@@ -41,4 +41,12 @@ export const gigsService = {
     const { data } = await apiClient.patch(`/api/gigs/${id}/toggle-status`);
     return unwrap<Gig>(data);
   },
+  publish: async (id: string): Promise<Gig> => {
+    const { data } = await apiClient.patch(`/api/gigs/${id}/publish`);
+    return unwrap<Gig>(data);
+  },
+  allocateSlots: async (id: string, applicationSlots: number): Promise<Gig> => {
+    const { data } = await apiClient.patch(`/api/gigs/${id}/slots`, { applicationSlots });
+    return unwrap<Gig>(data);
+  },
 };

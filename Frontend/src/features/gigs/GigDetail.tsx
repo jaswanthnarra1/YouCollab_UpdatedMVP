@@ -1,3 +1,4 @@
+import { GigStatusBadge, resolveGigStatus, daysUntilExpiry } from "@/components/common/gig-status-badge";
 import { applicationsService } from "@/services/applications";
 import {
   ArrowLeft, Calendar, IndianRupee, MapPin, Loader2,
@@ -35,9 +36,22 @@ export default function GigDetail() {
       toast({ title: "Pitch sent successfully! 🚀", description: "The brand will review your profile shortly." });
       setCoverNote("");
     },
-    onError: (err: { response?: { data?: { message?: string } } }) =>
-      toast({ variant: "destructive", title: "Apply failed", description: err?.response?.data?.message ?? "Try again." }),
+    onError: (err: { response?: { data?: { message?: string; error?: { message?: string } } } }) =>
+      toast({
+        variant: "destructive",
+        title: "Apply failed",
+        // Surface the backend's reason (expired / at capacity / outside radius)
+        // rather than a generic retry prompt.
+        description: err?.response?.data?.error?.message ?? err?.response?.data?.message ?? "Try again.",
+      }),
   });
+
+  // Capacity comes from the server; the button state is a courtesy, the real
+  // gate is the backend check in application.service.apply().
+  const isAtCapacity =
+    gig?.applicationSlots != null &&
+    gig?.applicationsReceived != null &&
+    gig.applicationsReceived >= gig.applicationSlots;
 
   if (isLoading) {
     return (
@@ -85,9 +99,12 @@ export default function GigDetail() {
             <span className="inline-flex items-center gap-1 border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground rounded-sm">
               <MapPin className="h-3 w-3" /> {gig.city}
             </span>
-            <span className={`inline-block px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] rounded-sm border ${
-              gig.status === "OPEN" ? "border-emerald-500/25 text-emerald-400 bg-emerald-500/10" : "border-border text-muted-foreground"
-            }`}>{gig.status}</span>
+            <GigStatusBadge gig={gig} className="tracking-[0.12em]" />
+            {resolveGigStatus(gig) === "ACTIVE" && daysUntilExpiry(gig.expiresAt) != null && (
+              <span className="inline-block border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground rounded-sm">
+                {daysUntilExpiry(gig.expiresAt)}d left
+              </span>
+            )}
           </div>
           <h1 className="text-3xl font-semibold tracking-tight">{gig.title}</h1>
         </div>
@@ -164,8 +181,20 @@ export default function GigDetail() {
                       <p className="text-[12px] italic text-muted-foreground whitespace-pre-wrap">"{application?.coverNote}"</p>
                     </div>
                   </div>
-                ) : gig.status !== "OPEN" ? (
+                ) : resolveGigStatus(gig) === "EXPIRED" ? (
+                  <div className="space-y-1">
+                    <p className="text-[13px] font-medium text-amber-400">Applications Closed</p>
+                    <p className="text-[12px] text-muted-foreground">
+                      This collab expired{gig.expiresAt ? ` on ${new Date(gig.expiresAt).toLocaleDateString()}` : ""} and is no longer accepting pitches.
+                    </p>
+                  </div>
+                ) : resolveGigStatus(gig) !== "ACTIVE" ? (
                   <p className="text-[13px] text-muted-foreground">Applications are now closed for this collab campaign.</p>
+                ) : isAtCapacity ? (
+                  <div className="space-y-1">
+                    <p className="text-[13px] font-medium text-amber-400">Applications Closed</p>
+                    <p className="text-[12px] text-muted-foreground">This collaboration has reached its application limit.</p>
+                  </div>
                 ) : (
                   <div className="space-y-3">
                     <p className="text-[12px] text-muted-foreground">Introduce yourself and outline why you are the ideal fit for this collab campaign brief.</p>

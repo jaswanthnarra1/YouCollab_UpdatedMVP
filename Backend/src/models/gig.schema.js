@@ -27,7 +27,10 @@ const createGigSchema = z.object({
     .refine((date) => date > new Date(), { message: 'Deadline cannot be in the past' }),
   category: z.string({ required_error: 'Select a category' })
     .min(2, 'Please select a category'),
-  status: z.enum(['OPEN', 'CLOSED', 'DRAFT']).optional().nullable(),
+  // ACTIVE/DRAFT are the only statuses a client may request at creation —
+  // EXPIRED is set by the scheduler and CLOSED via the toggle endpoint.
+  status: z.enum(['ACTIVE', 'DRAFT']).optional().nullable(),
+  applicationSlots: z.number().int().min(1, 'Every active campaign needs at least 1 application slot.').optional(),
   city: z.string().optional().nullable(),
   radiusKm: z.union([z.literal(2), z.literal(5), z.literal(10), z.literal(20)]).optional().nullable(),
 }).refine((data) => {
@@ -52,7 +55,7 @@ const updateGigSchema = z.object({
     .refine((date) => date > new Date(), { message: 'Deadline cannot be in the past' })
     .optional(),
   category: z.string().min(2).optional(),
-  status: z.enum(['OPEN', 'CLOSED', 'DRAFT']).optional(),
+  status: z.enum(['ACTIVE', 'CLOSED', 'DRAFT']).optional(),
   city: z.string().optional().nullable(),
   radiusKm: z.union([z.literal(2), z.literal(5), z.literal(10), z.literal(20)]).optional().nullable(),
 }).refine((data) => {
@@ -65,7 +68,14 @@ const updateGigSchema = z.object({
   path: ['budgetMax'],
 });
 
+const allocateSlotsSchema = z.object({
+  applicationSlots: z.number({ required_error: 'Slot count is required' })
+    .int('Slots must be a whole number')
+    .min(1, 'Every active campaign must have at least 1 application slot.'),
+});
+
 module.exports = {
   createGigSchema,
   updateGigSchema,
+  allocateSlotsSchema,
 };

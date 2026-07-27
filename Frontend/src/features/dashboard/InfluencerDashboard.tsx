@@ -3,6 +3,7 @@ import { profileService } from "@/services/profile";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import { Button } from "@/components/common/button";
 import { CATEGORIES } from "@/constants";
+import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/common/dialog";
 import { gigsService, type Gig } from "@/services/gigs";
 import { Input } from "@/components/common/input";
@@ -331,12 +332,6 @@ export default function InfluencerDashboard() {
       }),
   });
 
-  const handleWithdraw = (id: string) => {
-    if (confirm("Withdraw this pitch? You can pitch again later if you change your mind.")) {
-      withdrawPitch.mutate(id);
-    }
-  };
-
   const filtered = useMemo(() => {
     const gigs = gigsResult?.gigs ?? [];
     const list = gigs.filter((g) =>
@@ -538,15 +533,23 @@ export default function InfluencerDashboard() {
                           </Button>
                         )}
                         {a.status === "PENDING" && (
-                          <Button
-                            onClick={() => handleWithdraw(a.id)}
-                            disabled={withdrawPitch.isPending}
-                            variant="outline"
-                            size="sm"
-                            className="h-8 text-[12px] rounded-sm border-red-500/25 text-red-400 hover:bg-red-500/10 hover:text-red-400"
-                          >
-                            <X className="h-3.5 w-3.5 mr-1" /> Withdraw Pitch
-                          </Button>
+                          <ConfirmDialog
+                            destructive
+                            title="Withdraw this pitch?"
+                            description="Your application will be removed from this collaboration. You can pitch again later if you change your mind."
+                            confirmLabel="Withdraw Pitch"
+                            onConfirm={() => withdrawPitch.mutate(a.id)}
+                            trigger={
+                              <Button
+                                disabled={withdrawPitch.isPending}
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-[12px] rounded-sm border-red-500/25 text-red-400 hover:bg-red-500/10 hover:text-red-400"
+                              >
+                                <X className="h-3.5 w-3.5 mr-1" /> Withdraw Pitch
+                              </Button>
+                            }
+                          />
                         )}
                       </div>
                     </div>

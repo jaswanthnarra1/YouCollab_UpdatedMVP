@@ -3,6 +3,7 @@ import {
   BadgeCheck, Check, X, ArrowLeft, MessageSquareText, Send, Loader2, TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/common/button";
+import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/common/dialog";
 import { gigsService } from "@/services/gigs";
 import { Input } from "@/components/common/input";
@@ -72,7 +73,12 @@ export default function GigApplicants() {
       qc.invalidateQueries({ queryKey: ["applications", "gig", id] });
       toast({ title: "Status updated" });
     },
-    onError: () => toast({ variant: "destructive", title: "Update failed" }),
+    onError: (e: { response?: { data?: { error?: { message?: string } } } }) =>
+      toast({
+        variant: "destructive",
+        title: "Update failed",
+        description: e?.response?.data?.error?.message ?? "The application was left unchanged. Try again.",
+      }),
   });
 
   return (
@@ -142,20 +148,35 @@ export default function GigApplicants() {
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-2">
-                      <Button
-                        size="sm" disabled={updateStatus.isPending || a.status === "ACCEPTED"}
-                        onClick={() => updateStatus.mutate({ aid: a.id, status: "ACCEPTED" })}
-                        className="bg-gradient-brand text-primary-foreground border-0"
-                      >
-                        {updateStatus.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Check className="h-4 w-4 mr-1" /> Accept</>}
-                      </Button>
-                      <Button
-                        size="sm" variant="outline" disabled={updateStatus.isPending || a.status === "REJECTED"}
-                        onClick={() => updateStatus.mutate({ aid: a.id, status: "REJECTED" })}
-                        className="glass"
-                      >
-                        <X className="h-4 w-4 mr-1" /> Reject
-                      </Button>
+                      <ConfirmDialog
+                        title="Accept this applicant?"
+                        description="Are you sure you want to accept this creator for this collaboration?"
+                        confirmLabel="Confirm Accept"
+                        onConfirm={() => updateStatus.mutate({ aid: a.id, status: "ACCEPTED" })}
+                        trigger={
+                          <Button
+                            size="sm" disabled={updateStatus.isPending || a.status === "ACCEPTED"}
+                            className="bg-gradient-brand text-primary-foreground border-0"
+                          >
+                            {updateStatus.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Check className="h-4 w-4 mr-1" /> Accept</>}
+                          </Button>
+                        }
+                      />
+                      <ConfirmDialog
+                        destructive
+                        title="Reject this applicant?"
+                        description="Are you sure you want to reject this creator's application?"
+                        confirmLabel="Confirm Reject"
+                        onConfirm={() => updateStatus.mutate({ aid: a.id, status: "REJECTED" })}
+                        trigger={
+                          <Button
+                            size="sm" variant="outline" disabled={updateStatus.isPending || a.status === "REJECTED"}
+                            className="glass"
+                          >
+                            <X className="h-4 w-4 mr-1" /> Reject
+                          </Button>
+                        }
+                      />
                       <Button size="sm" variant="ghost" onClick={() => setChatApp(a)}>
                         <MessageSquareText className="h-4 w-4 mr-1" /> Message
                       </Button>

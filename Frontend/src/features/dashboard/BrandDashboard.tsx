@@ -3,8 +3,11 @@ import { profileService } from "@/services/profile";
 import { getTier, TIER_COST } from "@/lib/credits";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import { Button } from "@/components/common/button";
+import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/common/dialog";
 import { gigsService, type Gig } from "@/services/gigs";
+import { GigStatusBadge, resolveGigStatus, daysUntilExpiry } from "@/components/common/gig-status-badge";
+import { plansService } from "@/services/plans";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   Plus,
@@ -31,14 +34,17 @@ import {
   ArrowUpNarrowWide,
   ArrowDownWideNarrow,
   ArrowUpDown,
+  SlidersHorizontal,
+  Rocket,
 } from "lucide-react";
+import { Input } from "@/components/common/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/common/select";
 import { useAuthStore } from "@/stores/authStore";
 import { useEffect, useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
-type MyGigsTab = "active" | "closed";
+type MyGigsTab = "active" | "drafts" | "expired" | "closed";
 type AppFilterTab = "new" | "shortlisted" | "accepted" | "rejected";
 
 export default function BrandDashboard() {
@@ -55,6 +61,10 @@ export default function BrandDashboard() {
   });
 
   const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: profileService.getProfile });
+  const { data: planUsage, isLoading: isLoadingPlan } = useQuery({
+    queryKey: ["plans", "usage"],
+    queryFn: plansService.usage,
+  });
   const credits: number | null = (profile?.brand as { credits?: number } | undefined)?.credits ?? null;
   const pincode: string | null = (profile?.brand as { pincode?: string } | undefined)?.pincode ?? null;
 
@@ -91,7 +101,8 @@ export default function BrandDashboard() {
     mutationFn: (id: string) => gigsService.toggleStatus(id),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["gigs", "mine"] });
-      toast({ title: data.status === "OPEN" ? "Campaign is now live! 🎉" : "Campaign paused." });
+      qc.invalidateQueries({ queryKey: ["plans", "usage"] });
+      toast({ title: data.status === "ACTIVE" ? "Campaign is now live! 🎉" : "Campaign paused." });
     },
     onError: () => toast({ variant: "destructive", title: "Action failed" }),
   });
@@ -100,6 +111,7 @@ export default function BrandDashboard() {
     mutationFn: (id: string) => gigsService.remove(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["gigs", "mine"] });
+      qc.invalidateQueries({ queryKey: ["plans", "usage"] });
       toast({ title: "Campaign deleted permanently." });
     },
     onError: () => toast({ variant: "destructive", title: "Delete failed" }),
@@ -111,6 +123,7 @@ export default function BrandDashboard() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["gigs", "mine"] });
       qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["plans", "usage"] });
       fetchAllApplications();
     },
     onError: (e: { response?: { data?: { error?: { message?: string } } } }) =>
@@ -170,6 +183,46 @@ export default function BrandDashboard() {
       }
     );
   };
+
+  // Slot re-allocation editor
+  const [slotEditorGig, setSlotEditorGig] = useState<Gig | null>(null);
+  const [slotDraft, setSlotDraft] = useState<number | "">(1);
+
+  const openSlotEditor = (g: Gig) => {
+    setSlotEditorGig(g);
+    setSlotDraft(g.applicationSlots ?? 1);
+  };
+
+  const allocateSlots = useMutation({
+    mutationFn: ({ id, slots }: { id: string; slots: number }) => gigsService.allocateSlots(id, slots),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["gigs", "mine"] });
+      qc.invalidateQueries({ queryKey: ["plans", "usage"] });
+      setSlotEditorGig(null);
+      toast({ title: `Allocated ${data.applicationSlots} slot${data.applicationSlots === 1 ? "" : "s"}.` });
+    },
+    onError: (e: { response?: { data?: { error?: { message?: string } } } }) =>
+      toast({
+        variant: "destructive",
+        title: "Couldn't update slots",
+        description: e?.response?.data?.error?.message ?? "Try again.",
+      }),
+  });
+
+  const publishGig = useMutation({
+    mutationFn: (id: string) => gigsService.publish(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["gigs", "mine"] });
+      qc.invalidateQueries({ queryKey: ["plans", "usage"] });
+      toast({ title: "Campaign published! 🚀" });
+    },
+    onError: (e: { response?: { data?: { error?: { message?: string } } } }) =>
+      toast({
+        variant: "destructive",
+        title: "Couldn't publish",
+        description: e?.response?.data?.error?.message ?? "Try again.",
+      }),
+  });
 
   // Sub-tabs filters
   const [myGigsSubTab, setMyGigsSubTab] = useState<MyGigsTab>("active");
@@ -260,16 +313,10 @@ export default function BrandDashboard() {
   }, [activeTab, approvedCollabs, selectedChatPartner]);
 
   // Details statistics counts
-  const totalActiveGigs = gigs.filter(g => g.status === "OPEN").length;
+  const totalActiveGigs = gigs.filter(g => resolveGigStatus(g) === "ACTIVE").length;
   const totalApplications = apps.length;
   const totalApprovedCollabs = approvedCollabs.length;
   const totalPendingReviews = apps.filter(a => a.status === "PENDING").length;
-
-  const handleGigDelete = (id: string) => {
-    if (confirm("Are you sure you want to permanently delete this gig? All applications will be lost.")) {
-      deleteGig.mutate(id);
-    }
-  };
 
   // Switch status tab helper
   const handleToggleGigClose = (id: string, currentStatus?: string) => {
@@ -327,6 +374,50 @@ export default function BrandDashboard() {
                 </Button>
               </div>
             </div>
+
+            {/* Plan & capacity. Every number here comes from /api/plans/usage —
+                limits are never hardcoded in the component. */}
+            {isLoadingPlan ? (
+              <div className="border border-border rounded-sm p-4 bg-background">
+                <div className="h-4 w-40 bg-border/40 rounded-sm animate-pulse" />
+              </div>
+            ) : planUsage ? (
+              <div className="border border-border rounded-sm p-4 bg-background">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Plan</span>
+                    <span className="inline-block border border-primary/25 bg-primary/10 text-primary px-1.5 py-0.5 text-[10px] uppercase tracking-wider rounded-sm">
+                      {planUsage.plan.name}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {planUsage.plan.price === 0 ? "Free" : `₹${planUsage.plan.price}/mo`}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-5 text-[12px]">
+                    <span className="text-muted-foreground">
+                      Campaigns{" "}
+                      <span className="font-semibold text-foreground">
+                        {planUsage.campaignsUsed}/{planUsage.plan.campaignLimit}
+                      </span>
+                    </span>
+                    <span className="text-muted-foreground">
+                      Slots{" "}
+                      <span className="font-semibold text-foreground">
+                        {planUsage.slotsAllocated}/{planUsage.plan.applicationSlotLimit}
+                      </span>
+                    </span>
+                    <span className={planUsage.campaignsRemaining === 0 ? "text-amber-400" : "text-muted-foreground"}>
+                      {planUsage.campaignsRemaining} campaign{planUsage.campaignsRemaining === 1 ? "" : "s"} left
+                    </span>
+                  </div>
+                </div>
+                {planUsage.campaignsRemaining === 0 && (
+                  <p className="mt-2 text-[11px] text-amber-400">
+                    You've used every campaign on the {planUsage.plan.name} plan. Close one or upgrade to publish another.
+                  </p>
+                )}
+              </div>
+            ) : null}
 
             {/* Premium Stat Cards */}
             <div className="grid sm:grid-cols-5 gap-4">
@@ -438,7 +529,7 @@ export default function BrandDashboard() {
 
             {/* Campaign sub-tabs */}
             <div className="flex border-b border-border gap-2 overflow-x-auto whitespace-nowrap scrollbar-none">
-              {(["active", "closed"] as MyGigsTab[]).map((st) => (
+              {(["active", "drafts", "expired", "closed"] as MyGigsTab[]).map((st) => (
                 <button
                   key={st}
                   onClick={() => setMyGigsSubTab(st)}
@@ -458,9 +549,14 @@ export default function BrandDashboard() {
               <div className="border border-border rounded-sm p-10 text-center text-xs text-muted-foreground">Loading campaigns...</div>
             ) : (
               (() => {
+                // Expired and draft campaigns stay reachable here rather than
+                // disappearing — expired ones are kept for historical reference.
                 const filtered = gigs.filter(g => {
-                  if (myGigsSubTab === "active") return g.status === "OPEN";
-                  if (myGigsSubTab === "closed") return g.status === "CLOSED";
+                  const st = resolveGigStatus(g);
+                  if (myGigsSubTab === "active") return st === "ACTIVE";
+                  if (myGigsSubTab === "drafts") return st === "DRAFT";
+                  if (myGigsSubTab === "expired") return st === "EXPIRED";
+                  if (myGigsSubTab === "closed") return st === "CLOSED";
                   return true;
                 });
 
@@ -482,7 +578,10 @@ export default function BrandDashboard() {
                             <span className="text-foreground font-medium">{g.category}</span>
                           </div>
                           
-                          <h3 className="mt-3 text-[14px] font-semibold line-clamp-2">{g.title}</h3>
+                          <div className="mt-3 flex items-start justify-between gap-2">
+                            <h3 className="text-[14px] font-semibold line-clamp-2">{g.title}</h3>
+                            <GigStatusBadge gig={g} className="shrink-0 mt-0.5" />
+                          </div>
                           
                           {/* Platform & Campaign Type Info */}
                           <div className="flex flex-wrap gap-1.5 mt-2">
@@ -514,9 +613,40 @@ export default function BrandDashboard() {
                             </span>
                           </div>
 
-                          <div className="mt-2 text-[11px] text-muted-foreground">
-                            Applications: <span className="font-semibold text-foreground">{(g as any)._count?.applications || 0}</span>
-                          </div>
+                          {/* Capacity + lifecycle. Slots are read from the gig,
+                              never computed client-side. */}
+                          {(() => {
+                            const received = (g as any)._count?.applications || 0;
+                            const slots = g.applicationSlots ?? 1;
+                            const remaining = Math.max(0, slots - received);
+                            const status = resolveGigStatus(g);
+                            const days = daysUntilExpiry(g.expiresAt);
+                            return (
+                              <div className="mt-2 space-y-1">
+                                <div className="text-[11px] text-muted-foreground">
+                                  <span className="font-semibold text-foreground">{received} / {slots}</span> Applications
+                                  {" — "}
+                                  <span className={remaining === 0 ? "text-amber-400" : ""}>
+                                    {remaining} slot{remaining === 1 ? "" : "s"} remaining
+                                  </span>
+                                </div>
+                                <div className="h-1 w-full bg-border/40 rounded-sm overflow-hidden">
+                                  <div
+                                    className={`h-full ${remaining === 0 ? "bg-amber-500" : "bg-emerald-500"}`}
+                                    style={{ width: `${Math.min(100, (received / Math.max(1, slots)) * 100)}%` }}
+                                  />
+                                </div>
+                                {status === "ACTIVE" && days != null && (
+                                  <p className="text-[11px] text-muted-foreground">
+                                    Expires in {days} day{days === 1 ? "" : "s"}
+                                  </p>
+                                )}
+                                {status === "EXPIRED" && (
+                                  <p className="text-[11px] text-amber-400">Applications closed — expired</p>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         {/* Action buttons */}
@@ -537,27 +667,60 @@ export default function BrandDashboard() {
                             <Link to={`/gigs/${g.id}/edit`}><Edit3 className="h-3.5 w-3.5" /></Link>
                           </Button>
 
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 rounded-sm shrink-0 border border-border" 
-                            title={g.status === "OPEN" ? "Close campaign" : "Re-open campaign"}
-                            onClick={() => handleToggleGigClose(g.id, g.status)}
-                            disabled={toggleStatus.isPending}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-sm shrink-0 border border-border"
+                            title="Allocate application slots"
+                            onClick={() => openSlotEditor(g)}
                           >
-                            {g.status === "OPEN" ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+                            <SlidersHorizontal className="h-3.5 w-3.5" />
                           </Button>
 
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 rounded-sm shrink-0 border border-border hover:bg-destructive/10 text-muted-foreground hover:text-red-500" 
-                            title="Delete campaign"
-                            onClick={() => handleGigDelete(g.id)}
-                            disabled={deleteGig.isPending}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          {/* A DRAFT has never been published, so it needs a
+                              publish action rather than the open/close toggle. */}
+                          {resolveGigStatus(g) === "DRAFT" ? (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-sm shrink-0 border border-border text-emerald-400 hover:bg-emerald-500/10"
+                              title="Publish campaign"
+                              onClick={() => publishGig.mutate(g.id)}
+                              disabled={publishGig.isPending}
+                            >
+                              <Rocket className="h-3.5 w-3.5" />
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-sm shrink-0 border border-border"
+                              title={resolveGigStatus(g) === "ACTIVE" ? "Close campaign" : "Re-open campaign"}
+                              onClick={() => handleToggleGigClose(g.id, g.status)}
+                              disabled={toggleStatus.isPending}
+                            >
+                              {resolveGigStatus(g) === "ACTIVE" ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+                            </Button>
+                          )}
+
+                          <ConfirmDialog
+                            destructive
+                            title="Delete this campaign?"
+                            description="This permanently deletes the gig and all applications it received. This cannot be undone."
+                            confirmLabel="Delete Campaign"
+                            onConfirm={() => deleteGig.mutate(g.id)}
+                            trigger={
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 rounded-sm shrink-0 border border-border hover:bg-destructive/10 text-muted-foreground hover:text-red-500"
+                                title="Delete campaign"
+                                disabled={deleteGig.isPending}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            }
+                          />
                         </div>
                       </div>
                     ))}
@@ -781,15 +944,23 @@ export default function BrandDashboard() {
                                   {updateAppStatus.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Check className="h-3.5 w-3.5 mr-1" /> Approve</>}
                                 </Button>
                                 
-                                <Button 
-                                  onClick={() => updateAppStatus.mutate({ aid: a.id, status: "REJECTED" })} 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="h-8 text-[12px] rounded-sm text-red-400 hover:text-red-300 border-red-500/20 hover:bg-red-500/5"
-                                  disabled={updateAppStatus.isPending}
-                                >
-                                  <X className="h-3.5 w-3.5 mr-1" /> Reject
-                                </Button>
+                                <ConfirmDialog
+                                  destructive
+                                  title="Reject this applicant?"
+                                  description="Are you sure you want to reject this creator's application?"
+                                  confirmLabel="Confirm Reject"
+                                  onConfirm={() => updateAppStatus.mutate({ aid: a.id, status: "REJECTED" })}
+                                  trigger={
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-8 text-[12px] rounded-sm text-red-400 hover:text-red-300 border-red-500/20 hover:bg-red-500/5"
+                                      disabled={updateAppStatus.isPending}
+                                    >
+                                      <X className="h-3.5 w-3.5 mr-1" /> Reject
+                                    </Button>
+                                  }
+                                />
                               </>
                             )}
 
@@ -1117,6 +1288,78 @@ export default function BrandDashboard() {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Slot re-allocation. The server re-validates against the plan and against
+          applications already received — this form just prevents the obvious
+          mistakes before spending a round-trip. */}
+      <Dialog open={!!slotEditorGig} onOpenChange={(o) => !o && setSlotEditorGig(null)}>
+        <DialogContent className="max-w-sm rounded-sm">
+          <DialogHeader>
+            <DialogTitle>Application slots</DialogTitle>
+            <DialogDescription className="text-[12px]">{slotEditorGig?.title}</DialogDescription>
+          </DialogHeader>
+
+          {slotEditorGig && (() => {
+            const received = (slotEditorGig as any)._count?.applications ?? slotEditorGig.applicationsReceived ?? 0;
+            const current = slotEditorGig.applicationSlots ?? 1;
+            // Freeing this gig's own allocation back into the pool is what makes
+            // the ceiling "everything not committed to *other* campaigns".
+            const poolMax = planUsage ? planUsage.slotsRemaining + current : undefined;
+            const value = slotDraft === "" ? 0 : Number(slotDraft);
+            const tooFew = value < Math.max(1, received);
+            const tooMany = poolMax != null && value > poolMax;
+
+            return (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={Math.max(1, received)}
+                    max={poolMax}
+                    value={slotDraft}
+                    onChange={(e) => setSlotDraft(e.target.value === "" ? "" : Number(e.target.value))}
+                    className="h-9 text-[13px] rounded-sm max-w-[120px]"
+                    autoFocus
+                  />
+                  <span className="text-[12px] text-muted-foreground">
+                    {received} received{poolMax != null ? ` · max ${poolMax}` : ""}
+                  </span>
+                </div>
+
+                {tooFew && (
+                  <p className="text-[11px] text-amber-400">
+                    This campaign already received {received} application{received === 1 ? "" : "s"} — allocate at least that many.
+                  </p>
+                )}
+                {tooMany && (
+                  <p className="text-[11px] text-amber-400">
+                    Only {poolMax} slots available on your {planUsage?.plan.name} plan.
+                  </p>
+                )}
+                {planUsage && !tooFew && !tooMany && (
+                  <p className="text-[11px] text-muted-foreground">
+                    {planUsage.slotsAllocated} of {planUsage.plan.applicationSlotLimit} slots allocated across your campaigns.
+                  </p>
+                )}
+
+                <DialogFooter className="gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setSlotEditorGig(null)} className="h-8 text-[12px] rounded-sm">
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-8 text-[12px] rounded-sm"
+                    disabled={allocateSlots.isPending || tooFew || tooMany || value === current}
+                    onClick={() => allocateSlots.mutate({ id: slotEditorGig.id, slots: value })}
+                  >
+                    {allocateSlots.isPending ? "Saving…" : "Save slots"}
+                  </Button>
+                </DialogFooter>
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 

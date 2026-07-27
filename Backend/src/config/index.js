@@ -49,6 +49,14 @@ module.exports = {
     REFRESH_COOKIE_NAME: 'refreshToken',
   },
 
+  // Gig lifecycle. Duration lives here (not inline in the insert) so it can be
+  // tuned without a schema change or a code edit at the call site.
+  GIG: {
+    VALIDITY_DAYS: parseInt(process.env.GIG_VALIDITY_DAYS) || 14,
+    // How often the background sweep flips lapsed ACTIVE gigs to EXPIRED.
+    EXPIRY_SWEEP_MINUTES: parseInt(process.env.GIG_EXPIRY_SWEEP_MINUTES) || 15,
+  },
+
   UPLOAD: {
     DIR: path.join(__dirname, '../../', process.env.UPLOAD_DIR || 'uploads'),
     MAX_SIZE: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024, // 5MB

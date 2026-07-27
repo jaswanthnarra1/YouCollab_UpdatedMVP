@@ -1,3 +1,4 @@
+import { resolveGigStatus } from "@/components/common/gig-status-badge";
 import { Button } from "@/components/common/button";
 import { CATEGORIES } from "@/constants";
 import { gigsService } from "@/services/gigs";
@@ -47,7 +48,7 @@ export default function Marketplace() {
         ? (g.title + g.description + ((g as any).brand?.businessName || "")).toLowerCase().includes(searchQuery.toLowerCase())
         : true;
 
-      return matchCategory && matchLocation && matchSearch && g.status === "OPEN";
+      return matchCategory && matchLocation && matchSearch && resolveGigStatus(g) === "ACTIVE";
     });
   }, [data, activeCategory, activeLocation, searchQuery]);
 

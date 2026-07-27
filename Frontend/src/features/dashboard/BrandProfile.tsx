@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/api";
+import { AvatarCropDialog } from "@/components/common/avatar-crop-dialog";
 import { Button } from "@/components/common/button";
 import { CATEGORIES } from "@/constants";
 import { Input } from "@/components/common/input";
@@ -27,6 +28,7 @@ export default function BrandProfile() {
   const [website, setWebsite] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["profile"],
@@ -65,14 +67,19 @@ export default function BrandProfile() {
       }),
   });
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (file) setPendingImage(file);
+    // Reset so re-picking the same file still fires onChange.
+    e.target.value = "";
+  };
 
+  const handleCropped = async (blob: Blob) => {
+    setPendingImage(null);
     setUploading(true);
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", blob, "logo.jpg");
       const { data } = await apiClient.post("/api/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
@@ -137,7 +144,7 @@ export default function BrandProfile() {
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={handleImageUpload}
+                  onChange={handleImageSelect}
                   className="hidden"
                   disabled={uploading}
                 />
@@ -206,6 +213,12 @@ export default function BrandProfile() {
         </div>
 
       </main>
+
+      <AvatarCropDialog
+        file={pendingImage}
+        onCancel={() => setPendingImage(null)}
+        onCropped={handleCropped}
+      />
     </div>
   );
 }

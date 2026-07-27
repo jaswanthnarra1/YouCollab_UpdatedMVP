@@ -1,3 +1,4 @@
+import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { useClerk } from "@clerk/clerk-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Logo } from "@/components/ui/logo";
@@ -45,13 +46,20 @@ export function Navbar() {
               <Link to={user.role === "BRAND" ? "/profile/brand" : "/profile/creator"} className="text-[13px] text-foreground/70 hover:text-foreground transition-colors h-8 px-3 flex items-center">
                 Profile
               </Link>
-              <button
-                onClick={handleLogout}
-                className="h-8 w-8 flex items-center justify-center text-foreground/70 hover:text-foreground transition-colors"
-                title="Log out"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
+              <ConfirmDialog
+                title="Log out of You Collab?"
+                description="Are you sure you want to log out?"
+                confirmLabel="Log Out"
+                onConfirm={handleLogout}
+                trigger={
+                  <button
+                    className="h-8 w-8 flex items-center justify-center text-foreground/70 hover:text-foreground transition-colors"
+                    title="Log out"
+                  >
+                    <LogOut className="h-4 w-4" />
+                  </button>
+                }
+              />
             </>
           ) : (
             <>
