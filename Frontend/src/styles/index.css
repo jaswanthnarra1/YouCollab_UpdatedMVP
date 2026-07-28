@@ -137,6 +137,26 @@
   .chip {
     @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium glass;
   }
+  .hero-shine-overlay {
+    background-image: linear-gradient(
+      100deg,
+      transparent 30%,
+      rgba(255, 255, 255, 0.05) 40%,
+      rgba(255, 255, 255, 0.28) 46%,
+      rgba(255, 255, 255, 0.45) 50%,
+      rgba(255, 255, 255, 0.2) 56%,
+      transparent 65%
+    );
+    background-size: 260% 100%;
+    background-repeat: no-repeat;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    mix-blend-mode: screen;
+    filter: blur(3px);
+    will-change: background-position;
+  }
 }
 
 @layer utilities {

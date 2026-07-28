@@ -46,7 +46,7 @@ export function PricingCard({
       className={`relative flex flex-col rounded-[24px] p-6 sm:p-7 transition-colors duration-300 ${
         highlighted
           ? "border border-[#2353E9]/50 bg-gradient-to-b from-[#1B2B6B] to-[#0F1330] shadow-[0_20px_60px_rgba(35,83,233,0.3)] md:scale-[1.03]"
-          : "border border-white/[0.06] bg-white/[0.02] shadow-[0_12px_40px_rgba(0,0,0,0.25)] hover:border-[#2353E9]/30"
+          : "border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] shadow-[0_12px_40px_rgba(0,0,0,0.06)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.25)] hover:border-[#2353E9]/30"
       }`}
     >
       {badge && (
@@ -57,10 +57,14 @@ export function PricingCard({
 
       <div className="mb-2 flex items-center gap-2" style={{ color: highlighted ? "#9db4ff" : "#5B8CFF" }}>
         {icon}
-        <h3 className="text-[15px] font-semibold tracking-tight text-white">{name}</h3>
+        <h3 className={`text-[15px] font-semibold tracking-tight ${highlighted ? "text-white" : "text-slate-900 dark:text-white"}`}>
+          {name}
+        </h3>
       </div>
 
-      <p className={`text-[13px] leading-relaxed ${highlighted ? "text-white/60" : "text-white/45"}`}>{description}</p>
+      <p className={`text-[13px] leading-relaxed ${highlighted ? "text-white/60" : "text-slate-500 dark:text-white/45"}`}>
+        {description}
+      </p>
 
       <div className="mt-6 flex items-baseline gap-1.5 min-h-[2.75rem]">
         <AnimatePresence mode="wait">
@@ -70,12 +74,12 @@ export function PricingCard({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
-            className="text-4xl font-black tracking-tight text-white tabular-nums"
+            className={`text-4xl font-black tracking-tight tabular-nums ${highlighted ? "text-white" : "text-slate-900 dark:text-white"}`}
           >
             {priceLabel}
           </motion.span>
         </AnimatePresence>
-        <span className={`text-[13px] font-medium ${highlighted ? "text-white/50" : "text-white/35"}`}>
+        <span className={`text-[13px] font-medium ${highlighted ? "text-white/50" : "text-slate-500 dark:text-white/50"}`}>
           {periodLabel}
         </span>
         {saveLabel && (
@@ -85,7 +89,7 @@ export function PricingCard({
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
             className={`ml-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${
-              highlighted ? "bg-white/15 text-white" : "bg-[#5B8CFF]/15 text-[#88a3ff]"
+              highlighted ? "bg-white/15 text-white" : "bg-[#2353E9]/10 text-[#2353E9] dark:bg-[#5B8CFF]/15 dark:text-[#88a3ff]"
             }`}
           >
             {saveLabel}
@@ -95,7 +99,10 @@ export function PricingCard({
 
       <ul className="mt-6 space-y-3 flex-1">
         {features.map((f) => (
-          <li key={f} className="flex items-start gap-2 text-[13px] text-white/70">
+          <li
+            key={f}
+            className={`flex items-start gap-2 text-[13px] ${highlighted ? "text-white/70" : "text-slate-600 dark:text-white/70"}`}
+          >
             <CheckCircle2 className={`h-4 w-4 mt-0.5 shrink-0 ${highlighted ? "text-white" : "text-[#5B8CFF]"}`} aria-hidden="true" />
             <span>{f}</span>
           </li>
@@ -105,7 +112,7 @@ export function PricingCard({
       <Link to={ctaTo} className="mt-8 block" aria-label={`${ctaLabel} — ${name} plan`}>
         <button
           type="button"
-          className={`group w-full rounded-full px-5 py-3 font-semibold text-[13px] transition-all duration-300 flex items-center justify-center gap-2 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B8CFF]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B0D13] ${
+          className={`group w-full rounded-full px-5 py-3 font-semibold text-[13px] transition-all duration-300 flex items-center justify-center gap-2 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5B8CFF]/60 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#0B0D13] ${
             highlighted
               ? "bg-white text-[#2353E9] shadow-xl shadow-black/[0.15] hover:shadow-2xl hover:scale-[1.02]"
               : "bg-[#2353E9] text-white shadow-md shadow-blue-500/20 hover:bg-[#1d47cc] hover:shadow-lg hover:shadow-blue-500/30 hover:scale-[1.02]"

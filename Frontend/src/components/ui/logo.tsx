@@ -7,12 +7,13 @@ interface LogoProps {
 
 export function Logo({ className = "h-12", transparent = false }: LogoProps) {
   return (
-    <svg 
-      className={className} 
-      viewBox="0 0 400 400" 
-      fill="none" 
+    <svg
+      className={className}
+      viewBox="0 0 400 400"
+      fill="none"
       xmlns="http://www.w3.org/2000/svg"
       style={{ aspectRatio: "1/1" }}
+      aria-hidden="true"
     >
       {/* Background */}
       {!transparent && <rect width="400" height="400" rx="80" fill="#2353E9" />}

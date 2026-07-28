@@ -32,7 +32,7 @@ export function PricingSection() {
   );
 
   return (
-    <section className="relative py-28 px-6 overflow-hidden" id="pricing" style={{ background: "#0B0D13" }}>
+    <section className="relative py-28 px-6 overflow-hidden bg-white dark:bg-[#0B0D13]" id="pricing">
       <div
         className="absolute rounded-full pointer-events-none"
         style={{
@@ -57,12 +57,12 @@ export function PricingSection() {
             <Wallet className="h-3.5 w-3.5" aria-hidden="true" /> Pricing
           </p>
           <h2
-            className="font-semibold tracking-[-0.03em] leading-[1.15] text-white mx-auto"
+            className="font-semibold tracking-[-0.03em] leading-[1.15] text-slate-900 dark:text-white mx-auto"
             style={{ fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)" }}
           >
             Choose Your Plan
           </h2>
-          <p className="mt-4 max-w-[480px] mx-auto text-[14px] text-white/45 leading-relaxed">
+          <p className="mt-4 max-w-[480px] mx-auto text-[14px] text-slate-500 dark:text-white/45 leading-relaxed">
             Choose the plan that fits your brand and start connecting with local creators.
           </p>
 
@@ -79,7 +79,7 @@ export function PricingSection() {
             ? Array.from({ length: 4 }).map((_, i) => (
                 <div
                   key={i}
-                  className="h-[420px] rounded-[24px] border border-white/[0.06] bg-white/[0.02] animate-pulse"
+                  className="h-[420px] rounded-[24px] border border-slate-200 dark:border-white/[0.06] bg-slate-50 dark:bg-white/[0.02] animate-pulse"
                 />
               ))
             : displayPlans.map((plan, i) => {
@@ -131,7 +131,7 @@ export function PricingSection() {
         </div>
 
         {billing === "yearly" && (
-          <p className="mt-8 text-center text-[12px] text-white/35">
+          <p className="mt-8 text-center text-[12px] text-slate-500 dark:text-white/50">
             Yearly billing saves 16% versus paying monthly.
           </p>
         )}

@@ -5,7 +5,7 @@ import { FAQ_ENTRIES } from "./faqData";
 
 export function FAQSection() {
   return (
-    <section className="relative py-28 px-6 overflow-hidden" id="faq" style={{ background: "#0F1115" }}>
+    <section className="relative py-28 px-6 overflow-hidden bg-slate-50 dark:bg-[#0F1115]" id="faq">
       <div className="mx-auto max-w-[720px] relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -18,7 +18,7 @@ export function FAQSection() {
             <HelpCircle className="h-3.5 w-3.5" aria-hidden="true" /> FAQ
           </p>
           <h2
-            className="font-semibold tracking-[-0.03em] leading-[1.15] text-white mx-auto"
+            className="font-semibold tracking-[-0.03em] leading-[1.15] text-slate-900 dark:text-white mx-auto"
             style={{ fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)" }}
           >
             Frequently asked questions
@@ -33,9 +33,9 @@ export function FAQSection() {
         >
           <Accordion type="single" collapsible className="w-full">
             {FAQ_ENTRIES.map((entry, i) => (
-              <AccordionItem key={entry.question} value={`item-${i}`} className="border-white/[0.08]">
-                <AccordionTrigger className="text-white/90 hover:no-underline">{entry.question}</AccordionTrigger>
-                <AccordionContent className="text-[14px] text-white/45 leading-relaxed">
+              <AccordionItem key={entry.question} value={`item-${i}`} className="border-slate-200 dark:border-white/[0.08]">
+                <AccordionTrigger className="text-slate-900 dark:text-white/90 hover:no-underline">{entry.question}</AccordionTrigger>
+                <AccordionContent className="text-[14px] text-slate-500 dark:text-white/45 leading-relaxed">
                   {entry.answer}
                 </AccordionContent>
               </AccordionItem>

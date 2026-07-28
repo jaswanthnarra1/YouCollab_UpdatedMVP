@@ -29,13 +29,13 @@ function FeatureCard({ icon, title, desc, delay }: FeatureCardProps) {
       initial={{ opacity: 0, y: 40 }}
       animate={isInView ? { opacity: 1, y: 0 } : {}}
       transition={{ duration: 0.6, delay, ease: "easeOut" }}
-      className="group relative rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 transition-colors duration-300 hover:border-[#2353E9]/30"
+      className="group relative rounded-2xl border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-8 transition-colors duration-300 hover:border-[#2353E9]/30"
     >
       <div className="mb-7 w-fit transition-all duration-300 ease-out group-hover:scale-[1.05] group-hover:-translate-y-1">
         {icon}
       </div>
-      <h3 className="text-[15px] font-semibold tracking-tight mb-2 text-white/90">{title}</h3>
-      <p className="text-[13px] text-white/45 leading-relaxed">{desc}</p>
+      <h3 className="text-[15px] font-semibold tracking-tight mb-2 text-slate-900 dark:text-white/90">{title}</h3>
+      <p className="text-[13px] text-slate-500 dark:text-white/45 leading-relaxed">{desc}</p>
     </motion.div>
   );
 }
@@ -45,7 +45,7 @@ export function FeaturesGrid() {
   const headerInView = useInView(headerRef, { once: true, margin: "-80px" });
 
   return (
-    <section className="relative py-28 px-6 overflow-hidden" id="features" style={{ background: "#0F1115" }}>
+    <section className="relative py-28 px-6 overflow-hidden bg-slate-50 dark:bg-[#0F1115]" id="features">
       <div className="absolute inset-0 pointer-events-none">
         <div
           className="absolute rounded-full"
@@ -88,7 +88,7 @@ export function FeaturesGrid() {
             <Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> Why You Collab
           </p>
           <h2
-            className="font-semibold tracking-[-0.03em] max-w-[500px] leading-[1.15] text-white"
+            className="font-semibold tracking-[-0.03em] max-w-[500px] leading-[1.15] text-slate-900 dark:text-white"
             style={{ fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)" }}
           >
             Less DMs.

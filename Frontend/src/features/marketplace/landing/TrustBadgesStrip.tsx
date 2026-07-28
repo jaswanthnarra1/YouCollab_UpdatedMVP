@@ -10,7 +10,7 @@ const BADGES = [
 
 export function TrustBadgesStrip() {
   return (
-    <section className="relative py-10 px-6" id="trust" style={{ background: "#0B0D13" }}>
+    <section className="relative py-10 px-6 bg-white dark:bg-[#0B0D13]" id="trust">
       <h2 className="sr-only">Why brands and creators trust You Collab</h2>
       <motion.div
         initial={{ opacity: 0, y: 16 }}
@@ -22,7 +22,7 @@ export function TrustBadgesStrip() {
         {BADGES.map(({ icon: Icon, label }) => (
           <div key={label} className="flex items-center gap-2">
             <Icon className="h-4 w-4 text-[#5B8CFF]" aria-hidden="true" />
-            <span className="text-[13px] font-medium text-white/45">{label}</span>
+            <span className="text-[13px] font-medium text-slate-500 dark:text-white/45">{label}</span>
           </div>
         ))}
       </motion.div>

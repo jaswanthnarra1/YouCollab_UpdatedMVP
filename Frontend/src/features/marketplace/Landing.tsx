@@ -1,6 +1,7 @@
 import { ArrowRight, Sun, Moon, CheckCircle2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Logo } from "@/components/ui/logo";
+import { HeroShineText } from "@/components/common/HeroShineText";
 import { motion } from "framer-motion";
 import { useTheme } from "next-themes";
 import { PricingSection } from "./pricing/PricingSection";
@@ -25,8 +26,8 @@ const BrandCampaignCard = () => (
           US
         </div>
         <div>
-          <h4 className="text-[11px] font-semibold text-slate-800 dark:text-white/80 leading-none">UrbanFit Studio</h4>
-          <span className="text-[9px] text-slate-400 dark:text-white/40">Brand Partner</span>
+          <p className="text-[11px] font-semibold text-slate-800 dark:text-white/80 leading-none">UrbanFit Studio</p>
+          <span className="text-[9px] text-slate-500 dark:text-white/55">Brand Partner</span>
         </div>
       </div>
       <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/25 px-2 py-0.5 rounded-full flex items-center gap-1.5">
@@ -37,17 +38,17 @@ const BrandCampaignCard = () => (
 
     <div className="space-y-3">
       <div>
-        <div className="text-[10px] text-slate-400 dark:text-white/40 uppercase tracking-wider font-medium">Campaign</div>
+        <div className="text-[10px] text-slate-500 dark:text-white/55 uppercase tracking-wider font-medium">Campaign</div>
         <div className="text-[13px] font-semibold text-slate-800 dark:text-white/90">Fitness Transformation Challenge</div>
       </div>
 
       <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-white/[0.04]">
         <div>
-          <div className="text-[9px] text-slate-400 dark:text-white/40">Budget</div>
+          <div className="text-[9px] text-slate-500 dark:text-white/55">Budget</div>
           <div className="text-xs font-bold text-slate-800 dark:text-white/90">₹8K–15K</div>
         </div>
         <div>
-          <div className="text-[9px] text-slate-400 dark:text-white/40">Applications</div>
+          <div className="text-[9px] text-slate-500 dark:text-white/55">Applications</div>
           <div className="text-xs font-bold text-[#2353E9] dark:text-[#88a3ff]">12 Pitches</div>
         </div>
       </div>
@@ -95,18 +96,18 @@ const CreatorProfileCard = () => (
         </div>
       </div>
       <div>
-        <h4 className="text-[12px] font-semibold text-slate-800 dark:text-white/90 leading-none">Arjun Mehta</h4>
+        <p className="text-[12px] font-semibold text-slate-800 dark:text-white/90 leading-none">Arjun Mehta</p>
         <span className="text-[10px] text-[#2353E9] dark:text-[#88a3ff] font-medium mt-1 inline-block">@arjun_fitlife</span>
       </div>
     </div>
 
     <div className="grid grid-cols-2 gap-2.5 border-t border-slate-100 dark:border-white/[0.04] pt-3 text-center">
       <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-2 border border-slate-100 dark:border-white/[0.02]">
-        <div className="text-[9px] text-slate-400 dark:text-white/40 uppercase tracking-wider">Reach</div>
+        <div className="text-[9px] text-slate-500 dark:text-white/55 uppercase tracking-wider">Reach</div>
         <div className="text-xs font-bold text-slate-800 dark:text-white/90">72K</div>
       </div>
       <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-2 border border-slate-100 dark:border-white/[0.02]">
-        <div className="text-[9px] text-slate-400 dark:text-white/40 uppercase tracking-wider">Engagement</div>
+        <div className="text-[9px] text-slate-500 dark:text-white/55 uppercase tracking-wider">Engagement</div>
         <div className="text-xs font-bold text-slate-800 dark:text-white/90">5.8%</div>
       </div>
     </div>
@@ -116,17 +117,17 @@ const CreatorProfileCard = () => (
 const AnalyticsCard = () => (
   <div className="bg-white/95 dark:bg-[#1A1A24] border border-[#2353E9]/[0.08] dark:border-white/[0.06] rounded-[24px] shadow-[0_8px_30px_rgba(0,0,0,0.03),0_1px_3px_rgba(0,0,0,0.01),0_0_1px_rgba(0,0,0,0.05)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.35),0_1px_4px_rgba(0,0,0,0.15)] p-5 w-[220px] relative overflow-hidden group hover:border-[#2353E9]/30 dark:hover:border-[#2353E9]/40 transition-all duration-300">
     <div className="flex items-center justify-between mb-3.5">
-      <span className="text-[10px] font-semibold text-slate-400 dark:text-white/40 uppercase tracking-wider">Growth Analytics</span>
+      <span className="text-[10px] font-semibold text-slate-500 dark:text-white/55 uppercase tracking-wider">Growth Analytics</span>
       <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-1.5 py-0.5 rounded">Live</span>
     </div>
     
     <div className="grid grid-cols-2 gap-2 mb-3">
       <div>
-        <div className="text-[9px] text-slate-400 dark:text-white/40">Total ROI</div>
+        <div className="text-[9px] text-slate-500 dark:text-white/55">Total ROI</div>
         <div className="text-[15px] font-extrabold text-slate-800 dark:text-white">12.8x</div>
       </div>
       <div>
-        <div className="text-[9px] text-slate-400 dark:text-white/40">Growth</div>
+        <div className="text-[9px] text-slate-500 dark:text-white/55">Growth</div>
         <div className="text-[15px] font-extrabold text-emerald-500">+18.2%</div>
       </div>
     </div>
@@ -179,7 +180,7 @@ const Landing = () => {
           {/* Brand */}
           <Link to="/" className="flex items-center gap-2 shrink-0">
             <Logo className="h-7 w-7 rounded-md" />
-            <span className="text-sm font-bold text-gray-900 dark:text-white hidden sm:inline tracking-tight">
+            <span className="text-sm font-bold text-gray-900 dark:text-white sr-only sm:not-sr-only sm:inline tracking-tight">
               YouCollab
             </span>
           </Link>
@@ -227,6 +228,7 @@ const Landing = () => {
         </div>
       </nav>
 
+      <main>
       {/* ═══ Hero Section ═══ */}
       <section
         className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-6 pt-24 pb-16 transition-colors duration-500"
@@ -406,20 +408,22 @@ const Landing = () => {
                   textShadow: isDark ? "0 4px 60px rgba(0,0,0,0.15)" : "0 4px 30px rgba(0,0,0,0.03)",
                 }}
               >
-                Where Brands
-                <br />
-                Meet{" "}
-                <span
-                  className="text-transparent bg-clip-text select-none"
-                  style={{
-                    backgroundImage: "linear-gradient(to bottom, #4D7BFF 0%, #2353E9 50%, #1C44C5 100%)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    textShadow: "0 1px 0 #1C44C5, 0 2.5px 0 #1333A0, 0 8px 24px rgba(35,83,233,0.12), 0 2px 4px rgba(0,0,0,0.08)",
-                  }}
-                >
-                  Creators
-                </span>
+                <HeroShineText>
+                  Where Brands
+                  <br />
+                  Meet{" "}
+                  <span
+                    className="text-transparent bg-clip-text select-none"
+                    style={{
+                      backgroundImage: "linear-gradient(to bottom, #4D7BFF 0%, #2353E9 50%, #1C44C5 100%)",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      textShadow: "0 1px 0 #1C44C5, 0 2.5px 0 #1333A0, 0 2px 4px rgba(0,0,0,0.08)",
+                    }}
+                  >
+                    Creators
+                  </span>
+                </HeroShineText>
               </h1>
             </motion.div>
 
@@ -507,6 +511,7 @@ const Landing = () => {
 
       {/* ═══ Final CTA ═══ */}
       <FinalCta />
+      </main>
 
       {/* ═══ Footer ═══ */}
       <LandingFooter />
