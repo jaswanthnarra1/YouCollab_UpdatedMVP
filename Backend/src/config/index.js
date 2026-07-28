@@ -1,15 +1,6 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 
-// Fail fast in production if the JWT secret is not explicitly configured.
-// The fallback below is a dev-only convenience and must never be used to sign
-// real tokens in a deployed environment.
-if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
-  throw new Error(
-    'FATAL: JWT_SECRET must be set in production. Refusing to start with the insecure default secret.'
-  );
-}
-
 if (!process.env.CLERK_SECRET_KEY) {
   throw new Error('FATAL: CLERK_SECRET_KEY must be set. Auth cannot function without it.');
 }
@@ -41,13 +32,6 @@ module.exports = {
   },
 
   DATABASE_URL: process.env.DATABASE_URL,
-
-  JWT: {
-    SECRET: process.env.JWT_SECRET || 'youcollab-default-local-secret-310239019',
-    ACCESS_EXPIRES: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
-    REFRESH_EXPIRES: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
-    REFRESH_COOKIE_NAME: 'refreshToken',
-  },
 
   // Gig lifecycle. Duration lives here (not inline in the insert) so it can be
   // tuned without a schema change or a code edit at the call site.

@@ -10,10 +10,9 @@ import {
   Shield, 
   Bell, 
   Eye, 
-  Sliders, 
-  HelpCircle, 
-  Key, 
-  Mail, 
+  Sliders,
+  HelpCircle,
+  Mail,
   Trash2, 
   BadgeCheck, 
   Loader2,
@@ -51,9 +50,6 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState<TabType>("account");
 
   // 1. Account & Security Form States
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [emailOtp, setEmailOtp] = useState("");
   const [pendingEmailId, setPendingEmailId] = useState<string | null>(null);
@@ -136,33 +132,10 @@ export default function Settings() {
     toast({ title: "General preferences updated" });
   };
 
-  // Account management actions — password/email are managed by Clerk
-  // directly from the client; account deletion goes through the backend so
-  // it can also delete the Clerk user (admin-only operation).
-  const changePasswordMutation = useMutation({
-    mutationFn: () => clerkUser!.updatePassword({ currentPassword, newPassword }),
-    onSuccess: () => {
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      toast({ title: "Password updated successfully! 🔐" });
-    },
-    onError: (err) => toast({ variant: "destructive", title: "Couldn't update password", description: clerkErrorMessage(err, "Try again.") }),
-  });
-
-  const handleChangePassword = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      toast({ variant: "destructive", title: "Fill all password fields" });
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      toast({ variant: "destructive", title: "Passwords mismatch", description: "New password and confirm password do not match." });
-      return;
-    }
-    changePasswordMutation.mutate();
-  };
-
+  // Account management actions — email is managed by Clerk directly from
+  // the client; account deletion goes through the backend so it can also
+  // delete the Clerk user (admin-only operation).
+  //
   // Email change is two-step in Clerk: add the address, then verify it with
   // a code before it can become primary.
   const startEmailChangeMutation = useMutation({
@@ -339,64 +312,6 @@ export default function Settings() {
                   </form>
                 </div>
               </div>
-
-              {/* Update Password card */}
-              <div className="border border-border rounded-sm p-5 bg-background flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between text-[11px] uppercase tracking-wider text-muted-foreground">
-                    <span className="inline-flex items-center gap-1"><Key className="h-3 w-3" /> Password credentials</span>
-                  </div>
-                  
-                  <h3 className="mt-3 text-[14px] font-semibold">Update Password</h3>
-                  <p className="mt-1 text-[12px] text-muted-foreground">Change password security credentials periodically.</p>
-
-                  <form onSubmit={handleChangePassword} className="mt-4 space-y-3">
-                    <div className="space-y-1">
-                      <Label className="text-[12px]">Current Password</Label>
-                      <Input 
-                        type="password" 
-                        required
-                        value={currentPassword} 
-                        onChange={(e) => setCurrentPassword(e.target.value)} 
-                        placeholder="••••••••" 
-                        className="h-9 text-[13px] rounded-sm" 
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-[12px]">New Password</Label>
-                      <Input 
-                        type="password" 
-                        required
-                        minLength={6}
-                        value={newPassword} 
-                        onChange={(e) => setNewPassword(e.target.value)} 
-                        placeholder="••••••••" 
-                        className="h-9 text-[13px] rounded-sm" 
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-[12px]">Confirm New Password</Label>
-                      <Input 
-                        type="password" 
-                        required
-                        value={confirmPassword} 
-                        onChange={(e) => setConfirmPassword(e.target.value)} 
-                        placeholder="••••••••" 
-                        className="h-9 text-[13px] rounded-sm" 
-                      />
-                    </div>
-                    <Button
-                      type="submit"
-                      disabled={changePasswordMutation.isPending}
-                      className="w-full h-8 text-[12px] rounded-sm bg-gradient-brand text-primary-foreground border-0 shadow-md hover:opacity-95"
-                    >
-                      {changePasswordMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Update Password"}
-                    </Button>
-                  </form>
-                </div>
-              </div>
-
-
 
               {/* Danger Zone */}
               <div className="border border-red-500/25 rounded-sm p-5 bg-red-500/5 md:col-span-2 flex items-center justify-between">

@@ -24,7 +24,7 @@ npx vitest run src/test/example.test.ts   # single test file
 npx vitest -t "name"     # single test by name
 ```
 
-Backend has **no test/lint scripts** — only `dev` and `start`. Verify backend changes by booting it and hitting endpoints (e.g. `curl localhost:5000/api/health`, or `POST /api/auth/login` with a seed account).
+Backend has **no test/lint scripts** — only `dev` and `start`. Verify backend changes by booting it and hitting endpoints (e.g. `curl localhost:5000/api/health`, or `GET /api/auth/me` with a Clerk session bearer token).
 
 Node **22+** is required (Supabase JS v2 needs native WebSocket).
 
@@ -42,29 +42,29 @@ Every domain follows `route → controller → service → Supabase`:
 
 Supabase access is centralized in `Backend/supabase/client.js` (re-exported via `src/services/supabase.js`): `supabase` (anon key) and `supabaseAdmin` (service-role, used for auth-admin operations). Realtime is intentionally disabled on the backend.
 
-### Authentication (hybrid — important)
-Auth is a deliberate hybrid of Supabase Auth + **app-issued JWTs**:
-- Supabase Auth stores credentials and handles email confirmation; the backend calls `supabaseAdmin.auth.admin.*` for user creation/confirmation/password updates.
-- The backend issues its **own** access + rotating refresh JWTs (`middleware/auth.js` verifies them; `requireRole('BRAND'|'INFLUENCER')` guards routes). Refresh tokens are bcrypt-hashed in the `refresh_tokens` table and rotated on each refresh.
-- Registration is OTP-based: `register` creates an *unconfirmed* Supabase Auth user + stores hashed OTP/signup data in `email_otps`; `verifyOtp` confirms the user, creates the `public.users` row + role profile (`brands`/`influencers`), and issues tokens. In development the OTP is logged and returned as `dev_otp`.
-- The Supabase Auth admin API has no "get user by email"; use the `findAuthUserByEmail()` helper in `auth.service.js` (paginates `listUsers`) rather than an unpaginated `listUsers()` call.
-- `JWT_SECRET` has a dev-only fallback default; `config/index.js` throws on startup if it's unset when `NODE_ENV=production`.
+### Authentication (Clerk)
+Auth is **Clerk** — phone number + SMS OTP as the primary sign-up/sign-in method, plus Google OAuth kept alongside it. There is no app-issued JWT, no password, and no Supabase Auth involved; Supabase is used purely as the Postgres database.
+- Frontend: `<ClerkProvider>` wraps the app (`Frontend/src/routes/App.tsx`); `AuthPage.tsx` drives phone-code sign-in/sign-up via `useSignIn()`/`useSignUp()` (`strategy: "phone_code"`), `VerifyOtpPage.tsx` completes the code exchange for both flows, `OAuthRole.tsx` handles first-time role selection after Google OAuth (which skips the app's own role toggle).
+- `Frontend/src/lib/api.ts` reads the live Clerk session token via `window.Clerk.session.getToken()` on every request (Clerk auto-rotates it internally) and sends it as a Bearer token — no app-side token storage or refresh logic.
+- Backend: `middleware/auth.js` uses `@clerk/express`'s `getAuth(req)` to read the verified Clerk user ID off the session, then calls `authService.findOrCreateByClerkId()` to lazily provision (or link) the local `public.users` row.
+- `findOrCreateByClerkId()` (`services/auth.service.js`) links by whichever identifier the Clerk identity carries — email (Google OAuth) or phone (OTP sign-up) — checking both so a phone-only sign-up can still land on a pre-existing seed/demo profile created by email. `users.email` and `users.phone` are both nullable; at least one is always present.
+- `requireRole('BRAND'|'INFLUENCER')` guards role-specific routes.
 
 ### Frontend
 - Feature-sliced under `src/features/` (auth, dashboard, gigs, applications, marketplace). Routing in `src/routes/App.tsx` with `ProtectedRoute` / `RoleRoute` guards.
-- `src/lib/api.ts` — axios client with a request interceptor (attaches bearer token from `localStorage`) and a response interceptor that auto-refreshes on 401 (single-flight, queues concurrent requests) and redirects to `/login` on failure. Use `unwrap()` to strip the `{ data }` envelope.
-- State: **TanStack React Query** for server state, **Zustand** (`src/stores/authStore.ts`, persisted to `localStorage` key `yc.auth`) for session. Access token also stored under `yc.accessToken`.
+- `src/lib/api.ts` — axios client with a request interceptor (attaches the live Clerk session token as a Bearer header) and a response interceptor that redirects to `/login` on a 401. Use `unwrap()` to strip the `{ data }` envelope.
+- State: **TanStack React Query** for server state, **Zustand** (`src/stores/authStore.ts`, persisted to `localStorage` key `yc.auth`) for the app-side user profile (id/role/name/etc — not the Clerk session itself, which Clerk manages internally).
 - UI: shadcn/Radix components in `src/components/ui` and `src/components/common`; Tailwind; forms via react-hook-form + Zod. `@` aliases `Frontend/src`.
 - **Dev server runs on port 8080** (not Vite's default 5173) — see CORS allow-list in `Backend/src/index.js`.
 
 ### Database
-Postgres via Supabase. `npm run db:migrate` (`Backend/supabase/migrate.js`) connects with the raw `pg` client using `DATABASE_URL` (the only place `pg` is used — the app runtime uses the Supabase JS client) and applies **only two files**: `migrations/migration.sql` (base schema) then `migrations/schema.sql` (enhancements). The directory also holds several timestamped Supabase/Lovable-style migration files and `instagram_migration.sql` — `migrate.js` does **not** run these; they're not wired into the migrate script, so if you add schema changes, add them to `migration.sql`/`schema.sql` (or apply the timestamped file manually) or they won't reach a fresh database. Tables: `users`, `brands`, `influencers`, `gigs`, `applications`, `notifications`, `refresh_tokens`, `email_otps`. Note: `messages` and `reviews` tables exist in the schema but have **no API/UI** yet (planned features).
+Postgres via Supabase. `npm run db:migrate` (`Backend/supabase/migrate.js`) connects with the raw `pg` client using `DATABASE_URL` (the only place `pg` is used — the app runtime uses the Supabase JS client) and applies **only two files**: `migrations/migration.sql` (base schema) then `migrations/schema.sql` (enhancements). The directory also holds several timestamped Supabase/Lovable-style migration files and `instagram_migration.sql` — `migrate.js` does **not** run these; they're not wired into the migrate script, so if you add schema changes, add them to `migration.sql`/`schema.sql` (or apply the timestamped file manually) or they won't reach a fresh database. Tables: `users`, `brands`, `influencers`, `gigs`, `applications`, `notifications`. `refresh_tokens` and `email_otps` still exist in `migration.sql` but are orphaned leftovers from the pre-Clerk JWT/email-OTP flow — nothing in the app reads or writes them. Note: `messages` and `reviews` tables exist in the schema but have **no API/UI** yet (planned features).
 
 ## Environment
 
-Two `.env` files are required (templates in `Backend/.env.example`, `Frontend/.env.example`): Backend needs Supabase keys, `JWT_SECRET`, `DATABASE_URL`, Gmail SMTP (`GMAIL_USER`/`GMAIL_APP_PASSWORD` — OTP emails; falls back to console log if unset), `CLIENT_URL` (CORS, comma-separated), and Instagram Graph API keys. Frontend needs `VITE_API_BASE_URL` (empty in prod → relative calls) and Supabase client keys.
+Two `.env` files are required (templates in `Backend/.env.example`, `Frontend/.env.example`): Backend needs `CLERK_SECRET_KEY`, `RECAPTCHA_SECRET_KEY` (both fail-fast on startup if unset — see `config/index.js`), Supabase keys, `DATABASE_URL`, Gmail SMTP (`GMAIL_USER`/`GMAIL_APP_PASSWORD` — falls back to console log if unset), `CLIENT_URL` (CORS, comma-separated), and Instagram Graph API keys. Frontend needs `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_API_BASE_URL` (empty in prod → relative calls), and Supabase client keys.
 
 ## Integrations
-- **Gmail SMTP** via nodemailer (`services/email.service.js`) for OTP/reset emails.
+- **Gmail SMTP** via nodemailer (`services/contact.service.js`) for the public contact form.
 - **Instagram Graph API** (`services/instagram.service.js`) via OAuth for creator metrics.
 </content>

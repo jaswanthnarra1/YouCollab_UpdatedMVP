@@ -17,7 +17,6 @@ import Landing from "@/features/marketplace/Landing";
 // lazy-load it so a first-time visitor's initial bundle is just the landing
 // page + app shell, not the entire dashboard/gigs/profile surface.
 const AuthPage = lazy(() => import("@/features/auth/AuthPage"));
-const ForgotPassword = lazy(() => import("@/features/auth/ForgotPassword"));
 const InfluencerOnboarding = lazy(() => import("@/features/auth/InfluencerOnboarding"));
 const BrandOnboarding = lazy(() => import("@/features/auth/BrandOnboarding"));
 const InfluencerDashboard = lazy(() => import("@/features/dashboard/InfluencerDashboard"));
@@ -67,7 +66,6 @@ const App = () => (
                 <Route path="/" element={<Landing />} />
                 <Route path="/login" element={<AuthPage mode="login" />} />
                 <Route path="/register" element={<AuthPage mode="register" />} />
-                <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/verify-otp" element={<VerifyOtpPage />} />
                 <Route path="/sso-callback" element={<SsoCallback />} />
                 <Route path="/oauth-role" element={<OAuthRole />} />

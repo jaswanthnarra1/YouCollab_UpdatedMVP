@@ -485,16 +485,13 @@ GRANT EXECUTE ON FUNCTION list_gigs_in_radius(TEXT, TEXT, TEXT, INTEGER, TIMESTA
 GRANT EXECUTE ON FUNCTION haversine_km(DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION, DOUBLE PRECISION) TO anon, authenticated;
 
 -- ============================================
--- 13. users.phone (currently unused)
+-- 13. users.phone (Clerk phone + SMS OTP auth)
 -- ============================================
--- Added for a phone + SMS OTP auth attempt that was reverted — auth is back on
--- Clerk email/password + email OTP, so nothing reads or writes `phone` today.
--- Kept because it is already applied to the deployed database; removing it from
--- this file alone would leave the schema drifting from what's live.
--- To roll back fully, run against the DB *and* delete this section:
---   DROP INDEX IF EXISTS idx_users_phone;
---   ALTER TABLE users DROP COLUMN IF EXISTS phone;
---   ALTER TABLE users ALTER COLUMN email SET NOT NULL;  -- only if no NULL emails
+-- Auth is Clerk phone number + SMS OTP for direct sign-up, plus Google OAuth
+-- (email-based) kept alongside it — see Backend/src/services/auth.service.js
+-- findOrCreateByClerkId(), which links/creates users by whichever of
+-- email/phone the Clerk identity carries. email is nullable because phone
+-- sign-ups have none; phone is nullable because Google sign-ups have none.
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT;
 ALTER TABLE users ALTER COLUMN email DROP NOT NULL;

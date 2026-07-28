@@ -1,5 +1,5 @@
-import { ArrowRight, Loader2, Mail } from "lucide-react";
-import { useSignUp } from "@clerk/clerk-react";
+import { ArrowRight, Loader2, Smartphone } from "lucide-react";
+import { useSignIn, useSignUp } from "@clerk/clerk-react";
 import { authService } from "@/services/auth";
 import { Button } from "@/components/common/button";
 import { Input } from "@/components/common/input";
@@ -10,23 +10,28 @@ import { useAuthStore } from "@/stores/authStore";
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { clerkErrorMessage } from "@/lib/clerkError";
+import { resolveOtpCode } from "@/lib/demoAccounts";
 
 export default function VerifyOtpPage() {
   const [params] = useSearchParams();
-  const email = params.get("email") || "";
+  const phone = params.get("phone") || "";
+  const displayPhone = params.get("display") || phone;
+  const mode = params.get("mode") === "register" ? "register" : "login";
 
   const [otpVals, setOtpVals] = useState<string[]>(Array(6).fill(""));
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [countdown, setCountdown] = useState(60);
   const { setUser } = useAuthStore();
-  const { signUp, setActive, isLoaded } = useSignUp();
+  const { signIn, setActive: setActiveSignIn, isLoaded: signInLoaded } = useSignIn();
+  const { signUp, setActive: setActiveSignUp, isLoaded: signUpLoaded } = useSignUp();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   const otp = otpVals.join("");
+  const isLoaded = mode === "register" ? signUpLoaded : signInLoaded;
 
   useEffect(() => {
     inputRefs.current[0]?.focus();
@@ -94,9 +99,16 @@ export default function VerifyOtpPage() {
 
     setLoading(true);
     try {
-      const result = await signUp.attemptEmailAddressVerification({ code: otp });
-      if (result.status !== "complete") throw new Error("Verification incomplete. Try again.");
-      await setActive({ session: result.createdSessionId });
+      const code = resolveOtpCode(phone, otp);
+      if (mode === "register") {
+        const result = await signUp.attemptPhoneNumberVerification({ code });
+        if (result.status !== "complete") throw new Error("Verification incomplete. Try again.");
+        await setActiveSignUp({ session: result.createdSessionId });
+      } else {
+        const result = await signIn.attemptFirstFactor({ strategy: "phone_code", code });
+        if (result.status !== "complete") throw new Error("Verification incomplete. Try again.");
+        await setActiveSignIn({ session: result.createdSessionId });
+      }
 
       const res = await authService.me();
       if (!res?.user) throw new Error("Verification failed");
@@ -119,8 +131,12 @@ export default function VerifyOtpPage() {
     if (countdown > 0 || !isLoaded) return;
     setResending(true);
     try {
-      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-      toast({ title: "Code resent! ✉️", description: "A new 6-digit code has been sent to your email." });
+      if (mode === "register") {
+        await signUp.preparePhoneNumberVerification({ strategy: "phone_code" });
+      } else {
+        await signIn.create({ strategy: "phone_code", identifier: phone });
+      }
+      toast({ title: "Code resent! 📱", description: "A new 6-digit code has been sent to your phone." });
       setCountdown(60);
     } catch (err) {
       toast({ variant: "destructive", title: "Resend failed", description: clerkErrorMessage(err, "Failed to resend code.") });
@@ -150,14 +166,14 @@ export default function VerifyOtpPage() {
         <div className="border border-border rounded-md p-8 space-y-6 bg-background">
           <div className="flex flex-col items-start gap-2">
             <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 mb-1">
-              <Mail className="h-5 w-5" />
+              <Smartphone className="h-5 w-5" />
             </div>
             <h1 className="text-[22px] font-semibold tracking-tight leading-tight">
-              Verify your email
+              Verify your phone
             </h1>
             <p className="text-[13px] text-muted-foreground">
               We sent a 6-digit numeric verification code to{" "}
-              <span className="font-semibold text-foreground">{email || "your email"}</span>.
+              <span className="font-semibold text-foreground">{displayPhone || "your phone"}</span>.
             </p>
           </div>
 
@@ -206,8 +222,8 @@ export default function VerifyOtpPage() {
                 {resending ? "Resending code..." : "Resend Verification Code"}
               </button>
             )}
-            <Link to="/register" className="hover:underline mt-1 text-[11px]">
-              Use a different email address
+            <Link to={mode === "register" ? "/register" : "/login"} className="hover:underline mt-1 text-[11px]">
+              Use a different phone number
             </Link>
           </div>
         </div>

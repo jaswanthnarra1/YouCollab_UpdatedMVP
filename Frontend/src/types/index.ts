@@ -2,7 +2,8 @@ export type Role = "BRAND" | "INFLUENCER";
 
 export interface AuthUser {
   id: string;
-  email: string;
+  email?: string;
+  phone?: string;
   role: Role;
   isOnboarded: boolean;
   name?: string;

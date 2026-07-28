@@ -13,6 +13,7 @@ import { useAuthStore, type Role } from "@/stores/authStore";
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { clerkErrorMessage } from "@/lib/clerkError";
+import { resolveDemoPhone } from "@/lib/demoAccounts";
 
 interface Props {
   mode: "login" | "register";
@@ -22,16 +23,14 @@ export default function AuthPage({ mode }: Props) {
   const [params] = useSearchParams();
   const initialRole = (params.get("role") as Role) || "INFLUENCER";
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [phone, setPhone] = useState("");
   const [role, setRole] = useState<Role>(initialRole);
   const [loading, setLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const captchaRef = useRef<ReCAPTCHA>(null);
   const { setUser } = useAuthStore();
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
-  const { signIn, setActive: setActiveSignIn, isLoaded: signInLoaded } = useSignIn();
+  const { signIn, isLoaded: signInLoaded } = useSignIn();
   const { signUp, isLoaded: signUpLoaded } = useSignUp();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -84,14 +83,19 @@ export default function AuthPage({ mode }: Props) {
     }
   };
 
+  const digits = phone.replace(/\D/g, "");
+  const demoPhone = resolveDemoPhone(digits);
+  const fullPhone = demoPhone || `+91${digits}`;
+  const displayPhone = `+91${digits}`;
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSignedIn) {
       navigate("/oauth-role", { replace: true });
       return;
     }
-    if (mode === "register" && password !== confirmPassword) {
-      toast({ variant: "destructive", title: "Passwords mismatch", description: "Password and Confirm Password do not match." });
+    if (digits.length !== 10) {
+      toast({ variant: "destructive", title: "Invalid phone number", description: "Enter a 10-digit mobile number." });
       return;
     }
     if (!captchaToken) {
@@ -103,28 +107,18 @@ export default function AuthPage({ mode }: Props) {
       await verifyCaptchaToken(captchaToken);
       if (mode === "login") {
         if (!signInLoaded) return;
-        const result = await signIn.create({ identifier: email, password });
-        if (result.status !== "complete") throw new Error("Additional verification required.");
-        await setActiveSignIn({ session: result.createdSessionId });
-
-        const res = await authService.me();
-        if (!res?.user) throw new Error("Auth failed");
-        setUser(res.user);
-        const dest = !res.user.isOnboarded
-          ? res.user.role === "BRAND" ? "/onboarding/brand" : "/onboarding/influencer"
-          : res.user.role === "BRAND" ? "/dashboard/brand" : "/dashboard/influencer";
-        navigate(dest);
+        await signIn.create({ strategy: "phone_code", identifier: fullPhone });
+        toast({ title: "Code sent! 📱", description: "Please check your SMS for a 6-digit code." });
       } else {
         if (!signUpLoaded) return;
         await signUp.create({
-          emailAddress: email,
-          password,
+          phoneNumber: fullPhone,
           unsafeMetadata: { role, name },
         });
-        await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-        toast({ title: "Verification code sent! ✉️", description: "Please check your inbox for a 6-digit code." });
-        navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
+        await signUp.preparePhoneNumberVerification({ strategy: "phone_code" });
+        toast({ title: "Code sent! 📱", description: "Please check your SMS for a 6-digit code." });
       }
+      navigate(`/verify-otp?phone=${encodeURIComponent(fullPhone)}&display=${encodeURIComponent(displayPhone)}&mode=${mode}`);
     } catch (err) {
       const backendMsg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message;
       toast({
@@ -232,51 +226,22 @@ export default function AuthPage({ mode }: Props) {
               </div>
             )}
             <div className="space-y-1">
-              <Label htmlFor="email" className="text-[12px]">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="h-9 text-[13px] rounded-sm"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="password" className="text-[12px]">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="h-9 text-[13px] rounded-sm"
-              />
-              {mode === "login" && (
-                <div className="flex justify-end">
-                  <Link to="/forgot-password" className="text-[11px] text-muted-foreground hover:text-foreground transition-colors">
-                    Forgot password?
-                  </Link>
-                </div>
-              )}
-            </div>
-            {mode === "register" && (
-              <div className="space-y-1">
-                <Label htmlFor="confirmPassword" className="text-[12px]">Confirm Password</Label>
+              <Label htmlFor="phone" className="text-[12px]">Phone Number</Label>
+              <div className="flex h-9 items-stretch rounded-sm border border-input overflow-hidden">
+                <span className="flex items-center px-3 text-[13px] text-muted-foreground bg-muted border-r border-input">+91</span>
                 <Input
-                  id="confirmPassword"
-                  type="password"
+                  id="phone"
+                  type="tel"
+                  inputMode="numeric"
                   required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="h-9 text-[13px] rounded-sm"
+                  maxLength={10}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  placeholder="98765 43210"
+                  className="h-9 text-[13px] rounded-none border-0 focus-visible:ring-0"
                 />
               </div>
-            )}
+            </div>
 
             <Captcha ref={captchaRef} onChange={setCaptchaToken} />
 
@@ -286,7 +251,7 @@ export default function AuthPage({ mode }: Props) {
               className="w-full h-9 text-[13px] rounded-sm gap-1.5"
             >
               {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : (
-                <>{mode === "login" ? "Sign in" : "Create account"} <ArrowRight className="h-3.5 w-3.5" /></>
+                <>{mode === "login" ? "Send OTP" : "Create account"} <ArrowRight className="h-3.5 w-3.5" /></>
               )}
             </Button>
           </form>

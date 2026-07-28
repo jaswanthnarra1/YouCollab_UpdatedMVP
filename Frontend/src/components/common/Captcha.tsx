@@ -18,7 +18,7 @@ interface Props {
 }
 
 // Shared "I'm not a robot" widget used on every form Google reCAPTCHA v2
-// protects (login, signup, forgot-password, contact). Forwards the ref so
+// protects (login, signup, contact). Forwards the ref so
 // callers can call .reset() after a submit attempt — v2 tokens are single-use.
 // Scales itself down to fit its container instead of overflowing it, and
 // reserves exactly the scaled height so it doesn't leave a gap below.

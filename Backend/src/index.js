@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const cookieParser = require('cookie-parser');
 const { clerkMiddleware } = require('@clerk/express');
 const path = require('path');
 const fs = require('fs');
@@ -66,7 +65,6 @@ app.use((req, res, next) => {
 // Parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
 
 // Clerk: parses the session token (if any) onto req, does not require auth
 app.use(clerkMiddleware());
