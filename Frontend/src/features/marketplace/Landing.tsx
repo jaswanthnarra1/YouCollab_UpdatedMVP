@@ -16,10 +16,10 @@ const BrandCampaignCard = () => (
     <div className="flex items-center justify-between mb-4">
       <div className="flex items-center gap-2.5">
         <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#2353E9] to-indigo-500 flex items-center justify-center font-bold text-white text-[11px] shadow-sm">
-          AA
+          US
         </div>
         <div>
-          <h4 className="text-[11px] font-semibold text-slate-800 dark:text-white/80 leading-none">Aura Apparel</h4>
+          <h4 className="text-[11px] font-semibold text-slate-800 dark:text-white/80 leading-none">UrbanFit Studio</h4>
           <span className="text-[9px] text-slate-400 dark:text-white/40">Brand Partner</span>
         </div>
       </div>
@@ -28,21 +28,21 @@ const BrandCampaignCard = () => (
         <span className="text-[9px] font-medium text-emerald-600 dark:text-emerald-400">Active</span>
       </div>
     </div>
-    
+
     <div className="space-y-3">
       <div>
         <div className="text-[10px] text-slate-400 dark:text-white/40 uppercase tracking-wider font-medium">Campaign</div>
-        <div className="text-[13px] font-semibold text-slate-800 dark:text-white/90">Summer Collection '26</div>
+        <div className="text-[13px] font-semibold text-slate-800 dark:text-white/90">Fitness Transformation Challenge</div>
       </div>
-      
+
       <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-white/[0.04]">
         <div>
           <div className="text-[9px] text-slate-400 dark:text-white/40">Budget</div>
-          <div className="text-xs font-bold text-slate-800 dark:text-white/90">$3,200</div>
+          <div className="text-xs font-bold text-slate-800 dark:text-white/90">₹8K–15K</div>
         </div>
         <div>
           <div className="text-[9px] text-slate-400 dark:text-white/40">Applications</div>
-          <div className="text-xs font-bold text-[#2353E9] dark:text-[#88a3ff]">34 Pitches</div>
+          <div className="text-xs font-bold text-[#2353E9] dark:text-[#88a3ff]">12 Pitches</div>
         </div>
       </div>
     </div>
@@ -63,15 +63,15 @@ const AIMatchCard = () => (
     <div className="space-y-1.5 text-[10px] text-slate-500 dark:text-white/50 border-t border-slate-100 dark:border-white/[0.04] pt-2.5">
       <div className="flex items-center gap-1.5">
         <span className="w-1 h-1 rounded-full bg-[#2353E9]" />
-        <span>Target demo matching</span>
+        <span>Verified Instagram profile</span>
       </div>
       <div className="flex items-center gap-1.5">
         <span className="w-1 h-1 rounded-full bg-[#2353E9]" />
-        <span>Authentic audience</span>
+        <span>Baner, Pune radius match</span>
       </div>
       <div className="flex items-center gap-1.5">
         <span className="w-1 h-1 rounded-full bg-[#2353E9]" />
-        <span>Fashion/Lifestyle niche</span>
+        <span>Fitness/Wellness niche</span>
       </div>
     </div>
   </div>
@@ -82,26 +82,26 @@ const CreatorProfileCard = () => (
     <div className="flex items-center gap-3.5 mb-3.5">
       <div className="relative">
         <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#2353E9] to-indigo-500 flex items-center justify-center font-bold text-white text-xs shadow-md">
-          RS
+          AM
         </div>
         <div className="absolute -bottom-0.5 -right-0.5 bg-indigo-600 text-white rounded-full p-0.5 border border-white dark:border-[#1A1A24]">
           <CheckCircle2 className="w-2.5 h-2.5 text-white" />
         </div>
       </div>
       <div>
-        <h4 className="text-[12px] font-semibold text-slate-800 dark:text-white/90 leading-none">Riya Sen</h4>
-        <span className="text-[10px] text-[#2353E9] dark:text-[#88a3ff] font-medium mt-1 inline-block">@riyasen</span>
+        <h4 className="text-[12px] font-semibold text-slate-800 dark:text-white/90 leading-none">Arjun Mehta</h4>
+        <span className="text-[10px] text-[#2353E9] dark:text-[#88a3ff] font-medium mt-1 inline-block">@arjun_fitlife</span>
       </div>
     </div>
 
     <div className="grid grid-cols-2 gap-2.5 border-t border-slate-100 dark:border-white/[0.04] pt-3 text-center">
       <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-2 border border-slate-100 dark:border-white/[0.02]">
         <div className="text-[9px] text-slate-400 dark:text-white/40 uppercase tracking-wider">Reach</div>
-        <div className="text-xs font-bold text-slate-800 dark:text-white/90">142K</div>
+        <div className="text-xs font-bold text-slate-800 dark:text-white/90">72K</div>
       </div>
       <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-2 border border-slate-100 dark:border-white/[0.02]">
         <div className="text-[9px] text-slate-400 dark:text-white/40 uppercase tracking-wider">Engagement</div>
-        <div className="text-xs font-bold text-slate-800 dark:text-white/90">6.4%</div>
+        <div className="text-xs font-bold text-slate-800 dark:text-white/90">5.8%</div>
       </div>
     </div>
   </div>
