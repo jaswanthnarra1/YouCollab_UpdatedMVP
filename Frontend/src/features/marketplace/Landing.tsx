@@ -411,19 +411,19 @@ const Landing = () => {
                 <HeroShineText>
                   Where Brands
                   <br />
-                  Meet{" "}
-                  <span
-                    className="text-transparent bg-clip-text select-none"
-                    style={{
-                      backgroundImage: "linear-gradient(to bottom, #4D7BFF 0%, #2353E9 50%, #1C44C5 100%)",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      textShadow: "0 1px 0 #1C44C5, 0 2.5px 0 #1333A0, 0 2px 4px rgba(0,0,0,0.08)",
-                    }}
-                  >
-                    Creators
-                  </span>
+                  Meet{" "}
                 </HeroShineText>
+                <span
+                  className="text-transparent bg-clip-text select-none"
+                  style={{
+                    backgroundImage: "linear-gradient(to bottom, #4D7BFF 0%, #2353E9 50%, #1C44C5 100%)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    textShadow: "0 1px 0 #1C44C5, 0 2.5px 0 #1333A0, 0 2px 4px rgba(0,0,0,0.08)",
+                  }}
+                >
+                  Creators
+                </span>
               </h1>
             </motion.div>
 
