@@ -1,11 +1,17 @@
-import { ArrowRight, Sun, Moon, Shield, Target, MapPin, Sparkles, Users, CheckCircle2, TrendingUp } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ArrowRight, Sun, Moon, CheckCircle2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Logo } from "@/components/ui/logo";
-import { motion, useInView } from "framer-motion";
-import { useRef } from "react";
+import { motion } from "framer-motion";
 import { useTheme } from "next-themes";
 import { PricingSection } from "./pricing/PricingSection";
+import { TrustBadgesStrip } from "./landing/TrustBadgesStrip";
+import { BuiltForSection } from "./landing/BuiltForSection";
+import { HowItWorksSection } from "./landing/HowItWorksSection";
+import { FeaturesGrid } from "./landing/FeaturesGrid";
+import { ProductShowcase } from "./landing/ProductShowcase";
+import { FAQSection } from "./landing/FAQSection";
+import { FinalCta } from "./landing/FinalCta";
+import { LandingFooter } from "./landing/LandingFooter";
 
 /* ═══════════════════════════════════════════════════
    Floating Product Cards — Capsule-style hero cards
@@ -150,47 +156,6 @@ const AnalyticsCard = () => (
   </div>
 );
 
-/* ═══════════════════════════════════════════
-   Feature Card — Scroll-revealing glass card
-   ═══════════════════════════════════════════ */
-
-interface FeatureItemProps {
-  icon: React.ReactNode;
-  title: string;
-  desc: string;
-  delay: number;
-}
-
-const FeatureItem = ({ icon, title, desc, delay }: FeatureItemProps) => {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-80px" });
-
-  return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: 40 }}
-      animate={isInView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.6, delay, ease: "easeOut" }}
-      className="group relative py-10 px-8"
-    >
-      {/* ── Icon ── */}
-      <div
-        className="mb-7 w-fit transition-all duration-300 ease-out
-          group-hover:scale-[1.05] group-hover:-translate-y-1"
-      >
-        <div style={{ color: "#5B8CFF" }}>
-          {icon}
-        </div>
-      </div>
-
-      <h3 className="text-[15px] font-semibold tracking-tight mb-2 text-white/90">
-        {title}
-      </h3>
-      <p className="text-[13px] text-white/45 leading-relaxed">{desc}</p>
-    </motion.div>
-  );
-};
-
 /* ═══════════════════════════════════════
    Main Landing Page
    ═══════════════════════════════════════ */
@@ -198,9 +163,6 @@ const FeatureItem = ({ icon, title, desc, delay }: FeatureItemProps) => {
 const Landing = () => {
   const { theme, setTheme } = useTheme();
   const isDark = theme === "dark";
-
-  const featuresRef = useRef(null);
-  const featuresInView = useInView(featuresRef, { once: true, margin: "-80px" });
 
   return (
     <div className="min-h-screen overflow-x-hidden">
@@ -469,33 +431,42 @@ const Landing = () => {
               className="relative z-10 text-center text-white/80 dark:text-white/55 max-w-[420px] mb-10 leading-relaxed"
               style={{ fontSize: "clamp(0.9rem, 2.2vw, 1.1rem)" }}
             >
-              Everything related to influencer collabs
+              Verified Instagram creators, real budgets, structured pitches
               <br />
-              stored in one place. Never miss a campaign.
+              — no more DMs and guesswork.
             </motion.p>
 
-            {/* ── CTA Button ── */}
+            {/* ── CTA Buttons ── */}
             <motion.div
               initial={{ opacity: 0, y: 22 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.7, ease: "easeOut" }}
-              className="relative z-10"
+              className="relative z-10 flex flex-col sm:flex-row items-center gap-3"
             >
               <Link to="/register">
                 <button
-                  className="group bg-white text-[#2353E9] rounded-full px-8 py-3.5
+                  className="group w-full sm:w-auto bg-white text-[#2353E9] rounded-full px-8 py-3.5
                     font-semibold text-sm
                     shadow-xl shadow-black/[0.08]
                     hover:shadow-2xl hover:shadow-black/[0.15]
                     hover:scale-[1.04] active:scale-[0.98]
                     transition-all duration-300
-                    flex items-center gap-2"
+                    flex items-center justify-center gap-2"
                   id="hero-cta"
                 >
                   Get Started Free
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                 </button>
               </Link>
+              <a
+                href="#how-it-works"
+                className="w-full sm:w-auto rounded-full border border-white/25 px-8 py-3.5
+                  font-semibold text-sm text-white text-center
+                  hover:bg-white/10
+                  transition-all duration-300"
+              >
+                See How It Works
+              </a>
             </motion.div>
           </div>
 
@@ -513,253 +484,32 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* ═══ Features Section ═══ */}
-      <section
-        className="relative py-28 px-6 overflow-hidden"
-        id="features"
-        style={{ background: "#0F1115" }}
-      >
-        {/* ── Radial gradient accents ── */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div
-            className="absolute rounded-full"
-            style={{
-              top: "-20%", left: "-10%",
-              width: "50%", height: "60%",
-              background: "radial-gradient(ellipse, rgba(91,140,255,0.04) 0%, transparent 70%)",
-              filter: "blur(40px)",
-            }}
-          />
-          <div
-            className="absolute rounded-full"
-            style={{
-              bottom: "-15%", right: "-5%",
-              width: "40%", height: "50%",
-              background: "radial-gradient(ellipse, rgba(91,140,255,0.03) 0%, transparent 70%)",
-              filter: "blur(40px)",
-            }}
-          />
-        </div>
+      {/* ═══ Trust ═══ */}
+      <TrustBadgesStrip />
 
-        {/* ── Noise texture overlay ── */}
-        <div
-          className="absolute inset-0 pointer-events-none opacity-[0.03]"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")`,
-            backgroundRepeat: "repeat",
-            backgroundSize: "128px 128px",
-          }}
-        />
+      {/* ═══ Built For ═══ */}
+      <BuiltForSection />
 
-        <div className="mx-auto max-w-[1100px] relative z-10">
-          {/* Section header */}
-          <motion.div
-            ref={featuresRef}
-            initial={{ opacity: 0, y: 30 }}
-            animate={featuresInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.6, ease: "easeOut" }}
-            className="mb-16"
-          >
-            <p className="text-xs uppercase tracking-[0.2em] text-[#5B8CFF] font-semibold mb-4">
-              Built for Pune
-            </p>
-            <h2
-              className="font-semibold tracking-[-0.03em] max-w-[500px] leading-[1.15] text-white"
-              style={{ fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)" }}
-            >
-              Less DMs.
-              <br />
-              More deals.
-            </h2>
-          </motion.div>
+      {/* ═══ How It Works ═══ */}
+      <HowItWorksSection />
 
-          {/* Feature columns with vertical dividers */}
-          <div className="grid grid-cols-1 md:grid-cols-3 relative">
-            {/* Vertical dividers — desktop only */}
-            <div className="hidden md:block absolute top-0 bottom-0 left-1/3 w-px bg-white/[0.06]" />
-            <div className="hidden md:block absolute top-0 bottom-0 left-2/3 w-px bg-white/[0.06]" />
+      {/* ═══ Features ═══ */}
+      <FeaturesGrid />
 
-            {/* Horizontal dividers — mobile only */}
-            <div className="block md:hidden" />
-
-            <FeatureItem
-              icon={
-                <Shield
-                  className="h-7 w-7"
-                  style={{ color: "#5B8CFF", fill: "none", strokeWidth: 2.25 }}
-                />
-              }
-              title="Verified Instagram"
-              desc="Every creator connects their real Instagram. Followers, engagement, reach — checked, not claimed. Brands see what they're paying for."
-              delay={0.1}
-            />
-
-            {/* Mobile divider */}
-            <div className="block md:hidden h-px bg-white/[0.06] mx-8" />
-
-            <FeatureItem
-              icon={
-                <Target
-                  className="h-7 w-7"
-                  style={{ color: "#5B8CFF", fill: "none", strokeWidth: 2.25 }}
-                />
-              }
-              title="Structured Pitches"
-              desc="Apply, negotiate, accept, deliver. Every step leaves a trail. No 'sent you a DM bro' — just a clear pipeline."
-              delay={0.2}
-            />
-
-            {/* Mobile divider */}
-            <div className="block md:hidden h-px bg-white/[0.06] mx-8" />
-
-            <FeatureItem
-              icon={
-                <MapPin
-                  className="h-7 w-7"
-                  style={{ color: "#5B8CFF", fill: "none", strokeWidth: 2.25 }}
-                />
-              }
-              title="Real Pune Reach"
-              desc="Filter by area, category, and audience. Find the FC Road foodies or Kothrud fashion crowd that actually convert."
-              delay={0.3}
-            />
-          </div>
-        </div>
-      </section>
+      {/* ═══ Product Showcase ═══ */}
+      <ProductShowcase />
 
       {/* ═══ Pricing ═══ */}
       <PricingSection />
 
-      {/* ═══ Social Proof ═══ */}
-      <section className="py-24 px-6 bg-muted/30" id="social-proof">
-        <div className="mx-auto max-w-[800px]">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-80px" }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
-            className="p-10 sm:p-12 rounded-2xl bg-card border border-border shadow-sm"
-          >
-            <blockquote
-              className="font-medium leading-[1.6] text-foreground/85"
-              style={{ fontSize: "clamp(1rem, 2.5vw, 1.35rem)" }}
-            >
-              "Found three Pune creators in a week — all delivered on time, all
-              drove walk-ins. Cost less than one Insta agency call."
-            </blockquote>
-            <div className="mt-8 flex items-center gap-3">
-              <Avatar className="h-10 w-10">
-                <AvatarFallback className="text-xs bg-primary/15 text-primary font-semibold">
-                  AD
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <div className="text-sm font-semibold">Aarav Deshpande</div>
-                <div className="text-xs text-muted-foreground">
-                  Owner, Brew Lab · Koregaon Park
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
+      {/* ═══ FAQ ═══ */}
+      <FAQSection />
 
-      {/* ═══ Bottom CTA ═══ */}
-      <section
-        className="relative py-32 px-6 overflow-hidden"
-        id="bottom-cta"
-        style={{
-          background: isDark
-            ? "linear-gradient(180deg, #0f1a4a 0%, #080c24 100%)"
-            : "linear-gradient(180deg, #2353E9 0%, #1B3FCC 100%)",
-        }}
-      >
-        {/* Radial glow */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div
-            className="absolute rounded-full"
-            style={{
-              top: "50%", left: "50%",
-              transform: "translate(-50%, -50%)",
-              width: "60%", height: "90%",
-              background: isDark
-                ? "radial-gradient(ellipse, rgba(35,83,233,0.12) 0%, transparent 70%)"
-                : "radial-gradient(ellipse, rgba(255,255,255,0.08) 0%, transparent 70%)",
-              filter: "blur(60px)",
-            }}
-          />
-        </div>
-
-        <div className="mx-auto max-w-[600px] text-center relative z-10">
-          <motion.h2
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-            className="font-semibold tracking-[-0.03em] text-white leading-[1.1]"
-            style={{
-              fontSize: "clamp(2rem, 4.5vw, 3.2rem)",
-              fontFamily: "'Space Grotesk', sans-serif",
-            }}
-          >
-            Your next collab isn't going to find itself.
-          </motion.h2>
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
-            className="mt-5 text-[15px] text-white/45 max-w-[400px] mx-auto leading-relaxed"
-          >
-            Two minutes to set up. No credit card. No agency middleman.
-            <br />
-            Just real Pune collabs, starting now.
-          </motion.p>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.4, ease: "easeOut" }}
-            className="mt-10 flex justify-center"
-          >
-            <Link to="/register">
-              <button
-                className="group bg-white text-[#2353E9] rounded-full px-8 py-3.5
-                  font-semibold text-sm
-                  shadow-xl shadow-black/[0.08]
-                  hover:shadow-2xl hover:shadow-black/[0.15]
-                  hover:scale-[1.04] active:scale-[0.98]
-                  transition-all duration-300
-                  flex items-center gap-2.5"
-                id="bottom-cta-btn"
-              >
-                Start Collabing Now
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </button>
-            </Link>
-          </motion.div>
-        </div>
-      </section>
+      {/* ═══ Final CTA ═══ */}
+      <FinalCta />
 
       {/* ═══ Footer ═══ */}
-      <footer className="border-t border-border bg-background" id="footer">
-        <div className="mx-auto max-w-[1100px] px-6 py-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Logo className="h-6 w-6 rounded-sm" />
-            <span className="text-xs font-semibold text-muted-foreground tracking-tight">
-              YouCollab
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link to="/contact" className="text-[12px] text-muted-foreground hover:text-foreground transition-colors">
-              Contact
-            </Link>
-            <span className="text-[12px] text-muted-foreground">
-              © {new Date().getFullYear()} YouCollab
-            </span>
-          </div>
-        </div>
-      </footer>
+      <LandingFooter />
     </div>
   );
 };
