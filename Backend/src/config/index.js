@@ -5,10 +5,6 @@ if (!process.env.CLERK_SECRET_KEY) {
   throw new Error('FATAL: CLERK_SECRET_KEY must be set. Auth cannot function without it.');
 }
 
-if (!process.env.RECAPTCHA_SECRET_KEY) {
-  throw new Error('FATAL: RECAPTCHA_SECRET_KEY must be set. Captcha verification cannot function without it.');
-}
-
 module.exports = {
   PORT: process.env.PORT || 5000,
   NODE_ENV: process.env.NODE_ENV || 'development',
@@ -17,11 +13,6 @@ module.exports = {
   CLERK: {
     SECRET_KEY: process.env.CLERK_SECRET_KEY,
     PUBLISHABLE_KEY: process.env.CLERK_PUBLISHABLE_KEY,
-  },
-
-  RECAPTCHA: {
-    SITE_KEY: process.env.RECAPTCHA_SITE_KEY,
-    SECRET_KEY: process.env.RECAPTCHA_SECRET_KEY,
   },
 
   SUPABASE: {

@@ -1,13 +1,11 @@
 import { ArrowRight, Loader2 } from "lucide-react";
-import ReCAPTCHA from "react-google-recaptcha";
 import { Button } from "@/components/common/button";
-import { Captcha } from "@/components/common/Captcha";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/common/label";
 import { Textarea } from "@/components/common/textarea";
 import { Link } from "react-router-dom";
 import { Logo } from "@/components/ui/logo";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { contactService } from "@/services/contact";
@@ -16,15 +14,10 @@ export default function Contact() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const captchaRef = useRef<ReCAPTCHA>(null);
   const { toast } = useToast();
 
   const submit = useMutation({
-    mutationFn: () => {
-      if (!captchaToken) throw new Error("MISSING_CAPTCHA");
-      return contactService.submit({ name, email, message, captchaToken });
-    },
+    mutationFn: () => contactService.submit({ name, email, message }),
     onSuccess: (data) => {
       toast({ title: "Message sent! 📨", description: data.message });
       setName("");
@@ -32,16 +25,8 @@ export default function Contact() {
       setMessage("");
     },
     onError: (err) => {
-      if ((err as Error).message === "MISSING_CAPTCHA") {
-        toast({ variant: "destructive", title: "Verification required", description: "Please complete the \"I'm not a robot\" check." });
-        return;
-      }
       const backendMsg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message;
       toast({ variant: "destructive", title: "Couldn't send message", description: backendMsg || "Something went wrong. Try again." });
-    },
-    onSettled: () => {
-      captchaRef.current?.reset();
-      setCaptchaToken(null);
     },
   });
 
@@ -114,11 +99,9 @@ export default function Contact() {
               />
             </div>
 
-            <Captcha ref={captchaRef} onChange={setCaptchaToken} />
-
             <Button
               type="submit"
-              disabled={submit.isPending || !captchaToken}
+              disabled={submit.isPending}
               className="w-full h-9 text-[13px] rounded-sm gap-1.5"
             >
               {submit.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : (

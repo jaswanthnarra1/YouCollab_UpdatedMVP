@@ -4,7 +4,6 @@ export interface ContactPayload {
   name: string;
   email: string;
   message: string;
-  captchaToken: string;
 }
 
 export const contactService = {

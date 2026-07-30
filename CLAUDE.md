@@ -49,7 +49,7 @@ Auth is **Clerk** — email + password as the primary sign-up/sign-in method, wi
 - Backend: `middleware/auth.js` uses `@clerk/express`'s `getAuth(req)` to read the verified Clerk user ID off the session, then calls `authService.findOrCreateByClerkId()` to lazily provision (or link) the local `public.users` row.
 - `findOrCreateByClerkId()` (`services/auth.service.js`) links by the Clerk identity's email — a pre-existing seed/demo row with a matching `users.email` is linked instead of creating a duplicate.
 - `requireRole('BRAND'|'INFLUENCER')` guards role-specific routes.
-- **Clerk Dashboard requirements** for this instance: Email address enabled/required with `email_code` verification, **Password enabled**, Phone number disabled. Sign-up bot protection ("Smart"/Turnstile CAPTCHA) is handled transparently by `@clerk/clerk-react` — separate from the app's own Google reCAPTCHA v2 widget on the auth forms.
+- **Clerk Dashboard requirements** for this instance: Email address enabled/required with `email_code` verification, **Password enabled**, Phone number disabled. Sign-up bot protection ("Smart"/Turnstile CAPTCHA) is handled transparently by `@clerk/clerk-react`. The app's own Google reCAPTCHA v2 widget (auth forms + contact form) has been removed.
 
 ### Frontend
 - Feature-sliced under `src/features/` (auth, dashboard, gigs, applications, marketplace). Routing in `src/routes/App.tsx` with `ProtectedRoute` / `RoleRoute` guards.
@@ -63,7 +63,7 @@ Postgres via Supabase. `npm run db:migrate` (`Backend/supabase/migrate.js`) conn
 
 ## Environment
 
-Two `.env` files are required (templates in `Backend/.env.example`, `Frontend/.env.example`): Backend needs `CLERK_SECRET_KEY`, `RECAPTCHA_SECRET_KEY` (both fail-fast on startup if unset — see `config/index.js`), Supabase keys, `DATABASE_URL`, Gmail SMTP (`GMAIL_USER`/`GMAIL_APP_PASSWORD` — falls back to console log if unset), `CLIENT_URL` (CORS, comma-separated), and Instagram Graph API keys. Frontend needs `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_API_BASE_URL` (empty in prod → relative calls), and Supabase client keys.
+Two `.env` files are required (templates in `Backend/.env.example`, `Frontend/.env.example`): Backend needs `CLERK_SECRET_KEY` (fails fast on startup if unset — see `config/index.js`), Supabase keys, `DATABASE_URL`, Gmail SMTP (`GMAIL_USER`/`GMAIL_APP_PASSWORD` — falls back to console log if unset), `CLIENT_URL` (CORS, comma-separated), and Instagram Graph API keys. Frontend needs `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_API_BASE_URL` (empty in prod → relative calls), and Supabase client keys.
 
 ## Integrations
 - **Gmail SMTP** via nodemailer (`services/contact.service.js`) for the public contact form.

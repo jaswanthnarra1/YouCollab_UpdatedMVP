@@ -1,15 +1,12 @@
 import { ArrowRight, Loader2 } from "lucide-react";
 import { useAuth, useSignIn, useSignUp } from "@clerk/clerk-react";
-import ReCAPTCHA from "react-google-recaptcha";
-import { verifyCaptchaToken } from "@/services/recaptcha";
 import { Button } from "@/components/common/button";
-import { Captcha } from "@/components/common/Captcha";
 import { Input } from "@/components/common/input";
 import { Label } from "@/components/common/label";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Logo } from "@/components/ui/logo";
 import { useAuthStore, type Role } from "@/stores/authStore";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { clerkErrorMessage } from "@/lib/clerkError";
 import { authService } from "@/services/auth";
@@ -26,22 +23,12 @@ export default function AuthPage({ mode }: Props) {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>(initialRole);
   const [loading, setLoading] = useState(false);
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const captchaRef = useRef<ReCAPTCHA>(null);
   const { setUser } = useAuthStore();
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const { signIn, setActive: setActiveSignIn, isLoaded: signInLoaded } = useSignIn();
   const { signUp, isLoaded: signUpLoaded } = useSignUp();
   const { toast } = useToast();
   const navigate = useNavigate();
-
-  // reCAPTCHA v2 tokens are single-use and short-lived — reset the widget
-  // after every submit attempt (success or failure) so the next attempt
-  // always starts from a fresh, unconsumed token.
-  const resetCaptcha = () => {
-    captchaRef.current?.reset();
-    setCaptchaToken(null);
-  };
 
   // A Clerk session can already be active here — a stale tab, browser back
   // button after signing in, or a tab opened while signed in elsewhere.
@@ -89,13 +76,8 @@ export default function AuthPage({ mode }: Props) {
       navigate("/oauth-role", { replace: true });
       return;
     }
-    if (!captchaToken) {
-      toast({ variant: "destructive", title: "Verification required", description: "Please complete the \"I'm not a robot\" check." });
-      return;
-    }
     setLoading(true);
     try {
-      await verifyCaptchaToken(captchaToken);
       if (mode === "login") {
         if (!signInLoaded) return;
         const result = await signIn.create({ identifier: email, password });
@@ -128,7 +110,6 @@ export default function AuthPage({ mode }: Props) {
         description: backendMsg || clerkErrorMessage(err),
       });
     } finally {
-      resetCaptcha();
       setLoading(false);
     }
   };
@@ -261,11 +242,9 @@ export default function AuthPage({ mode }: Props) {
               />
             </div>
 
-            <Captcha ref={captchaRef} onChange={setCaptchaToken} />
-
             <Button
               type="submit"
-              disabled={loading || !captchaToken}
+              disabled={loading}
               className="w-full h-9 text-[13px] rounded-sm gap-1.5"
             >
               {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : (
