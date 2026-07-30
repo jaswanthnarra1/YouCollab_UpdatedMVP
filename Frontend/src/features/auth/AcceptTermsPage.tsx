@@ -2,7 +2,7 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/
 import { authService } from "@/services/auth";
 import { Button } from "@/components/common/button";
 import { Checkbox } from "@/components/common/checkbox";
-import { Loader2, Shield } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Label } from "@/components/common/label";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/layout/Navbar";
@@ -104,9 +104,6 @@ export default function AcceptTermsPage() {
           className="border border-border rounded-sm bg-background p-8 space-y-6"
         >
           <div className="flex flex-col items-center text-center gap-3">
-            <div className="h-11 w-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20">
-              <Shield className="h-5 w-5" />
-            </div>
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">Welcome to YouCollab</h1>
               <p className="text-[13px] text-muted-foreground mt-2 max-w-md mx-auto">
