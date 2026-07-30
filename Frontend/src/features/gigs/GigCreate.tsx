@@ -214,9 +214,9 @@ export default function GigCreate() {
               value={title} 
               onChange={(e) => { setTitle(e.target.value); if (errors.title) setErrors(prev => ({ ...prev, title: "" })); }} 
               placeholder="Reel collab for new espresso launch" 
-              className={`h-9 text-[13px] rounded-sm ${errors.title ? "border-red-500 focus-visible:ring-red-500" : ""}`} 
+              className={`h-9 text-[13px] rounded-sm ${errors.title ? "border-destructive focus-visible:ring-destructive" : ""}`} 
             />
-            {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
+            {errors.title && <p className="text-destructive text-xs mt-1">{errors.title}</p>}
           </div>
 
           {/* Category, Platform, Campaign Type */}
@@ -224,18 +224,18 @@ export default function GigCreate() {
             <div className="space-y-1.5">
               <Label className="text-[12px]">Category</Label>
               <Select value={category} onValueChange={(val) => { setCategory(val); if (errors.category) setErrors(prev => ({ ...prev, category: "" })); }}>
-                <SelectTrigger className={`h-9 text-[13px] rounded-sm bg-background border-border ${errors.category ? "border-red-500" : ""}`}>
+                <SelectTrigger className={`h-9 text-[13px] rounded-sm bg-background border-border ${errors.category ? "border-destructive" : ""}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}</SelectContent>
               </Select>
-              {errors.category && <p className="text-red-500 text-xs mt-1">{errors.category}</p>}
+              {errors.category && <p className="text-destructive text-xs mt-1">{errors.category}</p>}
             </div>
             
             <div className="space-y-1.5">
               <Label className="text-[12px]">Platform</Label>
               <Select value={platform} onValueChange={(val) => { setPlatform(val); if (errors.platform) setErrors(prev => ({ ...prev, platform: "" })); }}>
-                <SelectTrigger className={`h-9 text-[13px] rounded-sm bg-background border-border ${errors.platform ? "border-red-500" : ""}`}>
+                <SelectTrigger className={`h-9 text-[13px] rounded-sm bg-background border-border ${errors.platform ? "border-destructive" : ""}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -245,13 +245,13 @@ export default function GigCreate() {
                   <SelectItem value="LinkedIn">LinkedIn</SelectItem>
                 </SelectContent>
               </Select>
-              {errors.platform && <p className="text-red-500 text-xs mt-1">{errors.platform}</p>}
+              {errors.platform && <p className="text-destructive text-xs mt-1">{errors.platform}</p>}
             </div>
 
             <div className="space-y-1.5">
               <Label className="text-[12px]">Campaign Type</Label>
               <Select value={campaignType} onValueChange={(val) => { setCampaignType(val); if (errors.campaignType) setErrors(prev => ({ ...prev, campaignType: "" })); }}>
-                <SelectTrigger className={`h-9 text-[13px] rounded-sm bg-background border-border ${errors.campaignType ? "border-red-500" : ""}`}>
+                <SelectTrigger className={`h-9 text-[13px] rounded-sm bg-background border-border ${errors.campaignType ? "border-destructive" : ""}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -260,7 +260,7 @@ export default function GigCreate() {
                   <SelectItem value="Sponsorship">Sponsorship</SelectItem>
                 </SelectContent>
               </Select>
-              {errors.campaignType && <p className="text-red-500 text-xs mt-1">{errors.campaignType}</p>}
+              {errors.campaignType && <p className="text-destructive text-xs mt-1">{errors.campaignType}</p>}
             </div>
           </div>
 
@@ -274,7 +274,7 @@ export default function GigCreate() {
                 placeholder="Pune"
                 className="h-9 text-[13px] rounded-sm"
               />
-              {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
+              {errors.city && <p className="text-destructive text-xs mt-1">{errors.city}</p>}
             </div>
 
             <div className="space-y-1.5">
@@ -298,9 +298,9 @@ export default function GigCreate() {
                 type="date"
                 value={deadline}
                 onChange={(e) => { setDeadline(e.target.value); if (errors.deadline) setErrors(prev => ({ ...prev, deadline: "" })); }}
-                className={`h-9 text-[13px] rounded-sm cursor-pointer ${errors.deadline ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                className={`h-9 text-[13px] rounded-sm cursor-pointer ${errors.deadline ? "border-destructive focus-visible:ring-destructive" : ""}`}
               />
-              {errors.deadline && <p className="text-red-500 text-xs mt-1">{errors.deadline}</p>}
+              {errors.deadline && <p className="text-destructive text-xs mt-1">{errors.deadline}</p>}
             </div>
           </div>
 
@@ -312,9 +312,9 @@ export default function GigCreate() {
               onChange={(e) => { setDescription(e.target.value); if (errors.description) setErrors(prev => ({ ...prev, description: "" })); }} 
               rows={4} 
               placeholder="What is the goal of this campaign? (Minimum 20 characters)" 
-              className={`text-[13px] rounded-sm ${errors.description ? "border-red-500 focus-visible:ring-red-500" : ""}`} 
+              className={`text-[13px] rounded-sm ${errors.description ? "border-destructive focus-visible:ring-destructive" : ""}`} 
             />
-            {errors.description && <p className="text-red-500 text-xs mt-1">{errors.description}</p>}
+            {errors.description && <p className="text-destructive text-xs mt-1">{errors.description}</p>}
           </div>
 
           {/* Deliverables */}
@@ -325,9 +325,9 @@ export default function GigCreate() {
               onChange={(e) => { setDeliverables(e.target.value); if (errors.deliverables) setErrors(prev => ({ ...prev, deliverables: "" })); }} 
               rows={3} 
               placeholder="e.g. 1 reel + 3 stories within 7 days" 
-              className={`text-[13px] rounded-sm ${errors.deliverables ? "border-red-500 focus-visible:ring-red-500" : ""}`} 
+              className={`text-[13px] rounded-sm ${errors.deliverables ? "border-destructive focus-visible:ring-destructive" : ""}`} 
             />
-            {errors.deliverables && <p className="text-red-500 text-xs mt-1">{errors.deliverables}</p>}
+            {errors.deliverables && <p className="text-destructive text-xs mt-1">{errors.deliverables}</p>}
           </div>
 
           {/* Creator Requirements */}
@@ -338,9 +338,9 @@ export default function GigCreate() {
               onChange={(e) => { setRequirements(e.target.value); if (errors.requirements) setErrors(prev => ({ ...prev, requirements: "" })); }} 
               rows={2} 
               placeholder="e.g. Min 5k followers, Pune base, fashion niche" 
-              className={`text-[13px] rounded-sm ${errors.requirements ? "border-red-500 focus-visible:ring-red-500" : ""}`} 
+              className={`text-[13px] rounded-sm ${errors.requirements ? "border-destructive focus-visible:ring-destructive" : ""}`} 
             />
-            {errors.requirements && <p className="text-red-500 text-xs mt-1">{errors.requirements}</p>}
+            {errors.requirements && <p className="text-destructive text-xs mt-1">{errors.requirements}</p>}
           </div>
 
           {/* Budget min & Budget max */}
@@ -352,9 +352,9 @@ export default function GigCreate() {
                 min={0} 
                 value={budgetMin} 
                 onChange={(e) => { setBudgetMin(e.target.value === "" ? "" : Number(e.target.value)); if (errors.budgetMin) setErrors(prev => ({ ...prev, budgetMin: "" })); }} 
-                className={`h-9 text-[13px] rounded-sm ${errors.budgetMin ? "border-red-500 focus-visible:ring-red-500" : ""}`} 
+                className={`h-9 text-[13px] rounded-sm ${errors.budgetMin ? "border-destructive focus-visible:ring-destructive" : ""}`} 
               />
-              {errors.budgetMin && <p className="text-red-500 text-xs mt-1">{errors.budgetMin}</p>}
+              {errors.budgetMin && <p className="text-destructive text-xs mt-1">{errors.budgetMin}</p>}
             </div>
             <div className="space-y-1.5">
               <Label className="text-[12px]">Budget max (₹)</Label>
@@ -363,9 +363,9 @@ export default function GigCreate() {
                 min={0} 
                 value={budgetMax} 
                 onChange={(e) => { setBudgetMax(e.target.value === "" ? "" : Number(e.target.value)); if (errors.budgetMax) setErrors(prev => ({ ...prev, budgetMax: "" })); }} 
-                className={`h-9 text-[13px] rounded-sm ${errors.budgetMax ? "border-red-500 focus-visible:ring-red-500" : ""}`} 
+                className={`h-9 text-[13px] rounded-sm ${errors.budgetMax ? "border-destructive focus-visible:ring-destructive" : ""}`} 
               />
-              {errors.budgetMax && <p className="text-red-500 text-xs mt-1">{errors.budgetMax}</p>}
+              {errors.budgetMax && <p className="text-destructive text-xs mt-1">{errors.budgetMax}</p>}
             </div>
           </div>
 
@@ -387,7 +387,7 @@ export default function GigCreate() {
                 : "How many creators can apply to this campaign. Minimum 1."}
             </p>
             {planUsage && planUsage.campaignsRemaining === 0 && (
-              <p className="text-[11px] text-amber-400">
+              <p className="text-[11px] text-warning">
                 You've used all {planUsage.plan.campaignLimit} campaigns on {planUsage.plan.name}. Close one or save this as a draft.
               </p>
             )}

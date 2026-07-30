@@ -127,15 +127,15 @@ export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: Sid
   };
 
   return (
-    <aside className={`${collapsed ? "w-[68px]" : "w-64"} border-r border-border bg-[#0B0D17] flex flex-col h-full shrink-0 text-foreground transition-[width] duration-200`}>
+    <aside className={`${collapsed ? "w-[68px]" : "w-64"} border-r border-sidebar-border bg-sidebar flex flex-col h-full shrink-0 text-sidebar-foreground transition-[width] duration-200`}>
       {/* Brand Header */}
-      <div className={`border-b border-border/40 flex items-center ${collapsed ? "justify-center p-4" : "justify-between p-6"}`}>
+      <div className={`border-b border-sidebar-border flex items-center ${collapsed ? "justify-center p-4" : "justify-between p-6"}`}>
         <Link to="/" className={`flex items-center gap-2 hover:opacity-80 transition-opacity min-w-0 ${collapsed ? "justify-center" : ""}`}>
           <Logo className="h-8 w-8 rounded-sm shrink-0" />
           {!collapsed && (
             <>
-              <span className="text-sm font-semibold tracking-tight whitespace-nowrap">You Collab</span>
-              <span className="ml-2 border border-border px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted-foreground rounded-sm whitespace-nowrap">
+              <span className="text-sm font-semibold tracking-tight whitespace-nowrap text-sidebar-accent-foreground">You Collab</span>
+              <span className="ml-2 border border-sidebar-border px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-sidebar-foreground rounded-sm whitespace-nowrap">
                 Pune
               </span>
             </>
@@ -145,7 +145,7 @@ export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: Sid
         {onToggleCollapse && !collapsed && (
           <button
             onClick={onToggleCollapse}
-            className="h-7 w-7 flex items-center justify-center rounded-sm text-muted-foreground hover:text-foreground hover:bg-zinc-800/40 transition-colors shrink-0"
+            className="h-7 w-7 flex items-center justify-center rounded-sm text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent transition-colors shrink-0"
             title="Collapse sidebar"
             aria-label="Collapse sidebar"
           >
@@ -155,10 +155,10 @@ export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: Sid
       </div>
 
       {collapsed && onToggleCollapse && (
-        <div className="flex justify-center py-2 border-b border-border/40">
+        <div className="flex justify-center py-2 border-b border-sidebar-border">
           <button
             onClick={onToggleCollapse}
-            className="h-7 w-7 flex items-center justify-center rounded-sm text-muted-foreground hover:text-foreground hover:bg-zinc-800/40 transition-colors"
+            className="h-7 w-7 flex items-center justify-center rounded-sm text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent transition-colors"
             title="Expand sidebar"
             aria-label="Expand sidebar"
           >
@@ -178,8 +178,8 @@ export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: Sid
               collapsed ? "justify-center" : ""
             } ${
               item.active
-                ? "bg-zinc-800/80 text-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-zinc-800/30"
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                : "text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/60"
             }`}
           >
             <item.icon className="h-4 w-4 shrink-0" />
@@ -189,7 +189,7 @@ export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: Sid
       </nav>
 
       {/* User Footer Profile */}
-      <div className={`border-t border-border/40 flex items-center gap-3 bg-[#080A10] ${collapsed ? "justify-center p-3" : "justify-between p-4"}`}>
+      <div className={`border-t border-sidebar-border flex items-center gap-3 ${collapsed ? "justify-center p-3" : "justify-between p-4"}`}>
         <div className={`flex items-center gap-2 min-w-0 ${collapsed ? "" : ""}`}>
           <div className="h-8 w-8 rounded-full bg-primary/20 text-primary border border-primary/30 flex items-center justify-center font-bold text-xs shrink-0" title={collapsed ? user.name || "User" : undefined}>
             {user.avatarUrl ? (
@@ -200,8 +200,8 @@ export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: Sid
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <p className="text-[12px] font-semibold truncate leading-tight text-foreground">{user.name || "User"}</p>
-              <p className="text-[10px] text-muted-foreground truncate leading-none mt-0.5">{user.role}</p>
+              <p className="text-[12px] font-semibold truncate leading-tight text-sidebar-accent-foreground">{user.name || "User"}</p>
+              <p className="text-[10px] text-sidebar-foreground truncate leading-none mt-0.5">{user.role}</p>
             </div>
           )}
         </div>
@@ -211,7 +211,7 @@ export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: Sid
             {...logoutConfirmProps}
             trigger={
               <button
-                className="h-8 w-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-zinc-800/30 transition-colors rounded-sm shrink-0"
+                className="h-8 w-8 flex items-center justify-center text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent transition-colors rounded-sm shrink-0"
                 title="Sign out"
               >
                 <LogOut className="h-4.5 w-4.5" />
@@ -226,7 +226,7 @@ export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: Sid
           {...logoutConfirmProps}
           trigger={
             <button
-              className="h-9 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-zinc-800/30 transition-colors border-t border-border/40 bg-[#080A10]"
+              className="h-9 flex items-center justify-center text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent transition-colors border-t border-sidebar-border"
               title="Sign out"
             >
               <LogOut className="h-4 w-4" />

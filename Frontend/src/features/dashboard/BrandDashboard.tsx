@@ -406,13 +406,13 @@ export default function BrandDashboard() {
                         {planUsage.slotsAllocated}/{planUsage.plan.applicationSlotLimit}
                       </span>
                     </span>
-                    <span className={planUsage.campaignsRemaining === 0 ? "text-amber-400" : "text-muted-foreground"}>
+                    <span className={planUsage.campaignsRemaining === 0 ? "text-warning" : "text-muted-foreground"}>
                       {planUsage.campaignsRemaining} campaign{planUsage.campaignsRemaining === 1 ? "" : "s"} left
                     </span>
                   </div>
                 </div>
                 {planUsage.campaignsRemaining === 0 && (
-                  <p className="mt-2 text-[11px] text-amber-400">
+                  <p className="mt-2 text-[11px] text-warning">
                     You've used every campaign on the {planUsage.plan.name} plan. Close one or upgrade to publish another.
                   </p>
                 )}
@@ -428,7 +428,7 @@ export default function BrandDashboard() {
                 { label: "Pending Reviews", value: totalPendingReviews, icon: Eye },
               ].map((stat) => (
                 <div key={stat.label} className="border border-border rounded-sm p-4 bg-background flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-sm border border-border flex items-center justify-center bg-[#0B0D17]/40 shrink-0">
+                  <div className="h-9 w-9 rounded-sm border border-border flex items-center justify-center bg-muted shrink-0">
                     <stat.icon className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div>
@@ -476,10 +476,10 @@ export default function BrandDashboard() {
                           )}
                           <p className="text-[11px] text-muted-foreground mt-0.5">
                             {act.type === "gig_published" ? (
-                              <span className="text-emerald-400 font-medium">PUBLISHED</span>
+                              <span className="text-success font-medium">PUBLISHED</span>
                             ) : (
                               <>
-                                Status: <span className={act.status === "ACCEPTED" ? "text-emerald-400" : act.status === "REJECTED" ? "text-red-400" : "text-yellow-400"}>{act.status}</span>
+                                Status: <span className={act.status === "ACCEPTED" ? "text-success" : act.status === "REJECTED" ? "text-destructive" : "text-warning"}>{act.status}</span>
                               </>
                             )}
                           </p>
@@ -571,7 +571,7 @@ export default function BrandDashboard() {
                 return (
                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filtered.map((g) => (
-                      <div key={g.id} className="border border-border rounded-sm p-5 bg-background flex flex-col justify-between hover:border-zinc-500/50 transition-colors">
+                      <div key={g.id} className="border border-border rounded-sm p-5 bg-background flex flex-col justify-between hover:border-primary/40 transition-colors">
                         <div>
                           <div className="flex items-center justify-between text-[11px] uppercase tracking-wider text-muted-foreground">
                             <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> {g.city || "Pune"}</span>
@@ -626,13 +626,13 @@ export default function BrandDashboard() {
                                 <div className="text-[11px] text-muted-foreground">
                                   <span className="font-semibold text-foreground">{received} / {slots}</span> Applications
                                   {" — "}
-                                  <span className={remaining === 0 ? "text-amber-400" : ""}>
+                                  <span className={remaining === 0 ? "text-warning" : ""}>
                                     {remaining} slot{remaining === 1 ? "" : "s"} remaining
                                   </span>
                                 </div>
                                 <div className="h-1 w-full bg-border/40 rounded-sm overflow-hidden">
                                   <div
-                                    className={`h-full ${remaining === 0 ? "bg-amber-500" : "bg-emerald-500"}`}
+                                    className={`h-full ${remaining === 0 ? "bg-warning" : "bg-success"}`}
                                     style={{ width: `${Math.min(100, (received / Math.max(1, slots)) * 100)}%` }}
                                   />
                                 </div>
@@ -642,7 +642,7 @@ export default function BrandDashboard() {
                                   </p>
                                 )}
                                 {status === "EXPIRED" && (
-                                  <p className="text-[11px] text-amber-400">Applications closed — expired</p>
+                                  <p className="text-[11px] text-warning">Applications closed — expired</p>
                                 )}
                               </div>
                             );
@@ -683,7 +683,7 @@ export default function BrandDashboard() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 rounded-sm shrink-0 border border-border text-emerald-400 hover:bg-emerald-500/10"
+                              className="h-8 w-8 rounded-sm shrink-0 border border-border text-success hover:bg-success/10"
                               title="Publish campaign"
                               onClick={() => publishGig.mutate(g.id)}
                               disabled={publishGig.isPending}
@@ -713,7 +713,7 @@ export default function BrandDashboard() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 rounded-sm shrink-0 border border-border hover:bg-destructive/10 text-muted-foreground hover:text-red-500"
+                                className="h-8 w-8 rounded-sm shrink-0 border border-border hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
                                 title="Delete campaign"
                                 disabled={deleteGig.isPending}
                               >
@@ -849,7 +849,7 @@ export default function BrandDashboard() {
                       const isShortlisted = shortlistedIds.includes(a.id);
 
                       return (
-                        <div key={a.id} className="border border-border rounded-sm p-5 bg-background flex flex-col justify-between hover:border-zinc-500/50 transition-colors">
+                        <div key={a.id} className="border border-border rounded-sm p-5 bg-background flex flex-col justify-between hover:border-primary/40 transition-colors">
                           <div>
                             {/* Card top details */}
                             <div className="flex items-start gap-4">
@@ -884,7 +884,7 @@ export default function BrandDashboard() {
 
                             {/* Stats */}
                             {hasIgStats && (
-                              <div className="mt-3 grid grid-cols-3 gap-2 bg-[#0B0D17]/40 p-2 rounded-sm border border-border/60">
+                              <div className="mt-3 grid grid-cols-3 gap-2 bg-muted p-2 rounded-sm border border-border/60">
                                 <div className="text-center">
                                   <p className="text-[9px] uppercase tracking-wider text-muted-foreground">Followers</p>
                                   <p className="text-xs font-semibold mt-0.5">{(ig.followerCount || ig.followersCount || 0).toLocaleString()}</p>
@@ -911,21 +911,21 @@ export default function BrandDashboard() {
 
                             {/* Shared details if ACCEPTED */}
                             {a.status === "ACCEPTED" && (
-                              <div className="mt-3 bg-emerald-500/5 border border-emerald-500/25 p-3 rounded-sm space-y-2">
-                                <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold">
+                              <div className="mt-3 bg-success/5 border border-success/25 p-3 rounded-sm space-y-2">
+                                <div className="flex items-center gap-1.5 text-success text-xs font-bold">
                                   <Mail className="h-3.5 w-3.5" /> Collaboration Details (Emails Shared)
                                 </div>
                                 <div className="text-[11px] space-y-1 text-muted-foreground">
                                   <p>Creator Email: <span className="font-semibold text-foreground select-all">{ig?.user?.email || "Shared"}</span></p>
                                   <p>Your Brand Email: <span className="font-semibold text-foreground select-all">{user?.email || "Shared"}</span></p>
                                 </div>
-                                <p className="text-[10px] text-emerald-500/70 italic">Creator approved successfully. Contact information has been shared.</p>
+                                <p className="text-[10px] text-success/70 italic">Creator approved successfully. Contact information has been shared.</p>
                               </div>
                             )}
 
                             {/* Info if REJECTED */}
                             {a.status === "REJECTED" && (
-                              <div className="mt-3 bg-red-500/5 border border-red-500/10 p-2.5 rounded-sm text-[11px] text-red-400">
+                              <div className="mt-3 bg-destructive/5 border border-destructive/10 p-2.5 rounded-sm text-[11px] text-destructive">
                                 Application rejected. Contact information remains hidden.
                               </div>
                             )}
@@ -954,7 +954,7 @@ export default function BrandDashboard() {
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      className="h-8 text-[12px] rounded-sm text-red-400 hover:text-red-300 border-red-500/20 hover:bg-red-500/5"
+                                      className="h-8 text-[12px] rounded-sm text-destructive hover:text-destructive border-destructive/20 hover:bg-destructive/5"
                                       disabled={updateAppStatus.isPending}
                                     >
                                       <X className="h-3.5 w-3.5 mr-1" /> Reject
@@ -990,7 +990,7 @@ export default function BrandDashboard() {
             
             {/* Chat List (Col-4) */}
             <div className="md:col-span-4 border-r border-border flex flex-col">
-              <div className="p-4 border-b border-border bg-[#0B0D17]/40">
+              <div className="p-4 border-b border-border bg-muted">
                 <h3 className="text-sm font-semibold tracking-tight uppercase text-muted-foreground">Collaborators</h3>
                 <p className="text-[10px] text-muted-foreground">Direct DMs with approved creator partners.</p>
               </div>
@@ -1012,7 +1012,7 @@ export default function BrandDashboard() {
                         key={collab.id}
                         onClick={() => setSelectedChatPartner(collab)}
                         className={`w-full p-4 flex items-center gap-3 text-left transition-colors ${
-                          active ? "bg-zinc-800/80" : "hover:bg-zinc-800/20"
+                          active ? "bg-accent" : "hover:bg-accent/50"
                         }`}
                       >
                         <div className="h-9 w-9 rounded-sm bg-gradient-brand shrink-0 flex items-center justify-center text-primary-foreground font-bold text-sm overflow-hidden">
@@ -1041,12 +1041,12 @@ export default function BrandDashboard() {
                 {selectedChatPartner ? (
                   <>
                     {/* Header */}
-                    <div className="p-4 border-b border-border bg-[#0B0D17]/40 flex items-center justify-between">
+                    <div className="p-4 border-b border-border bg-muted flex items-center justify-between">
                       <div>
                         <h4 className="font-semibold text-xs text-foreground">{(selectedChatPartner.influencer as any)?.name}</h4>
                         <p className="text-[9px] text-muted-foreground uppercase mt-0.5">Approved Collaboration Partner</p>
                       </div>
-                      <span className="inline-flex border border-border px-1.5 py-0.5 text-[8px] uppercase tracking-wider rounded-sm text-emerald-400 bg-emerald-500/5 border-emerald-500/25">Connected</span>
+                      <span className="inline-flex border border-border px-1.5 py-0.5 text-[8px] uppercase tracking-wider rounded-sm text-success bg-success/5 border-success/25">Connected</span>
                     </div>
 
                     {/* Messages List */}
@@ -1111,7 +1111,7 @@ export default function BrandDashboard() {
               </div>
 
               {/* Collab Details / Info sidebar (1/3 columns) */}
-              <div className="p-4 bg-[#0B0D17]/40 flex flex-col justify-between">
+              <div className="p-4 bg-muted flex flex-col justify-between">
                 {selectedChatPartner ? (
                   <div className="space-y-4 text-xs">
                     <h4 className="font-semibold uppercase tracking-wider text-muted-foreground text-[10px]">Collaboration Details</h4>
@@ -1189,15 +1189,15 @@ export default function BrandDashboard() {
                 </div>
                 <div className="flex justify-between border-t border-border/60 pt-1.5 mt-1.5">
                   <span className="text-muted-foreground">Remaining after this hire</span>
-                  <span className={`font-semibold ${insufficient ? "text-red-400" : "text-primary"}`}>
+                  <span className={`font-semibold ${insufficient ? "text-destructive" : "text-primary"}`}>
                     {locked ? "—" : remainingAfter}
                   </span>
                 </div>
                 {locked && (
-                  <p className="text-amber-500 pt-1">Mid-tier creators unlock after the trial pack — can't hire yet.</p>
+                  <p className="text-warning pt-1">Mid-tier creators unlock after the trial pack — can't hire yet.</p>
                 )}
                 {insufficient && (
-                  <p className="text-amber-500 pt-1">Not enough trial credits left for this hire.</p>
+                  <p className="text-warning pt-1">Not enough trial credits left for this hire.</p>
                 )}
               </div>
             );
@@ -1207,7 +1207,7 @@ export default function BrandDashboard() {
             <Button
               variant="ghost"
               onClick={() => { setConfirmApproveOpen(false); setSelectedAppToApprove(null); }}
-              className="h-9 text-xs rounded-sm hover:bg-zinc-800"
+              className="h-9 text-xs rounded-sm"
             >
               Cancel
             </Button>
@@ -1253,7 +1253,7 @@ export default function BrandDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 bg-[#0B0D17]/40 p-3 rounded-sm border border-border">
+                <div className="grid grid-cols-2 gap-2 bg-muted p-3 rounded-sm border border-border">
                   <div>
                     <p className="text-[10px] text-muted-foreground">Primary Niche</p>
                     <p className="text-xs font-semibold text-foreground">{(viewingCreator.influencer as any)?.niche}</p>
@@ -1329,12 +1329,12 @@ export default function BrandDashboard() {
                 </div>
 
                 {tooFew && (
-                  <p className="text-[11px] text-amber-400">
+                  <p className="text-[11px] text-warning">
                     This campaign already received {received} application{received === 1 ? "" : "s"} — allocate at least that many.
                   </p>
                 )}
                 {tooMany && (
-                  <p className="text-[11px] text-amber-400">
+                  <p className="text-[11px] text-warning">
                     Only {poolMax} slots available on your {planUsage?.plan.name} plan.
                   </p>
                 )}

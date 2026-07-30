@@ -158,10 +158,10 @@ export default function GigDetail() {
                   <div className="space-y-4">
                     <div className={`p-3 border rounded-sm flex items-start gap-3 text-[12px] ${
                       application?.status === "ACCEPTED"
-                        ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400"
+                        ? "bg-success/10 border-success/25 text-success"
                         : application?.status === "REJECTED"
-                        ? "bg-red-500/10 border-red-500/25 text-red-400"
-                        : "bg-amber-500/10 border-amber-500/25 text-amber-400"
+                        ? "bg-destructive/10 border-destructive/25 text-destructive"
+                        : "bg-warning/10 border-warning/25 text-warning"
                     }`}>
                       {application?.status === "ACCEPTED" && <CheckCircle2 className="h-4 w-4 shrink-0" />}
                       {application?.status === "REJECTED" && <XCircle className="h-4 w-4 shrink-0" />}
@@ -183,7 +183,7 @@ export default function GigDetail() {
                   </div>
                 ) : resolveGigStatus(gig) === "EXPIRED" ? (
                   <div className="space-y-1">
-                    <p className="text-[13px] font-medium text-amber-400">Applications Closed</p>
+                    <p className="text-[13px] font-medium text-warning">Applications Closed</p>
                     <p className="text-[12px] text-muted-foreground">
                       This collab expired{gig.expiresAt ? ` on ${new Date(gig.expiresAt).toLocaleDateString()}` : ""} and is no longer accepting pitches.
                     </p>
@@ -192,7 +192,7 @@ export default function GigDetail() {
                   <p className="text-[13px] text-muted-foreground">Applications are now closed for this collab campaign.</p>
                 ) : isAtCapacity ? (
                   <div className="space-y-1">
-                    <p className="text-[13px] font-medium text-amber-400">Applications Closed</p>
+                    <p className="text-[13px] font-medium text-warning">Applications Closed</p>
                     <p className="text-[12px] text-muted-foreground">This collaboration has reached its application limit.</p>
                   </div>
                 ) : (

@@ -165,7 +165,7 @@ function GigCard({ gig, hasApplied, status, onClick }: { gig: Gig; hasApplied: b
           )}
         </div>
         {posted && <p className="mt-1.5 text-[11px] text-muted-foreground">Posted {posted}</p>}
-        {expired && <p className="mt-2 text-[12px] font-semibold text-red-500">Gig expired</p>}
+        {expired && <p className="mt-2 text-[12px] font-semibold text-destructive">Gig expired</p>}
       </div>
 
       <div className="mt-4 flex gap-2">
@@ -173,11 +173,11 @@ function GigCard({ gig, hasApplied, status, onClick }: { gig: Gig; hasApplied: b
           <Link to={`/gigs/${gig.id}`}>View brief</Link>
         </Button>
         {hasApplied ? (
-          <Button disabled variant="secondary" size="sm" className="flex-1 h-8 text-[12px] rounded-sm bg-zinc-500/10 text-zinc-400 border border-zinc-500/25">
+          <Button disabled variant="secondary" size="sm" className="flex-1 h-8 text-[12px] rounded-sm bg-muted text-muted-foreground border border-border">
             Applied ({status})
           </Button>
         ) : expired ? (
-          <Button disabled variant="outline" size="sm" className="flex-1 h-8 text-[12px] rounded-sm border-red-500/25 text-red-500">
+          <Button disabled variant="outline" size="sm" className="flex-1 h-8 text-[12px] rounded-sm border-destructive/25 text-destructive">
             Gig expired
           </Button>
         ) : (
@@ -234,7 +234,7 @@ function ApplyDialog({ gig, onClose }: { gig: Gig | null; onClose: () => void })
                 <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={5} placeholder="Why are you a great fit?" className="text-[13px] rounded-sm" />
               </div>
               {apply.isError && (
-                <p className="flex items-start gap-1.5 text-[12px] text-red-500 border border-red-500/25 bg-red-500/10 rounded-sm px-3 py-2">
+                <p className="flex items-start gap-1.5 text-[12px] text-destructive border border-destructive/25 bg-destructive/10 rounded-sm px-3 py-2">
                   <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                   {extractErrorMessage(apply.error, "Something went wrong. Try again.")}
                 </p>
@@ -512,8 +512,8 @@ export default function InfluencerDashboard() {
                   <Loader2 className="h-4 w-4 animate-spin mx-auto" />
                 </div>
               ) : gigsFailed ? (
-                <div className="border border-red-500/25 bg-red-500/10 rounded-sm p-10 text-center text-[13px] space-y-3">
-                  <p className="flex items-center justify-center gap-1.5 text-red-500 font-medium">
+                <div className="border border-destructive/25 bg-destructive/10 rounded-sm p-10 text-center text-[13px] space-y-3">
+                  <p className="flex items-center justify-center gap-1.5 text-destructive font-medium">
                     <AlertCircle className="h-4 w-4" /> Couldn't load gigs — {extractErrorMessage(gigsError, "please try again.")}
                   </p>
                   <Button size="sm" variant="outline" onClick={() => refetchGigs()} disabled={gigsFetching} className="h-8 text-[12px] rounded-sm">
@@ -557,10 +557,10 @@ export default function InfluencerDashboard() {
                           <div className="flex items-center gap-1.5">
                             <span className={`px-1.5 py-0.5 rounded-sm text-[9px] font-bold ${
                               a.status === "ACCEPTED"
-                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/25"
+                                ? "bg-success/10 text-success border border-success/25"
                                 : a.status === "REJECTED" || a.status === "CANCELLED"
-                                ? "bg-red-500/10 text-red-400 border border-red-500/25"
-                                : "bg-amber-500/10 text-amber-400 border border-amber-500/25"
+                                ? "bg-destructive/10 text-destructive border border-destructive/25"
+                                : "bg-warning/10 text-warning border border-warning/25"
                             }`}>
                               {a.status}
                             </span>
@@ -572,7 +572,7 @@ export default function InfluencerDashboard() {
                           Brand: <span className="text-foreground font-medium">{a.gig?.brand?.businessName || "Anonymous"}</span>
                         </p>
                         {a.status === "PENDING" && resolveGigStatus(a.gig) === "EXPIRED" && (
-                          <p className="mt-1.5 text-[12px] font-semibold text-red-500">Gig expired</p>
+                          <p className="mt-1.5 text-[12px] font-semibold text-destructive">Gig expired</p>
                         )}
 
                         <div className="mt-3 bg-muted/40 rounded-sm p-3 border border-border/30">
@@ -606,7 +606,7 @@ export default function InfluencerDashboard() {
                                 disabled={withdrawPitch.isPending}
                                 variant="outline"
                                 size="sm"
-                                className="h-8 text-[12px] rounded-sm border-red-500/25 text-red-400 hover:bg-red-500/10 hover:text-red-400"
+                                className="h-8 text-[12px] rounded-sm border-destructive/25 text-destructive hover:bg-destructive/10 hover:text-destructive"
                               >
                                 <X className="h-3.5 w-3.5 mr-1" /> Withdraw Pitch
                               </Button>

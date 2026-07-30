@@ -5,10 +5,10 @@ import type { GigStatus } from "@/types";
  * detail page and marketplace can't drift apart on wording or colour.
  */
 const STATUS_STYLES: Record<GigStatus, { label: string; className: string }> = {
-  ACTIVE: { label: "Active", className: "border-emerald-500/25 text-emerald-400 bg-emerald-500/10" },
-  EXPIRED: { label: "Expired", className: "border-amber-500/25 text-amber-400 bg-amber-500/10" },
+  ACTIVE: { label: "Active", className: "border-success/25 text-success bg-success/10" },
+  EXPIRED: { label: "Expired", className: "border-warning/25 text-warning bg-warning/10" },
   CLOSED: { label: "Closed", className: "border-border text-muted-foreground" },
-  DRAFT: { label: "Draft", className: "border-sky-500/25 text-sky-400 bg-sky-500/10" },
+  DRAFT: { label: "Draft", className: "border-info/25 text-info bg-info/10" },
 };
 
 /**

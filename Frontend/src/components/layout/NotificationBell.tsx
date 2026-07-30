@@ -54,18 +54,18 @@ export function NotificationBell() {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
-          className="relative h-8 w-8 flex items-center justify-center rounded-full border border-border text-muted-foreground hover:text-foreground hover:bg-zinc-800/40 transition-colors shrink-0"
+          className="relative h-8 w-8 flex items-center justify-center rounded-full border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
           title="Notifications"
         >
           <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent side="bottom" align="end" className="w-[320px] p-0 bg-[#12141C] border-border">
+      <PopoverContent side="bottom" align="end" className="w-[320px] p-0 bg-popover border-border">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
           <span className="text-[12px] font-semibold uppercase tracking-wider text-foreground">Notifications</span>
           {unreadCount > 0 && (
@@ -89,7 +89,7 @@ export function NotificationBell() {
               <button
                 key={n.id}
                 onClick={() => !n.isRead && markRead.mutate(n.id)}
-                className={`w-full text-left px-4 py-3 transition-colors hover:bg-white/[0.03] ${
+                className={`w-full text-left px-4 py-3 transition-colors hover:bg-accent/50 ${
                   !n.isRead ? "bg-primary/[0.04]" : ""
                 }`}
               >

@@ -150,7 +150,7 @@ export default function Marketplace() {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredGigs.map((g) => (
-              <div key={g.id} className="border border-border rounded-sm p-5 bg-background flex flex-col justify-between hover:border-zinc-500/50 transition-colors">
+              <div key={g.id} className="border border-border rounded-sm p-5 bg-background flex flex-col justify-between hover:border-primary/40 transition-colors">
                 <div>
                   <div className="flex items-center justify-between text-[11px] uppercase tracking-wider text-muted-foreground">
                     <span className="inline-flex items-center gap-1">

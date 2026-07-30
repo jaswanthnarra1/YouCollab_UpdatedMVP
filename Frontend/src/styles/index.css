@@ -89,8 +89,7 @@
 
 @layer base {
   * { @apply border-border; }
-  html { background-color: hsl(240 6% 4%); }
-  html.dark { background-color: hsl(240 6% 4%); }
+  html { @apply bg-background; }
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;

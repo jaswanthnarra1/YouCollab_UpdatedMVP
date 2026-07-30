@@ -258,7 +258,7 @@ export default function Settings() {
                 <div>
                   <div className="flex items-center justify-between text-[11px] uppercase tracking-wider text-muted-foreground">
                     <span className="inline-flex items-center gap-1"><Mail className="h-3 w-3" /> Email settings</span>
-                    <span className="inline-flex items-center gap-1 border border-emerald-500/25 px-1.5 py-0.5 text-[9px] uppercase tracking-wider rounded-sm text-emerald-400 bg-emerald-500/5">
+                    <span className="inline-flex items-center gap-1 border border-success/25 px-1.5 py-0.5 text-[9px] uppercase tracking-wider rounded-sm text-success bg-success/5">
                       <BadgeCheck className="h-3 w-3" /> Verified
                     </span>
                   </div>
@@ -314,15 +314,15 @@ export default function Settings() {
               </div>
 
               {/* Danger Zone */}
-              <div className="border border-red-500/25 rounded-sm p-5 bg-red-500/5 md:col-span-2 flex items-center justify-between">
+              <div className="border border-destructive/25 rounded-sm p-5 bg-destructive/5 md:col-span-2 flex items-center justify-between">
                 <div>
-                  <h3 className="text-[14px] font-semibold text-red-400">Danger Zone</h3>
-                  <p className="text-[12px] text-red-400/70 mt-1">Permanently delete your profile data, campaign listings, application histories, and auth metadata.</p>
+                  <h3 className="text-[14px] font-semibold text-destructive">Danger Zone</h3>
+                  <p className="text-[12px] text-destructive/70 mt-1">Permanently delete your profile data, campaign listings, application histories, and auth metadata.</p>
                 </div>
                 <Button 
                   variant="destructive" 
                   onClick={() => setIsDeleteModalOpen(true)}
-                  className="h-8 text-[12px] rounded-sm bg-red-600 hover:bg-red-500"
+                  className="h-8 text-[12px] rounded-sm"
                 >
                   <Trash className="h-3.5 w-3.5 mr-1" /> Delete Account
                 </Button>
@@ -645,7 +645,7 @@ export default function Settings() {
       <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
         <DialogContent className="border-border text-foreground max-w-sm rounded-sm bg-background">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-red-400">Delete Account Permanently?</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-destructive">Delete Account Permanently?</DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground leading-relaxed pt-1">
               This action cannot be undone. This will permanently delete your user profile and all campaign mappings.
               Please type <strong className="text-foreground">DELETE</strong> below to confirm.
@@ -660,10 +660,10 @@ export default function Settings() {
             />
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="ghost" onClick={() => { setIsDeleteModalOpen(false); setDeleteConfirmText(""); }} className="h-9 text-xs rounded-sm hover:bg-zinc-800">
+            <Button variant="ghost" onClick={() => { setIsDeleteModalOpen(false); setDeleteConfirmText(""); }} className="h-9 text-xs rounded-sm">
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteAccount} disabled={deleteAccountMutation.isPending} className="h-9 text-xs rounded-sm bg-red-600 hover:bg-red-500">
+            <Button variant="destructive" onClick={handleDeleteAccount} disabled={deleteAccountMutation.isPending} className="h-9 text-xs rounded-sm">
               {deleteAccountMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Confirm Delete"}
             </Button>
           </DialogFooter>
