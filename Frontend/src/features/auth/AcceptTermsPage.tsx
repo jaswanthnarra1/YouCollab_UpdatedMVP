@@ -2,7 +2,7 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/
 import { authService } from "@/services/auth";
 import { Button } from "@/components/common/button";
 import { Checkbox } from "@/components/common/checkbox";
-import { Download, Loader2, Shield } from "lucide-react";
+import { Loader2, Shield } from "lucide-react";
 import { Label } from "@/components/common/label";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/layout/Navbar";
@@ -153,15 +153,7 @@ export default function AcceptTermsPage() {
             </Label>
           </div>
 
-          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-1 print:hidden">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => window.print()}
-              className="h-9 text-[13px] rounded-sm gap-1.5"
-            >
-              <Download className="h-3.5 w-3.5" /> Download PDF
-            </Button>
+          <div className="flex justify-end pt-1 print:hidden">
             <Button
               disabled={!agreed || accept.isPending}
               onClick={() => accept.mutate()}
