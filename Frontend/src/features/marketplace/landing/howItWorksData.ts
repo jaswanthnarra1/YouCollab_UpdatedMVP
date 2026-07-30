@@ -11,7 +11,7 @@ export const HOW_IT_WORKS_STEPS: HowItWorksStep[] = [
   {
     icon: "userPlus",
     title: "Create Your Account",
-    description: "Sign up as a brand or creator with phone + OTP in under two minutes.",
+    description: "Sign up as a brand or creator with email + password in under two minutes.",
   },
   {
     icon: "building",

@@ -611,4 +611,13 @@ GRANT EXECUTE ON FUNCTION insert_application_with_capacity(UUID, UUID, TEXT) TO 
 -- Reads only: plan writes go through supabaseAdmin, which bypasses RLS.
 GRANT ALL ON plans TO anon, authenticated;
 ALTER TABLE plans ENABLE ROW LEVEL SECURITY;
+
+-- ============================================
+-- 15. Drop phone auth (migrated to Email + Password + Email OTP)
+-- ============================================
+-- Auth is now Clerk email + password with email-code verification, plus
+-- Google OAuth — see Backend/src/services/auth.service.js
+-- findOrCreateByClerkId(), which links/creates users by email only.
+DROP INDEX IF EXISTS idx_users_phone;
+ALTER TABLE users DROP COLUMN IF EXISTS phone;
 CREATE POLICY "read_plans" ON plans FOR SELECT TO anon, authenticated USING (true);

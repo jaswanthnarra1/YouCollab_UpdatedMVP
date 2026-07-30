@@ -10,7 +10,6 @@ const AppError = require('../utils/AppError');
 const toProfile = (user) => ({
   id: user.id,
   email: user.email,
-  phone: user.phone,
   role: user.role,
   name: user.full_name,
   avatarUrl: user.avatar_url,
@@ -27,12 +26,10 @@ const toProfile = (user) => ({
  * it (and its role profile) on first sight. Role/name come from Clerk
  * unsafeMetadata, set client-side during sign-up.
  *
- * If a `users` row already exists for the verified email or phone (e.g. a
- * seed/demo account, or one created under a prior auth strategy), it's
- * linked to this Clerk identity instead of creating a duplicate — safe
- * because Clerk already verified the signer owns that identifier. Phone
- * sign-ups carry no email, so email-only linking would silently orphan
- * them into a brand-new empty profile; phone is checked as a fallback key.
+ * If a `users` row already exists for the verified email (e.g. a seed/demo
+ * account, or one created under a prior auth strategy), it's linked to this
+ * Clerk identity instead of creating a duplicate — safe because Clerk
+ * already verified the signer owns that email.
  */
 const findOrCreateByClerkId = async (clerkUserId) => {
   const { data: existing } = await supabase
@@ -47,12 +44,9 @@ const findOrCreateByClerkId = async (clerkUserId) => {
   const email = clerkUser.emailAddresses.find(
     (e) => e.id === clerkUser.primaryEmailAddressId
   )?.emailAddress;
-  const phone = clerkUser.phoneNumbers.find(
-    (p) => p.id === clerkUser.primaryPhoneNumberId
-  )?.phoneNumber;
 
-  if (!email && !phone) {
-    throw new AppError('Your Clerk account has no verified email or phone number.', 400, 'BAD_REQUEST');
+  if (!email) {
+    throw new AppError('Your Clerk account has no verified email address.', 400, 'BAD_REQUEST');
   }
 
   const role = clerkUser.unsafeMetadata?.role;
@@ -62,27 +56,15 @@ const findOrCreateByClerkId = async (clerkUserId) => {
   const name =
     clerkUser.unsafeMetadata?.name ||
     [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') ||
-    email ||
-    phone;
+    email;
 
-  let byIdentifier = null;
-  if (email) {
-    ({ data: byIdentifier } = await supabase.from('users').select('id').eq('email', email).maybeSingle());
-  }
-  if (!byIdentifier && phone) {
-    ({ data: byIdentifier } = await supabase.from('users').select('id').eq('phone', phone).maybeSingle());
-  }
+  const { data: byIdentifier } = await supabase.from('users').select('id').eq('email', email).maybeSingle();
 
   let userId;
   if (byIdentifier) {
     const { data: linked, error } = await supabase
       .from('users')
-      .update({
-        clerk_user_id: clerkUserId,
-        full_name: name,
-        ...(email && { email }),
-        ...(phone && { phone }),
-      })
+      .update({ clerk_user_id: clerkUserId, full_name: name, email })
       .eq('id', byIdentifier.id)
       .select('id')
       .single();
@@ -91,7 +73,7 @@ const findOrCreateByClerkId = async (clerkUserId) => {
   } else {
     const { data: created, error } = await supabase
       .from('users')
-      .insert({ email: email || null, phone: phone || null, role, clerk_user_id: clerkUserId, full_name: name, is_onboarded: false })
+      .insert({ email, role, clerk_user_id: clerkUserId, full_name: name, is_onboarded: false })
       .select('id')
       .single();
     if (error) throw new AppError('Failed to create user profile.', 500, 'DATABASE_ERROR');

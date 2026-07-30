@@ -2,18 +2,13 @@
  * YouCollab — Demo Account Seeder
  * ================================
  * Creates two fully-onboarded, login-ready demo accounts (Brand + Creator)
- * for live demos/testing without sending a real SMS.
- *
- * Uses Clerk's test-mode fictional phone number range: only +1 (XXX) 555-01XX
- * numbers skip real SMS, and the verification code is always fixed at
- * 424242 — this is a Clerk platform convention, not configurable
- * (see https://clerk.com/docs/testing/test-emails-and-phones). A real-looking
- * number (e.g. +91 9999999999) is NOT treated as a test number by Clerk.
+ * for live demos/testing.
  *
  * The Clerk identity is created server-side (clerkClient.users.createUser)
- * and its clerk_user_id is linked to the `users` row immediately, so demoing
- * is just: open /login, enter the phone below, enter code 424242. No
- * one-time registration step needed.
+ * with a password and pre-verified email — users created via the Backend
+ * API skip the email verification step — and its clerk_user_id is linked to
+ * the `users` row immediately, so demoing is just: open /login, enter the
+ * email + password below.
  *
  * Usage:
  *   node Backend/supabase/seed-demo-accounts.js
@@ -33,9 +28,13 @@ if (!connectionString) {
   process.exit(1);
 }
 
+// Must not be a common/breached password — Clerk rejects those at sign-in
+// time with form_password_pwned even if account creation itself succeeds.
+const DEMO_PASSWORD = 'YcE52YjgZh!9';
+
 const DEMO_ACCOUNTS = [
   {
-    phone: '+12015550100',
+    email: 'demo.brand@youcollab.in',
     role: 'BRAND',
     name: 'Demo Brand',
     profile: {
@@ -46,7 +45,7 @@ const DEMO_ACCOUNTS = [
     },
   },
   {
-    phone: '+12015550101',
+    email: 'demo.creator@youcollab.in',
     role: 'INFLUENCER',
     name: 'Demo Creator',
     profile: {
@@ -59,16 +58,21 @@ const DEMO_ACCOUNTS = [
   },
 ];
 
-async function ensureClerkUser({ phone, role, name }) {
-  const { data: existing } = await clerkClient.users.getUserList({ phoneNumber: [phone] });
-  if (existing.length > 0) return existing[0];
+async function ensureClerkUser({ email, role, name }) {
+  const { data: existing } = await clerkClient.users.getUserList({ emailAddress: [email] });
+  if (existing.length > 0) {
+    // Re-set the password every run so re-seeding after a DEMO_PASSWORD
+    // change (e.g. Clerk rejected the old one as breached) fixes existing users too.
+    return clerkClient.users.updateUser(existing[0].id, {
+      password: DEMO_PASSWORD,
+      skipPasswordChecks: true,
+    });
+  }
   return clerkClient.users.createUser({
-    phoneNumber: [phone],
+    emailAddress: [email],
+    password: DEMO_PASSWORD,
+    skipPasswordChecks: true,
     unsafeMetadata: { role, name },
-    // This Clerk instance still lists password as a required instance-level
-    // field (a dashboard setting, not code) even though the app never
-    // collects one — without this, server-side creation 422s on "password".
-    skipPasswordRequirement: true,
   });
 }
 
@@ -79,30 +83,30 @@ async function run() {
 
   try {
     for (const account of DEMO_ACCOUNTS) {
-      console.log(`--- ${account.name} (${account.role}, ${account.phone}) ---`);
+      console.log(`--- ${account.name} (${account.role}, ${account.email}) ---`);
 
       const clerkUser = await ensureClerkUser(account);
       console.log(`  Clerk user: ${clerkUser.id}`);
 
       const { rows: existingRows } = await client.query(
-        `SELECT id FROM users WHERE "clerk_user_id" = $1 OR phone = $2`,
-        [clerkUser.id, account.phone]
+        `SELECT id FROM users WHERE "clerk_user_id" = $1 OR email = $2`,
+        [clerkUser.id, account.email]
       );
 
       let userId;
       if (existingRows.length > 0) {
         userId = existingRows[0].id;
         await client.query(
-          `UPDATE users SET clerk_user_id = $1, phone = $2, role = $3, full_name = $4, is_onboarded = true WHERE id = $5`,
-          [clerkUser.id, account.phone, account.role, account.name, userId]
+          `UPDATE users SET clerk_user_id = $1, email = $2, role = $3, full_name = $4, is_onboarded = true WHERE id = $5`,
+          [clerkUser.id, account.email, account.role, account.name, userId]
         );
         console.log(`  users row: updated (${userId})`);
       } else {
         const { rows } = await client.query(
-          `INSERT INTO users (clerk_user_id, phone, role, full_name, is_onboarded)
+          `INSERT INTO users (clerk_user_id, email, role, full_name, is_onboarded)
            VALUES ($1, $2, $3, $4, true)
            RETURNING id`,
-          [clerkUser.id, account.phone, account.role, account.name]
+          [clerkUser.id, account.email, account.role, account.name]
         );
         userId = rows[0].id;
         console.log(`  users row: created (${userId})`);
@@ -137,16 +141,14 @@ async function run() {
     }
 
     console.log('🎉 Demo accounts ready!\n');
-    console.log('   ┌─────────────┬────────────────┬──────────┐');
-    console.log('   │ Role        │ Phone          │ OTP code │');
-    console.log('   ├─────────────┼────────────────┼──────────┤');
+    console.log('   ┌─────────────┬──────────────────────────┬──────────────┐');
+    console.log('   │ Role        │ Email                     │ Password     │');
+    console.log('   ├─────────────┼──────────────────────────┼──────────────┤');
     for (const a of DEMO_ACCOUNTS) {
-      console.log(`   │ ${a.role.padEnd(11)} │ ${a.phone.padEnd(14)} │ 424242   │`);
+      console.log(`   │ ${a.role.padEnd(11)} │ ${a.email.padEnd(25)} │ ${DEMO_PASSWORD.padEnd(12)} │`);
     }
-    console.log('   └─────────────┴────────────────┴──────────┘');
-    console.log('\n   Use /login (not /register) — these Clerk identities already exist.');
-    console.log('   The phone field defaults to a +91 prefix; type the full +1... number');
-    console.log('   including the leading "+" to override it.');
+    console.log('   └─────────────┴──────────────────────────┴──────────────┘');
+    console.log('\n   Use /login (not /register) — these Clerk identities already exist and are pre-verified.');
   } finally {
     await client.end();
   }
