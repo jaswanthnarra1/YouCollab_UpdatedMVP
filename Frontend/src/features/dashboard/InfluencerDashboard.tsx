@@ -354,7 +354,7 @@ export default function InfluencerDashboard() {
     });
   };
 
-  const { data: gigsResult, isError: gigsFailed, error: gigsError, refetch: refetchGigs, isFetching: gigsFetching } =
+  const { data: gigsResult, isLoading: gigsLoading, isError: gigsFailed, error: gigsError, refetch: refetchGigs, isFetching: gigsFetching } =
     useQuery({ queryKey: ["gigs"], queryFn: () => gigsService.list() });
   const { data: myApps = [] } = useQuery({ queryKey: ["myApplications"], queryFn: applicationsService.mine, retry: false });
   const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: profileService.getProfile });
@@ -507,7 +507,11 @@ export default function InfluencerDashboard() {
                 ))}
               </div>
 
-              {gigsFailed ? (
+              {gigsLoading ? (
+                <div className="border border-border rounded-sm p-10 text-center text-muted-foreground text-[13px]">
+                  <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                </div>
+              ) : gigsFailed ? (
                 <div className="border border-red-500/25 bg-red-500/10 rounded-sm p-10 text-center text-[13px] space-y-3">
                   <p className="flex items-center justify-center gap-1.5 text-red-500 font-medium">
                     <AlertCircle className="h-4 w-4" /> Couldn't load gigs — {extractErrorMessage(gigsError, "please try again.")}

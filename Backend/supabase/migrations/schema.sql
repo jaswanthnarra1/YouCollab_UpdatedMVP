@@ -445,8 +445,12 @@ BEGIN
     -- ACTIVE replaces the old OPEN status (see section 14). Expired gigs are
     -- excluded from discovery here as well as by the scheduler, so a gig that
     -- lapses between sweeps still disappears from the feed immediately.
+    -- A gig that has already filled every application slot is excluded the
+    -- same way — otherwise it keeps showing a live "Pitch now" button that
+    -- deterministically fails every attempt with CAPACITY_REACHED.
     WHERE g.status = 'ACTIVE'
       AND (g."expiresAt" IS NULL OR g."expiresAt" > now())
+      AND COALESCE(a.cnt, 0) < g."applicationSlots"
       AND g.city = 'Pune'
       AND (p_category IS NULL OR g.category = p_category)
       AND (p_search IS NULL OR g.title ILIKE '%' || p_search || '%' OR g.description ILIKE '%' || p_search || '%')

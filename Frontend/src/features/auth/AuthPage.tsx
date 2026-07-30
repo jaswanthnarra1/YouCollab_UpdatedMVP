@@ -81,6 +81,12 @@ export default function AuthPage({ mode }: Props) {
       if (mode === "login") {
         if (!signInLoaded) return;
         const result = await signIn.create({ identifier: email, password });
+        if (result.status === "needs_second_factor") {
+          await signIn.prepareSecondFactor({ strategy: "email_code" });
+          toast({ title: "Code sent! ✉️", description: "Please check your email for a 6-digit code." });
+          navigate(`/verify-login-otp?email=${encodeURIComponent(email)}`);
+          return;
+        }
         if (result.status !== "complete") throw new Error("Sign-in incomplete. Try again.");
         await setActiveSignIn({ session: result.createdSessionId });
 
@@ -241,6 +247,12 @@ export default function AuthPage({ mode }: Props) {
                 className="h-9 text-[13px] rounded-sm"
               />
             </div>
+
+            {/* Clerk's Smart CAPTCHA bot-protection for sign-up mounts into this
+                element on custom flows (signUp.create() instead of <SignUp/>) —
+                without it present, the widget can't attach and every sign-up
+                silently fails. See https://clerk.com/docs/guides/development/custom-flows/bot-sign-up-protection */}
+            {mode === "register" && <div id="clerk-captcha" />}
 
             <Button
               type="submit"

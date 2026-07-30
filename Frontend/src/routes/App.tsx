@@ -31,6 +31,7 @@ const GigDetail = lazy(() => import("@/features/gigs/GigDetail"));
 const InstagramCallback = lazy(() => import("@/features/auth/InstagramCallback"));
 const Settings = lazy(() => import("@/features/dashboard/Settings"));
 const VerifyOtpPage = lazy(() => import("@/features/auth/VerifyOtpPage"));
+const VerifyLoginOtpPage = lazy(() => import("@/features/auth/VerifyLoginOtpPage"));
 const ForgotPasswordPage = lazy(() => import("@/features/auth/ForgotPasswordPage"));
 const SsoCallback = lazy(() => import("@/features/auth/SsoCallback"));
 const OAuthRole = lazy(() => import("@/features/auth/OAuthRole"));
@@ -53,7 +54,7 @@ const RouteFallback = () => (
 );
 
 const App = () => (
-  <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} afterSignOutUrl="/login">
+  <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} afterSignOutUrl="/">
   <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -68,21 +69,27 @@ const App = () => (
                 <Route path="/login" element={<AuthPage mode="login" />} />
                 <Route path="/register" element={<AuthPage mode="register" />} />
                 <Route path="/verify-otp" element={<VerifyOtpPage />} />
+                <Route path="/verify-login-otp" element={<VerifyLoginOtpPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/sso-callback" element={<SsoCallback />} />
                 <Route path="/oauth-role" element={<OAuthRole />} />
                 <Route path="/instagram/callback" element={<InstagramCallback />} />
                 <Route path="/contact" element={<Contact />} />
 
+                {/* Onboarding renders its own Navbar (a focused single-purpose flow,
+                    like /login and /register) — kept outside SidebarLayout so a
+                    not-yet-onboarded user doesn't also get the dashboard sidebar,
+                    whose links (Browse Gigs, My Applications, ...) aren't valid
+                    for them yet and just bounce back here via RoleRoute. */}
+                <Route path="/onboarding/influencer" element={
+                  <RoleRoute role="INFLUENCER" allowUnonboarded><InfluencerOnboarding /></RoleRoute>
+                } />
+                <Route path="/onboarding/brand" element={
+                  <RoleRoute role="BRAND" allowUnonboarded><BrandOnboarding /></RoleRoute>
+                } />
+
                 {/* Protected Sidebar Routes */}
                 <Route element={<SidebarLayout />}>
-                  <Route path="/onboarding/influencer" element={
-                    <RoleRoute role="INFLUENCER" allowUnonboarded><InfluencerOnboarding /></RoleRoute>
-                  } />
-                  <Route path="/onboarding/brand" element={
-                    <RoleRoute role="BRAND" allowUnonboarded><BrandOnboarding /></RoleRoute>
-                  } />
-
                   <Route path="/dashboard/influencer" element={
                     <RoleRoute role="INFLUENCER"><InfluencerDashboard /></RoleRoute>
                   } />

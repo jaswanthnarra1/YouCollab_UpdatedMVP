@@ -48,6 +48,6 @@ module.exports = {
   INSTAGRAM: {
     APP_ID: process.env.INSTAGRAM_APP_ID,
     APP_SECRET: process.env.INSTAGRAM_APP_SECRET,
-    REDIRECT_URI: process.env.INSTAGRAM_REDIRECT_URI || 'http://localhost:5173/instagram/callback',
+    REDIRECT_URI: process.env.INSTAGRAM_REDIRECT_URI || 'http://localhost:8080/instagram/callback',
   },
 };
