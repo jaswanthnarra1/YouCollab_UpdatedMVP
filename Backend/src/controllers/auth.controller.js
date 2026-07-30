@@ -41,8 +41,27 @@ const updatePreferences = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Record acceptance of the current Terms of Service / Privacy Policy.
+ */
+const acceptTerms = asyncHandler(async (req, res) => {
+  const { version } = req.body;
+
+  const userProfile = await authService.acceptTerms(req.user.id, {
+    version,
+    ip: req.ip,
+    userAgent: req.get('user-agent'),
+  });
+
+  res.status(200).json({
+    success: true,
+    data: { user: userProfile },
+  });
+});
+
 module.exports = {
   me,
   deleteAccount,
   updatePreferences,
+  acceptTerms,
 };

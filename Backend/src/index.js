@@ -14,6 +14,11 @@ const AppError = require('./utils/AppError');
 
 const app = express();
 
+// Railway (and most PaaS hosts) put the app behind a reverse proxy, so
+// req.ip is the proxy's address unless this is set — needed for both the
+// rate limiter's per-IP keying and the ToS-acceptance IP audit trail below.
+app.set('trust proxy', 1);
+
 // Set security headers
 app.use(
   helmet({

@@ -1,6 +1,7 @@
 const { clerkClient } = require('@clerk/express');
 const supabase = require('./supabase');
 const AppError = require('../utils/AppError');
+const config = require('../config');
 
 /**
  * Map a raw `users` row (snake_case for the columns that predate this
@@ -19,7 +20,34 @@ const toProfile = (user) => ({
   privacyPrefs: user.privacyPrefs,
   brand: user.brand,
   influencer: user.influencer,
+  hasAcceptedTerms: user.terms_accepted,
+  termsAcceptedAt: user.terms_accepted_at,
+  termsVersion: user.terms_version,
+  // Single boolean the frontend route guards gate on — recomputed server-side
+  // on every /me call so bumping config.TERMS.VERSION alone re-prompts
+  // everyone, with no per-user migration needed.
+  needsTermsAcceptance: !user.terms_accepted || user.terms_version !== config.TERMS.VERSION,
 });
+
+/**
+ * ponytail: regex sniffing, not a UA-parsing library — this only needs to be
+ * good enough for a human-readable audit trail (who accepted, roughly from
+ * what), not analytics-grade device detection. Upgrade path: swap in a
+ * proper parser (e.g. ua-parser-js) if that ever becomes a real requirement.
+ */
+const parseUserAgent = (ua = '') => {
+  let browser = 'Unknown';
+  if (/edg\//i.test(ua)) browser = 'Edge';
+  else if (/chrome|crios/i.test(ua)) browser = 'Chrome';
+  else if (/firefox|fxios/i.test(ua)) browser = 'Firefox';
+  else if (/safari/i.test(ua)) browser = 'Safari';
+
+  let device = 'Desktop';
+  if (/ipad|tablet/i.test(ua)) device = 'Tablet';
+  else if (/mobi|iphone|android/i.test(ua)) device = 'Mobile';
+
+  return { browser, device };
+};
 
 /**
  * Look up the local user row for an authenticated Clerk session, creating
@@ -201,9 +229,48 @@ const updatePreferences = async (userId, { notificationPrefs, privacyPrefs }) =>
   return updated;
 };
 
+/**
+ * Record acceptance of the current Terms of Service / Privacy Policy.
+ * `version` must match the server's current TERMS.VERSION — a stale client
+ * (open in a tab since before a version bump) gets rejected rather than
+ * silently recording acceptance of a version that's no longer current.
+ */
+const acceptTerms = async (userId, { version, ip, userAgent }) => {
+  if (version !== config.TERMS.VERSION) {
+    throw new AppError(
+      'The Terms of Service have been updated. Please refresh the page and review the latest version.',
+      409,
+      'TERMS_VERSION_STALE'
+    );
+  }
+
+  const { browser, device } = parseUserAgent(userAgent);
+
+  const { data: updated, error } = await supabase
+    .from('users')
+    .update({
+      terms_accepted: true,
+      terms_accepted_at: new Date().toISOString(),
+      terms_version: version,
+      terms_accept_ip: ip || null,
+      terms_accept_browser: browser,
+      terms_accept_device: device,
+    })
+    .eq('id', userId)
+    .select('*, brand:brands(*), influencer:influencers(*)')
+    .single();
+
+  if (error) {
+    throw new AppError('Failed to record Terms acceptance.', 500, 'DATABASE_ERROR');
+  }
+
+  return toProfile(updated);
+};
+
 module.exports = {
   findOrCreateByClerkId,
   getMe,
   deleteAccount,
   updatePreferences,
+  acceptTerms,
 };

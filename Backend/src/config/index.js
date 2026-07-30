@@ -50,4 +50,12 @@ module.exports = {
     APP_SECRET: process.env.INSTAGRAM_APP_SECRET,
     REDIRECT_URI: process.env.INSTAGRAM_REDIRECT_URI || 'http://localhost:8080/instagram/callback',
   },
+
+  // Bump (or override via env, for a same-day forced reacceptance without a
+  // deploy) whenever Frontend/src/features/auth/termsContent.ts changes —
+  // every user whose stored terms_version differs gets sent back through
+  // the acceptance screen. See authService.acceptTerms().
+  TERMS: {
+    VERSION: process.env.TERMS_VERSION || '2026-07',
+  },
 };

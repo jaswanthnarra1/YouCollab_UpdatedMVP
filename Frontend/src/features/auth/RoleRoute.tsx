@@ -20,6 +20,7 @@ export function RoleRoute({ children, role, allowUnonboarded = false }: Props) {
   }
 
   if (!user) return <Navigate to="/login" replace state={{ from: location }} />;
+  if (user.needsTermsAcceptance) return <Navigate to="/terms" replace />;
   if (role && user.role !== role) {
     const dest = user.role === "BRAND" ? "/dashboard/brand" : "/dashboard/influencer";
     return <Navigate to={dest} replace />;

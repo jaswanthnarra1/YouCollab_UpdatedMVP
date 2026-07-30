@@ -14,4 +14,8 @@ export const authService = {
     const { data } = await apiClient.patch("/api/auth/preferences", prefs);
     return unwrap<{ notificationPrefs: Record<string, boolean>; privacyPrefs: Record<string, boolean> }>(data);
   },
+  async acceptTerms(version: string) {
+    const { data } = await apiClient.post("/api/auth/accept-terms", { accepted: true, version });
+    return unwrap<{ user: AuthUser }>(data);
+  },
 };

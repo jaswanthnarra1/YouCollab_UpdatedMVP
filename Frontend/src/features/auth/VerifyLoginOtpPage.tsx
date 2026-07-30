@@ -107,9 +107,11 @@ export default function VerifyLoginOtpPage() {
       if (!res?.user) throw new Error("Sign-in failed");
       setUser(res.user);
 
-      const dest = !res.user.isOnboarded
-        ? res.user.role === "BRAND" ? "/onboarding/brand" : "/onboarding/influencer"
-        : res.user.role === "BRAND" ? "/dashboard/brand" : "/dashboard/influencer";
+      const dest = res.user.needsTermsAcceptance
+        ? "/terms"
+        : !res.user.isOnboarded
+          ? res.user.role === "BRAND" ? "/onboarding/brand" : "/onboarding/influencer"
+          : res.user.role === "BRAND" ? "/dashboard/brand" : "/dashboard/influencer";
       navigate(dest);
     } catch (err) {
       toast({ variant: "destructive", title: "Verification failed", description: clerkErrorMessage(err, "Verification failed. Try again.") });

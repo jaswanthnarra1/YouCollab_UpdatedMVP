@@ -9,6 +9,11 @@ export interface AuthUser {
   profile?: Record<string, unknown>;
   notificationPrefs?: Record<string, boolean>;
   privacyPrefs?: Record<string, boolean>;
+  /** Single gate the route guards check — true when acceptance is missing or stale vs the server's current terms version. */
+  needsTermsAcceptance: boolean;
+  hasAcceptedTerms?: boolean;
+  termsAcceptedAt?: string | null;
+  termsVersion?: string | null;
 }
 
 export type AppStatus = "PENDING" | "ACCEPTED" | "REJECTED";

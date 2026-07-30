@@ -93,9 +93,11 @@ export default function AuthPage({ mode }: Props) {
         const res = await authService.me();
         if (!res?.user) throw new Error("Sign-in failed");
         setUser(res.user);
-        const dest = !res.user.isOnboarded
-          ? res.user.role === "BRAND" ? "/onboarding/brand" : "/onboarding/influencer"
-          : res.user.role === "BRAND" ? "/dashboard/brand" : "/dashboard/influencer";
+        const dest = res.user.needsTermsAcceptance
+          ? "/terms"
+          : !res.user.isOnboarded
+            ? res.user.role === "BRAND" ? "/onboarding/brand" : "/onboarding/influencer"
+            : res.user.role === "BRAND" ? "/dashboard/brand" : "/dashboard/influencer";
         navigate(dest);
       } else {
         if (!signUpLoaded) return;

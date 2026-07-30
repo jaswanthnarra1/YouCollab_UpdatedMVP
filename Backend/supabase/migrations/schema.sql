@@ -625,3 +625,17 @@ ALTER TABLE plans ENABLE ROW LEVEL SECURITY;
 DROP INDEX IF EXISTS idx_users_phone;
 ALTER TABLE users DROP COLUMN IF EXISTS phone;
 CREATE POLICY "read_plans" ON plans FOR SELECT TO anon, authenticated USING (true);
+
+-- ============================================
+-- 16. Terms of Service / Privacy Policy acceptance
+-- ============================================
+-- snake_case, unquoted — matches is_onboarded/last_active_at/full_name, the
+-- naming style the live users table actually uses (see section 9 note and
+-- Backend/src/services/auth.service.js toProfile()), not the camelCase-quoted
+-- style used by the later JSONB prefs columns above.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_version TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accept_ip TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accept_browser TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accept_device TEXT;
