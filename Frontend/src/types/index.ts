@@ -20,7 +20,18 @@ export interface Application {
   status: AppStatus;
   createdAt?: string;
   distanceKm?: number | null;
-  gig?: { id: string; title: string; category?: string };
+  gig?: {
+    id: string;
+    title: string;
+    category?: string;
+    city?: string;
+    budgetMin?: number;
+    budgetMax?: number;
+    deadline?: string;
+    status?: GigStatus;
+    expiresAt?: string | null;
+    brand?: { businessName?: string; logoUrl?: string };
+  };
   influencer?: {
     id: string;
     name?: string;

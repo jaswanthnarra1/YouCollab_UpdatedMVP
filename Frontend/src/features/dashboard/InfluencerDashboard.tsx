@@ -5,13 +5,14 @@ import { Button } from "@/components/common/button";
 import { CATEGORIES } from "@/constants";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/common/dialog";
+import { resolveGigStatus } from "@/components/common/gig-status-badge";
 import { gigsService, type Gig } from "@/services/gigs";
 import { Input } from "@/components/common/input";
 import type { Application } from "@/types";
 import {
   Instagram, BadgeCheck, RefreshCw, Unlink, IndianRupee, Calendar,
   MapPin, Send, Loader2, Search, TrendingUp, Sparkles, MessageSquare, Coins, Clock, CheckCircle2,
-  ArrowUpNarrowWide, ArrowDownWideNarrow, ArrowUpDown, X
+  ArrowUpNarrowWide, ArrowDownWideNarrow, ArrowUpDown, X, AlertCircle
 } from "lucide-react";
 import { instagramService } from "@/services/instagram";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -20,6 +21,27 @@ import { useAuthStore } from "@/stores/authStore";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+
+function timeAgo(iso?: string): string | null {
+  if (!iso) return null;
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min${mins === 1 ? "" : "s"} ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hr${hrs === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
+/** Backend always replies with { error: { message, code } } on failure — pull that out, and call
+ *  out a connection failure (no response at all) separately since "Try again" is misleading for that. */
+function extractErrorMessage(e: unknown, fallback: string): string {
+  const err = e as { response?: { data?: { error?: { message?: string } } } } | undefined;
+  if (err?.response?.data?.error?.message) return err.response.data.error.message;
+  if (!err?.response) return "Connection failed. Check your internet and try again.";
+  return fallback;
+}
 
 function StatCard({ label, value, Icon, accent }: { label: string; value: string; Icon: typeof TrendingUp; accent?: boolean }) {
   return (
@@ -107,6 +129,13 @@ function InstagramCard() {
 }
 
 function GigCard({ gig, hasApplied, status, onClick }: { gig: Gig; hasApplied: boolean; status?: string; onClick: () => void }) {
+  // Defense-in-depth: the browse list already excludes expired gigs at fetch time,
+  // but this card can still be showing stale data if a gig expires while it's on
+  // screen (no live refetch) — catch that here so "Pitch now" never fires on a
+  // dead gig and eats a round trip just to bounce off the backend's own check.
+  const expired = resolveGigStatus(gig) === "EXPIRED";
+  const posted = timeAgo(gig.createdAt);
+
   return (
     <div className="border border-border rounded-sm p-5 w-full bg-background flex flex-col justify-between">
       <div>
@@ -116,7 +145,7 @@ function GigCard({ gig, hasApplied, status, onClick }: { gig: Gig; hasApplied: b
         </div>
         <h3 className="mt-3 text-[14px] font-semibold line-clamp-2">{gig.title}</h3>
         <p className="mt-1 text-[12px] text-muted-foreground line-clamp-2">{gig.deliverables}</p>
-        
+
         {gig.brand?.businessName && (
           <p className="mt-2 text-[11px] text-muted-foreground">
             Brand: <span className="text-foreground font-medium">{gig.brand.businessName}</span>
@@ -135,6 +164,8 @@ function GigCard({ gig, hasApplied, status, onClick }: { gig: Gig; hasApplied: b
             </span>
           )}
         </div>
+        {posted && <p className="mt-1.5 text-[11px] text-muted-foreground">Posted {posted}</p>}
+        {expired && <p className="mt-2 text-[12px] font-semibold text-red-500">Gig expired</p>}
       </div>
 
       <div className="mt-4 flex gap-2">
@@ -144,6 +175,10 @@ function GigCard({ gig, hasApplied, status, onClick }: { gig: Gig; hasApplied: b
         {hasApplied ? (
           <Button disabled variant="secondary" size="sm" className="flex-1 h-8 text-[12px] rounded-sm bg-zinc-500/10 text-zinc-400 border border-zinc-500/25">
             Applied ({status})
+          </Button>
+        ) : expired ? (
+          <Button disabled variant="outline" size="sm" className="flex-1 h-8 text-[12px] rounded-sm border-red-500/25 text-red-500">
+            Gig expired
           </Button>
         ) : (
           <Button onClick={onClick} className="flex-1 h-8 text-[12px] rounded-sm bg-gradient-brand text-primary-foreground border-0">
@@ -164,14 +199,15 @@ function ApplyDialog({ gig, onClose }: { gig: Gig | null; onClose: () => void })
     onSuccess: () => {
       toast({ title: "Pitch sent", description: "The brand will review and reach out." });
       qc.invalidateQueries({ queryKey: ["myApplications"] });
+      qc.invalidateQueries({ queryKey: ["gigs"] });
       setNote(""); onClose();
     },
-    onError: (e: { response?: { data?: { message?: string } } }) =>
-      toast({ variant: "destructive", title: "Couldn't apply", description: e?.response?.data?.message ?? "Try again." }),
+    onError: (e) =>
+      toast({ variant: "destructive", title: "Couldn't send pitch", description: extractErrorMessage(e, "Try again.") }),
   });
 
   return (
-    <Dialog open={!!gig} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={!!gig} onOpenChange={(o) => { if (!o) { apply.reset(); onClose(); } }}>
       <DialogContent className="border-border max-w-lg rounded-sm bg-background">
         {gig && (
           <>
@@ -197,6 +233,12 @@ function ApplyDialog({ gig, onClose }: { gig: Gig | null; onClose: () => void })
                 <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Your cover note</p>
                 <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={5} placeholder="Why are you a great fit?" className="text-[13px] rounded-sm" />
               </div>
+              {apply.isError && (
+                <p className="flex items-start gap-1.5 text-[12px] text-red-500 border border-red-500/25 bg-red-500/10 rounded-sm px-3 py-2">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  {extractErrorMessage(apply.error, "Something went wrong. Try again.")}
+                </p>
+              )}
               <Button
                 onClick={() => apply.mutate()}
                 disabled={!note.trim() || apply.isPending}
@@ -312,7 +354,8 @@ export default function InfluencerDashboard() {
     });
   };
 
-  const { data: gigsResult } = useQuery({ queryKey: ["gigs"], queryFn: () => gigsService.list() });
+  const { data: gigsResult, isError: gigsFailed, error: gigsError, refetch: refetchGigs, isFetching: gigsFetching } =
+    useQuery({ queryKey: ["gigs"], queryFn: () => gigsService.list() });
   const { data: myApps = [] } = useQuery({ queryKey: ["myApplications"], queryFn: applicationsService.mine, retry: false });
   const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: profileService.getProfile });
   const credits: number | null = (profile?.influencer as { credits?: number } | undefined)?.credits ?? null;
@@ -324,17 +367,20 @@ export default function InfluencerDashboard() {
       qc.invalidateQueries({ queryKey: ["myApplications"] });
       toast({ title: "Pitch withdrawn." });
     },
-    onError: (e: { response?: { data?: { error?: { message?: string } } } }) =>
+    onError: (e) =>
       toast({
         variant: "destructive",
         title: "Couldn't withdraw pitch",
-        description: e?.response?.data?.error?.message,
+        description: extractErrorMessage(e, "Try again."),
       }),
   });
 
   const filtered = useMemo(() => {
     const gigs = gigsResult?.gigs ?? [];
+    // Expired gigs are excluded server-side too, but the list isn't refetched
+    // live — this prunes any that lapsed while sitting in the cached result.
     const list = gigs.filter((g) =>
+      resolveGigStatus(g) !== "EXPIRED" &&
       (active ? g.category === active : true) &&
       (query ? (g.title + g.description).toLowerCase().includes(query.toLowerCase()) : true)
     );
@@ -461,7 +507,16 @@ export default function InfluencerDashboard() {
                 ))}
               </div>
 
-              {filtered.length === 0 ? (
+              {gigsFailed ? (
+                <div className="border border-red-500/25 bg-red-500/10 rounded-sm p-10 text-center text-[13px] space-y-3">
+                  <p className="flex items-center justify-center gap-1.5 text-red-500 font-medium">
+                    <AlertCircle className="h-4 w-4" /> Couldn't load gigs — {extractErrorMessage(gigsError, "please try again.")}
+                  </p>
+                  <Button size="sm" variant="outline" onClick={() => refetchGigs()} disabled={gigsFetching} className="h-8 text-[12px] rounded-sm">
+                    {gigsFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Retry"}
+                  </Button>
+                </div>
+              ) : filtered.length === 0 ? (
                 <div className="border border-border rounded-sm p-10 text-center text-muted-foreground text-[13px]">No gigs match your filters.</div>
               ) : (
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -512,7 +567,10 @@ export default function InfluencerDashboard() {
                         <p className="mt-2 text-[11px] text-muted-foreground">
                           Brand: <span className="text-foreground font-medium">{a.gig?.brand?.businessName || "Anonymous"}</span>
                         </p>
-                        
+                        {a.status === "PENDING" && resolveGigStatus(a.gig) === "EXPIRED" && (
+                          <p className="mt-1.5 text-[12px] font-semibold text-red-500">Gig expired</p>
+                        )}
+
                         <div className="mt-3 bg-muted/40 rounded-sm p-3 border border-border/30">
                           <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 font-semibold">Your cover note</p>
                           <p className="text-[12px] text-muted-foreground line-clamp-3 italic">"{a.coverNote}"</p>

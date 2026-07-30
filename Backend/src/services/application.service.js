@@ -218,7 +218,7 @@ const getMyApplications = async (userId, filters) => {
 
   let query = supabase
     .from('applications')
-    .select('*, gig:gigs(id, title, budgetMin, budgetMax, deadline, category, status, city, brand:brands(businessName, logoUrl, user:users(email)))', { count: 'exact' })
+    .select('*, gig:gigs(id, title, budgetMin, budgetMax, deadline, category, status, expiresAt, city, brand:brands(businessName, logoUrl, user:users(email)))', { count: 'exact' })
     .eq('influencerId', influencer.id);
 
   if (cursor) {
