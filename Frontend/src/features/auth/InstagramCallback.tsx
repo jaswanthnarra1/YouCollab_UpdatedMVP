@@ -1,5 +1,6 @@
 import { CheckCircle2, XCircle } from "lucide-react";
 import { instagramService, IG_RETURN_TO_KEY, IG_LAST_ERROR_KEY } from "@/services/instagram";
+import { useAuth } from "@clerk/clerk-react";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/layout/Navbar";
 import { useEffect, useRef, useState } from "react";
@@ -28,8 +29,14 @@ export default function InstagramCallback() {
   // OAuth codes are single-use: React 18 StrictMode double-invokes effects in
   // dev, and a second exchange of the same code always fails. Guard it.
   const startedRef = useRef(false);
+  const { isLoaded: clerkLoaded } = useAuth();
 
   useEffect(() => {
+    // Defence in depth: the exchange below is a one-shot (single-use OAuth
+    // code), so it must not fire before Clerk can mint a session token — the
+    // axios interceptor would attach no Authorization header and the backend
+    // would reject it 401, burning the code with no way to retry.
+    if (!clerkLoaded) return;
     if (startedRef.current) return;
     startedRef.current = true;
 
@@ -85,7 +92,7 @@ export default function InstagramCallback() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [clerkLoaded]);
 
   return (
     <div className="relative min-h-screen overflow-hidden">
