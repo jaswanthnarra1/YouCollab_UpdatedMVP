@@ -1,5 +1,5 @@
 import { CheckCircle2, XCircle } from "lucide-react";
-import { instagramService, IG_RETURN_TO_KEY } from "@/services/instagram";
+import { instagramService, IG_RETURN_TO_KEY, IG_LAST_ERROR_KEY } from "@/services/instagram";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/layout/Navbar";
 import { useEffect, useRef, useState } from "react";
@@ -41,9 +41,12 @@ export default function InstagramCallback() {
 
     // Never strand the user on this route — every path below ends in a
     // navigate() back into the app.
-    const failAndReturn = (msg: string) => {
+    const failAndReturn = (msg: string, code?: string) => {
       setStatus("error");
       setMessage(msg);
+      // Survives the redirect below so the card can show a durable reason —
+      // the toast alone disappears before most users read it.
+      sessionStorage.setItem(IG_LAST_ERROR_KEY, code ? `${msg} (${code})` : msg);
       toast({ variant: "destructive", title: "Instagram connection failed", description: msg });
       const dest = readReturnTo();
       setTimeout(() => navigate(dest, { replace: true }), SUCCESS_DWELL_MS);
@@ -68,15 +71,17 @@ export default function InstagramCallback() {
         // Refresh the cached profile so the card is already in its connected
         // state by the time we land back on it — no manual page refresh.
         await qc.invalidateQueries({ queryKey: ["instagramProfile"] });
+        sessionStorage.removeItem(IG_LAST_ERROR_KEY);
         setStatus("success");
         toast({ title: "Instagram connected ✨", description: "Your profile metrics are now syncing." });
         const dest = readReturnTo();
         setTimeout(() => navigate(dest, { replace: true }), SUCCESS_DWELL_MS);
       } catch (e) {
-        const msg =
-          (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ??
-          "Connection failed. Please try again.";
-        failAndReturn(msg);
+        const err = e as { response?: { data?: { error?: { message?: string; code?: string } } } };
+        failAndReturn(
+          err?.response?.data?.error?.message ?? "Connection failed. Please try again.",
+          err?.response?.data?.error?.code
+        );
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

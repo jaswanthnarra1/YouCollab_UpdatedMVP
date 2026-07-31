@@ -14,7 +14,7 @@ import {
   MapPin, Send, Loader2, Search, TrendingUp, Sparkles, MessageSquare, Coins, Clock, CheckCircle2,
   ArrowUpNarrowWide, ArrowDownWideNarrow, ArrowUpDown, X, AlertCircle
 } from "lucide-react";
-import { instagramService, IG_RETURN_TO_KEY } from "@/services/instagram";
+import { instagramService, IG_RETURN_TO_KEY, IG_LAST_ERROR_KEY } from "@/services/instagram";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Textarea } from "@/components/common/textarea";
 import { useAuthStore } from "@/stores/authStore";
@@ -63,6 +63,13 @@ function InstagramCard() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const { data, isLoading } = useQuery({ queryKey: ["instagramProfile"], queryFn: instagramService.profile, retry: false });
+  // Reason the last connect attempt failed, carried over from the callback
+  // redirect (see IG_LAST_ERROR_KEY) so it doesn't vanish with the toast.
+  const [lastError, setLastError] = useState<string | null>(() => sessionStorage.getItem(IG_LAST_ERROR_KEY));
+  const dismissError = () => {
+    sessionStorage.removeItem(IG_LAST_ERROR_KEY);
+    setLastError(null);
+  };
 
   const connect = useMutation({
     mutationFn: instagramService.connect,
@@ -93,6 +100,15 @@ function InstagramCard() {
 
   return (
     <div className="border border-border rounded-sm p-5 bg-background">
+      {lastError && (
+        <div className="mb-4 flex items-start gap-2 border border-destructive/30 bg-destructive/10 rounded-sm p-3">
+          <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0 mt-0.5" />
+          <p className="flex-1 text-[12px] text-destructive leading-relaxed">{lastError}</p>
+          <button onClick={dismissError} className="text-destructive/70 hover:text-destructive shrink-0" aria-label="Dismiss">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
       <div className="flex items-start gap-4">
         <div className="h-11 w-11 rounded-sm border border-border flex items-center justify-center shrink-0 overflow-hidden">
           {connected && data?.profilePicUrl ? (

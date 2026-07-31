@@ -9,6 +9,14 @@ import type { InstagramConnectionStatus, InstagramProfile } from "@/types";
  */
 export const IG_RETURN_TO_KEY = "yc.ig.returnTo";
 
+/**
+ * sessionStorage key holding the reason the last connect attempt failed.
+ * A toast alone is too transient here: the callback redirects immediately
+ * after showing it, so a user who looks away misses the only explanation
+ * they get. Persisting it lets the card show a durable, dismissible reason.
+ */
+export const IG_LAST_ERROR_KEY = "yc.ig.lastError";
+
 export const instagramService = {
   connect: async (): Promise<{ url: string; state: string }> => {
     const { data } = await apiClient.get("/api/instagram/connect");
