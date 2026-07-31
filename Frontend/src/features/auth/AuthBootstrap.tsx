@@ -10,19 +10,25 @@ export function AuthBootstrap({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isLoaded) return;
     let mounted = true;
+    console.log("[AuthBootstrap] Clerk loaded", { isSignedIn });
     (async () => {
       if (!isSignedIn) {
         if (mounted) {
           setUser(null);
           setHydrated(true);
+          console.log("[AuthBootstrap] not signed in — hydrated with no user");
         }
         return;
       }
       try {
         const res = await authService.me();
-        if (mounted && res?.user) setUser(res.user);
-      } catch {
+        if (mounted && res?.user) {
+          setUser(res.user);
+          console.log("[AuthBootstrap] user fetched — hydrated", { id: res.user.id, role: res.user.role });
+        }
+      } catch (err) {
         if (mounted) setUser(null);
+        console.warn("[AuthBootstrap] /api/auth/me failed — hydrated with no user", err);
       } finally {
         if (mounted) setHydrated(true);
       }

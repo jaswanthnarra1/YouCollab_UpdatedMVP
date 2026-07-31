@@ -2,6 +2,9 @@ const { clerkClient } = require('@clerk/express');
 const supabase = require('./supabase');
 const AppError = require('../utils/AppError');
 const config = require('../config');
+const logger = require('../utils/logger');
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Map a raw `users` row (snake_case for the columns that predate this
@@ -66,9 +69,14 @@ const findOrCreateByClerkId = async (clerkUserId) => {
     .eq('clerk_user_id', clerkUserId)
     .maybeSingle();
 
-  if (existing) return existing;
+  if (existing) {
+    logger.debug({ clerkUserId }, '[auth] existing user matched by clerk_user_id');
+    return existing;
+  }
 
-  const clerkUser = await clerkClient.users.getUser(clerkUserId);
+  logger.info({ clerkUserId }, '[auth] no local user yet — provisioning from Clerk');
+
+  let clerkUser = await clerkClient.users.getUser(clerkUserId);
   const email = clerkUser.emailAddresses.find(
     (e) => e.id === clerkUser.primaryEmailAddressId
   )?.emailAddress;
@@ -77,8 +85,21 @@ const findOrCreateByClerkId = async (clerkUserId) => {
     throw new AppError('Your Clerk account has no verified email address.', 400, 'BAD_REQUEST');
   }
 
-  const role = clerkUser.unsafeMetadata?.role;
+  let role = clerkUser.unsafeMetadata?.role;
   if (role !== 'BRAND' && role !== 'INFLUENCER') {
+    // OAuthRole.tsx calls user.update({ unsafeMetadata: { role } }) client-side
+    // right before hitting this endpoint — that resolves once Clerk's client
+    // record is updated, but Clerk's Backend API (what getUser() above reads)
+    // can lag behind by a moment. One short re-read absorbs that documented
+    // propagation window instead of failing a legitimate, just-completed
+    // role selection outright.
+    logger.warn({ clerkUserId, role }, '[auth] role missing on first Clerk read — retrying once after propagation delay');
+    await sleep(700);
+    clerkUser = await clerkClient.users.getUser(clerkUserId);
+    role = clerkUser.unsafeMetadata?.role;
+  }
+  if (role !== 'BRAND' && role !== 'INFLUENCER') {
+    logger.error({ clerkUserId, role }, '[auth] role still missing after retry');
     throw new AppError('Account setup is incomplete. Please sign up again.', 400, 'BAD_REQUEST');
   }
   const name =
@@ -96,16 +117,24 @@ const findOrCreateByClerkId = async (clerkUserId) => {
       .eq('id', byIdentifier.id)
       .select('id')
       .single();
-    if (error) throw new AppError('Failed to link account.', 500, 'DATABASE_ERROR');
+    if (error) {
+      logger.error({ clerkUserId, email, err: error.message }, '[auth] failed to link existing user row');
+      throw new AppError('Failed to link account.', 500, 'DATABASE_ERROR');
+    }
     userId = linked.id;
+    logger.info({ clerkUserId, userId }, '[auth] linked Clerk identity to existing user row');
   } else {
     const { data: created, error } = await supabase
       .from('users')
       .insert({ email, role, clerk_user_id: clerkUserId, full_name: name, is_onboarded: false })
       .select('id')
       .single();
-    if (error) throw new AppError('Failed to create user profile.', 500, 'DATABASE_ERROR');
+    if (error) {
+      logger.error({ clerkUserId, email, role, err: error.message }, '[auth] failed to create user row');
+      throw new AppError('Failed to create user profile.', 500, 'DATABASE_ERROR');
+    }
     userId = created.id;
+    logger.info({ clerkUserId, userId, role }, '[auth] created new user row');
 
     if (role === 'BRAND') {
       await supabase.from('brands').insert({

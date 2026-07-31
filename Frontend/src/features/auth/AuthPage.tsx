@@ -38,6 +38,7 @@ export default function AuthPage({ mode }: Props) {
   // the form at all.
   useEffect(() => {
     if (authLoaded && isSignedIn) {
+      console.log("[AuthPage] Clerk session already active on mount — routing to /oauth-role to resolve it");
       navigate("/oauth-role", { replace: true });
     }
   }, [authLoaded, isSignedIn, navigate]);
