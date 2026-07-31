@@ -126,6 +126,21 @@ app.listen(config.PORT, () => {
   } else {
     logger.warn('[auth] CLERK_PUBLISHABLE_KEY not set — cannot verify this server matches the frontend Clerk instance.');
   }
+
+  // Validate the Instagram token-encryption key at boot rather than letting a
+  // bad value surface as an opaque 500 deep inside the OAuth callback (after
+  // Instagram has already been consented to), which is near-impossible to
+  // diagnose from the UI. Deliberately a loud warning rather than a hard exit:
+  // only the Instagram integration depends on this key, so a bad value should
+  // not take the whole API down.
+  const encKey = config.TOKEN_ENCRYPTION_KEY;
+  if (!encKey) {
+    logger.warn('[instagram] TOKEN_ENCRYPTION_KEY is not set — connecting Instagram WILL fail. Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
+  } else if (encKey.length !== 64 || !/^[0-9a-fA-F]+$/.test(encKey)) {
+    logger.warn(`[instagram] TOKEN_ENCRYPTION_KEY is invalid (got ${encKey.length} chars, need exactly 64 hex) — connecting Instagram WILL fail.`);
+  } else {
+    logger.info('[instagram] token encryption key OK.');
+  }
   // Background gig-expiry sweep. Expiry is also enforced on read and on apply,
   // so this keeps statuses truthful rather than being the gate itself.
   scheduler.start();
