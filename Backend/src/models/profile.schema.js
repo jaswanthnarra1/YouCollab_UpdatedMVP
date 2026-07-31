@@ -17,9 +17,10 @@ const updateBrandProfileSchema = z.object({
   logoUrl: z.string().url('Invalid URL format').optional().nullable().or(z.literal('')),
 });
 
+// `instagramHandle` / `followerCount` are intentionally omitted — they are
+// Meta-API-owned. See the note in models/onboarding.schema.js.
 const updateInfluencerProfileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100).optional(),
-  instagramHandle: z.string().min(1).max(100).optional(),
   niche: z.string().min(2).optional(),
   pincode: pincodeSchema,
   bio: z.string({ required_error: 'Bio is required' })
@@ -28,7 +29,6 @@ const updateInfluencerProfileSchema = z.object({
       message: 'Bio must contain at least three words',
     }),
   profileImageUrl: z.string().url('Invalid URL format').optional().nullable().or(z.literal('')),
-  followerCount: z.number().int().min(0).optional(),
 });
 
 module.exports = {

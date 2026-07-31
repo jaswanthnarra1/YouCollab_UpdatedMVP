@@ -273,6 +273,13 @@ const syncInfluencerIgData = async (userId) => {
     igUserId: profile.id,
     igUsername: profile.username,
     igName: profile.name || null,
+    // Mirror into the legacy creator-profile columns, which are what the rest
+    // of the app reads: brand-facing creator cards, and getTier() — which sets
+    // the credit cost of hiring this creator. Meta is the only writer of these
+    // now (users can no longer edit them), so mirroring here keeps every
+    // existing consumer correct without a risky refactor of the billing path.
+    instagramHandle: profile.username,
+    followerCount: profile.followers_count ?? 0,
     igProfilePicUrl: profile.profile_picture_url || null,
     igBio: profile.biography || null,
     igFollowersCount: profile.followers_count ?? null,
@@ -477,6 +484,13 @@ const connectInstagram = async (userId, code) => {
     igUserId: profile.id,
     igUsername: profile.username,
     igName: profile.name || null,
+    // Mirror into the legacy creator-profile columns, which are what the rest
+    // of the app reads: brand-facing creator cards, and getTier() — which sets
+    // the credit cost of hiring this creator. Meta is the only writer of these
+    // now (users can no longer edit them), so mirroring here keeps every
+    // existing consumer correct without a risky refactor of the billing path.
+    instagramHandle: profile.username,
+    followerCount: profile.followers_count ?? 0,
     igAccessToken: encryptSecret(longToken.access_token),
     igTokenExpiresAt: expiresAt.toISOString(),
     igConnectedAt: now,
@@ -522,6 +536,11 @@ const disconnectIg = async (userId) => {
       igUserId: null,
       igUsername: null,
       igName: null,
+      // Clear the mirrored profile fields too, so a disconnected creator can't
+      // keep showing a follower count (and its associated pricing tier) that
+      // is no longer backed by a live, verified Instagram connection.
+      instagramHandle: '',
+      followerCount: 0,
       igAccessToken: null,
       igTokenExpiresAt: null,
       igConnectedAt: null,

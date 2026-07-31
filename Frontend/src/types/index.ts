@@ -64,23 +64,26 @@ export interface BrandProfilePayload {
   logoUrl?: string;
 }
 
+/**
+ * `instagramHandle` and `followerCount` are intentionally NOT part of these
+ * payloads — they're owned by the Meta Graph API and written only by the
+ * Instagram integration after a verified OAuth connection. The backend strips
+ * them from both request schemas, so including them here would be a lie the
+ * compiler couldn't catch.
+ */
 export interface CreatorProfilePayload {
   name?: string;
-  instagramHandle?: string;
   niche?: string;
   pincode: string;
   bio?: string;
   profileImageUrl?: string;
-  followerCount?: number;
 }
 
 export interface InfluencerOnboardingPayload {
   name: string;
-  instagramHandle?: string;
   niche: string;
   pincode: string;
   bio: string;
-  followerCount: number;
   profileImageUrl?: string;
 }
 

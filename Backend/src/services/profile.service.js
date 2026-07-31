@@ -99,13 +99,14 @@ const updateInfluencerProfile = async (userId, data) => {
     throw new AppError('Creator profile not found. Complete onboarding first.', 404, 'NOT_FOUND');
   }
 
+  // instagramHandle / followerCount are absent by design: the Zod schema strips
+  // them, and even if a caller bypassed it they are never copied here. Only the
+  // Instagram integration writes those fields — see instagram.service.js.
   const updateData = {};
   if (data.name !== undefined) updateData.name = data.name;
-  if (data.instagramHandle !== undefined) updateData.instagramHandle = data.instagramHandle;
   if (data.niche !== undefined) updateData.niche = data.niche;
   if (data.bio !== undefined) updateData.bio = data.bio;
   if (data.profileImageUrl !== undefined) updateData.profileImageUrl = data.profileImageUrl || null;
-  if (data.followerCount !== undefined) updateData.followerCount = data.followerCount;
   if (data.pincode !== undefined) {
     if (data.pincode) {
       const resolved = await geocodePincode(data.pincode);

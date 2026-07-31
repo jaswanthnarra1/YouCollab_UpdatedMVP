@@ -20,15 +20,25 @@ const brandOnboardingSchema = z.object({
   website: z.string().url('Please enter a valid website URL starting with http/https').optional().or(z.literal('')),
 });
 
+/**
+ * NOTE: `instagramHandle` and `followerCount` are deliberately absent here and
+ * in updateInfluencerProfileSchema. They are owned exclusively by the Instagram
+ * integration (see services/instagram.service.js), which writes them from the
+ * Meta Graph API after a verified OAuth connection.
+ *
+ * This is a correctness AND a security boundary: `followerCount` determines the
+ * creator's pricing tier via getTier(), which decides how many credits a brand
+ * is charged to hire them (services/application.service.js). A user-supplied
+ * value would let a creator move their own tier and change what brands pay.
+ *
+ * Zod strips unknown keys by default, so a client sending these fields has them
+ * silently discarded rather than the request failing — the desired behaviour
+ * for a field the client should simply have no say over.
+ */
 const influencerOnboardingSchema = z.object({
   name: z.string({ required_error: 'Your name is required' })
     .min(2, 'Name must be at least 2 characters long')
     .max(100, 'Name is too long'),
-  instagramHandle: z.string().optional().default('')
-    .transform((val) => {
-      if (!val) return '';
-      return val.startsWith('@') ? val : `@${val}`;
-    }),
   niche: z.string({ required_error: 'Niche is required' })
     .min(2, 'Niche is required'),
   pincode: pincodeSchema,
@@ -38,7 +48,6 @@ const influencerOnboardingSchema = z.object({
       message: 'Bio must contain at least three words',
     }),
   profileImageUrl: z.string().url('Invalid profile image URL').optional().or(z.literal('')),
-  followerCount: z.number().int().min(0).optional().default(0),
 });
 
 module.exports = {

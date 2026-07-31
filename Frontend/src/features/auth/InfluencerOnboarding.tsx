@@ -21,8 +21,6 @@ export default function InfluencerOnboarding() {
   const [niche, setNiche] = useState<string>("Fashion");
   const [pincode, setPincode] = useState("");
   const [bio, setBio] = useState("");
-  const [handle, setHandle] = useState("");
-  const [followers, setFollowers] = useState<number | "">("");
   const [profileImageUrl, setProfileImageUrl] = useState("");
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -31,8 +29,6 @@ export default function InfluencerOnboarding() {
   const save = useMutation({
     mutationFn: () => onboardingService.influencer({
       name, niche, bio, pincode,
-      followerCount: Number(followers || 0),
-      instagramHandle: handle || undefined,
       profileImageUrl: profileImageUrl || undefined,
     }),
     onSuccess: () => {
@@ -83,18 +79,12 @@ export default function InfluencerOnboarding() {
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Aarav Sharma" className="h-9 text-[13px] rounded-sm" />
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-[12px]">Niche</Label>
-              <Select value={niche} onValueChange={setNiche}>
-                <SelectTrigger className="h-9 text-[13px] rounded-sm bg-background border-border"><SelectValue /></SelectTrigger>
-                <SelectContent>{NICHES.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-[12px]">Instagram handle (optional)</Label>
-              <Input value={handle} onChange={(e) => setHandle(e.target.value)} placeholder="@yourhandle" className="h-9 text-[13px] rounded-sm" />
-            </div>
+          <div className="space-y-1.5">
+            <Label className="text-[12px]">Niche</Label>
+            <Select value={niche} onValueChange={setNiche}>
+              <SelectTrigger className="h-9 text-[13px] rounded-sm bg-background border-border"><SelectValue /></SelectTrigger>
+              <SelectContent>{NICHES.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}</SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-1.5">
@@ -115,15 +105,9 @@ export default function InfluencerOnboarding() {
             <p className="text-xs text-muted-foreground">{countWords(bio)}/3 words</p>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label className="text-[12px]">Follower count (fallback)</Label>
-              <Input type="number" min={0} value={followers} onChange={(e) => setFollowers(e.target.value === "" ? "" : Number(e.target.value))} placeholder="12500" className="h-9 text-[13px] rounded-sm" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-[12px]">Profile image URL (optional)</Label>
-              <Input value={profileImageUrl} onChange={(e) => setProfileImageUrl(e.target.value)} placeholder="https://..." className="h-9 text-[13px] rounded-sm" />
-            </div>
+          <div className="space-y-1.5">
+            <Label className="text-[12px]">Profile image URL (optional)</Label>
+            <Input value={profileImageUrl} onChange={(e) => setProfileImageUrl(e.target.value)} placeholder="https://..." className="h-9 text-[13px] rounded-sm" />
           </div>
 
           <div className="border border-border rounded-sm p-4 flex items-start gap-3">

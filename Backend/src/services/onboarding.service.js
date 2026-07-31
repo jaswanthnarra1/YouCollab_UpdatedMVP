@@ -117,12 +117,13 @@ const onboardInfluencer = async (userId, data) => {
     .upsert({
       userId,
       name: data.name,
-      instagramHandle: data.instagramHandle,
       niche: data.niche,
       ...locationFields,
       bio: data.bio,
       profileImageUrl: data.profileImageUrl || null,
-      followerCount: data.followerCount || 0,
+      // instagramHandle / followerCount deliberately not set here — they are
+      // written only by the Instagram integration after a verified OAuth
+      // connection. The column defaults ('' / 0) stand in until then.
     }, { onConflict: 'userId' })
     .select('*')
     .single();
