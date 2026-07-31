@@ -9,10 +9,13 @@ import { profileService } from "@/services/profile";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/common/select";
 import { Textarea } from "@/components/common/textarea";
 import { useAuthStore } from "@/stores/authStore";
+import { useEditableForm } from "@/hooks/useEditableForm";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+
+const EMPTY = { businessName: "", category: "Cafe", location: "Pune", pincode: "", bio: "", website: "", logoUrl: "" };
 
 export default function BrandProfile() {
   const navigate = useNavigate();
@@ -20,13 +23,9 @@ export default function BrandProfile() {
   const qc = useQueryClient();
   const { patchUser } = useAuthStore();
 
-  const [businessName, setBusinessName] = useState("");
-  const [category, setCategory] = useState("Cafe");
-  const [location, setLocation] = useState("Pune");
-  const [pincode, setPincode] = useState("");
-  const [bio, setBio] = useState("");
-  const [website, setWebsite] = useState("");
-  const [logoUrl, setLogoUrl] = useState("");
+  const { values, setField, editing, isDirty, startEdit, discard, commit, hydrate } = useEditableForm(EMPTY);
+  const { businessName, category, location, pincode, bio, website, logoUrl } = values;
+
   const [uploading, setUploading] = useState(false);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
 
@@ -36,16 +35,18 @@ export default function BrandProfile() {
   });
 
   useEffect(() => {
-    if (profile && profile.brand) {
-      setBusinessName(profile.brand.businessName || "");
-      setCategory(profile.brand.category || "Cafe");
-      setLocation(profile.brand.location || "Pune");
-      setPincode(profile.brand.pincode || "");
-      setBio(profile.brand.bio || "");
-      setWebsite(profile.brand.website || "");
-      setLogoUrl(profile.brand.logoUrl || "");
-    }
-  }, [profile]);
+    // Don't let a background refetch overwrite in-progress edits.
+    if (!profile?.brand || editing) return;
+    hydrate({
+      businessName: profile.brand.businessName || "",
+      category: profile.brand.category || "Cafe",
+      location: profile.brand.location || "Pune",
+      pincode: profile.brand.pincode || "",
+      bio: profile.brand.bio || "",
+      website: profile.brand.website || "",
+      logoUrl: profile.brand.logoUrl || "",
+    });
+  }, [profile, editing, hydrate]);
 
   const update = useMutation({
     mutationFn: () => profileService.updateProfile({
@@ -57,13 +58,14 @@ export default function BrandProfile() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["profile"] });
       patchUser({ name: businessName, avatarUrl: logoUrl || null });
-      toast({ title: "Profile updated successfully! ✨" });
+      commit();
+      toast({ title: "Profile updated successfully." });
     },
     onError: (e: any) =>
-      toast({ 
-        variant: "destructive", 
-        title: "Update failed", 
-        description: e?.response?.data?.error?.message ?? e?.response?.data?.message ?? "Try again." 
+      toast({
+        variant: "destructive",
+        title: "Update failed",
+        description: e?.response?.data?.error?.message ?? e?.response?.data?.message ?? "Try again.",
       }),
   });
 
@@ -85,7 +87,8 @@ export default function BrandProfile() {
       });
       const url = data.data?.url || data.url;
       if (url) {
-        setLogoUrl(url);
+        // Staged like any other field — persisted only when the form is saved.
+        setField("logoUrl", url);
         toast({ title: "Logo updated successfully! 📸" });
       }
     } catch {
@@ -109,7 +112,7 @@ export default function BrandProfile() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <main className="mx-auto max-w-2xl px-6 py-10 space-y-6">
-        
+
         {/* Back Link */}
         <div>
           <Button onClick={() => navigate("/dashboard/brand")} variant="ghost" size="sm" className="-ml-2 text-muted-foreground hover:text-foreground h-8 text-[12px] rounded-sm">
@@ -127,7 +130,7 @@ export default function BrandProfile() {
         {/* Content Panel Box matching Dashboard card style */}
         <div className="border border-border rounded-sm p-6 bg-background space-y-5">
           <div className="flex items-center gap-4">
-            {/* Logo Container with Pen Upload Overlay */}
+            {/* Logo — editable only in edit mode, since it's saved with the form. */}
             <div className="relative group h-16 w-16 rounded-sm bg-gradient-brand shrink-0 flex items-center justify-center text-primary-foreground font-bold text-xl overflow-hidden border border-border">
               {uploading ? (
                 <Loader2 className="h-5 w-5 animate-spin text-white" />
@@ -137,16 +140,18 @@ export default function BrandProfile() {
                 businessName?.[0] || "B"
               )}
 
-              <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity duration-200">
-                <Pencil className="h-4 w-4 text-white" />
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageSelect}
-                  className="hidden"
-                  disabled={uploading}
-                />
-              </label>
+              {editing && (
+                <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity duration-200">
+                  <Pencil className="h-4 w-4 text-white" />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    className="hidden"
+                    disabled={uploading}
+                  />
+                </label>
+              )}
             </div>
             <div>
               <h3 className="font-semibold text-lg">{businessName || "Your business"}</h3>
@@ -156,7 +161,13 @@ export default function BrandProfile() {
 
           <div className="space-y-1.5">
             <Label className="text-[12px]">Business name</Label>
-            <Input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Koregaon Coffee Co." className="h-9 text-[13px] rounded-sm" />
+            <Input
+              value={businessName}
+              onChange={(e) => setField("businessName", e.target.value)}
+              disabled={!editing}
+              placeholder="Koregaon Coffee Co."
+              className="h-9 text-[13px] rounded-sm disabled:opacity-70 disabled:cursor-not-allowed"
+            />
           </div>
 
           <div className="space-y-1.5">
@@ -167,14 +178,19 @@ export default function BrandProfile() {
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label className="text-[12px]">Category</Label>
-              <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger className="h-9 text-[13px] rounded-sm bg-background border-border"><SelectValue /></SelectTrigger>
+              <Select value={category} onValueChange={(v) => setField("category", v)} disabled={!editing}>
+                <SelectTrigger className="h-9 text-[13px] rounded-sm bg-background border-border disabled:opacity-70 disabled:cursor-not-allowed"><SelectValue /></SelectTrigger>
                 <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
               <Label className="text-[12px]">Location</Label>
-              <Input value={location} onChange={(e) => setLocation(e.target.value)} className="h-9 text-[13px] rounded-sm" />
+              <Input
+                value={location}
+                onChange={(e) => setField("location", e.target.value)}
+                disabled={!editing}
+                className="h-9 text-[13px] rounded-sm disabled:opacity-70 disabled:cursor-not-allowed"
+              />
             </div>
           </div>
 
@@ -182,17 +198,24 @@ export default function BrandProfile() {
             <Label className="text-[12px]">PIN code</Label>
             <Input
               value={pincode}
-              onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              onChange={(e) => setField("pincode", e.target.value.replace(/\D/g, "").slice(0, 6))}
+              disabled={!editing}
               placeholder="411001"
               maxLength={6}
-              className="h-9 text-[13px] rounded-sm max-w-[160px]"
+              className="h-9 text-[13px] rounded-sm max-w-[160px] disabled:opacity-70 disabled:cursor-not-allowed"
             />
             <p className="text-xs text-muted-foreground">Unlocks radius matching for your collabs. We currently support Pune PIN codes.</p>
           </div>
 
           <div className="space-y-1.5">
             <Label className="text-[12px]">Bio <span className="text-muted-foreground">(min 3 words)</span></Label>
-            <Textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="What does your brand stand for?" className="text-[13px] rounded-sm min-h-[110px]" />
+            <Textarea
+              value={bio}
+              onChange={(e) => setField("bio", e.target.value)}
+              disabled={!editing}
+              placeholder="What does your brand stand for?"
+              className="text-[13px] rounded-sm min-h-[110px] disabled:opacity-70 disabled:cursor-not-allowed"
+            />
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>{countWords(bio)}/3 words</span>
             </div>
@@ -200,13 +223,42 @@ export default function BrandProfile() {
 
           <div className="space-y-1.5">
             <Label className="text-[12px]">Website (optional)</Label>
-            <Input type="url" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." className="h-9 text-[13px] rounded-sm" />
+            <Input
+              type="url"
+              value={website}
+              onChange={(e) => setField("website", e.target.value)}
+              disabled={!editing}
+              placeholder="https://..."
+              className="h-9 text-[13px] rounded-sm disabled:opacity-70 disabled:cursor-not-allowed"
+            />
           </div>
 
-          <div className="flex justify-end pt-2">
-            <Button disabled={!valid || update.isPending || uploading} onClick={() => update.mutate()} className="h-9 text-[13px] rounded-sm bg-gradient-brand text-primary-foreground border-0 shadow-md hover:opacity-95">
-              {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save changes"}
-            </Button>
+          <div className="flex justify-end gap-2 pt-2">
+            {editing ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={discard}
+                  disabled={update.isPending || uploading}
+                  className="h-9 text-[13px] rounded-sm"
+                >
+                  Discard
+                </Button>
+                <Button
+                  // Disabled until something actually differs from the loaded
+                  // values, and re-disabled if the user reverts their edit.
+                  disabled={!isDirty || !valid || update.isPending || uploading}
+                  onClick={() => update.mutate()}
+                  className="h-9 text-[13px] rounded-sm bg-gradient-brand text-primary-foreground border-0 shadow-md hover:opacity-95"
+                >
+                  {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save changes"}
+                </Button>
+              </>
+            ) : (
+              <Button onClick={startEdit} className="h-9 text-[13px] rounded-sm bg-gradient-brand text-primary-foreground border-0 shadow-md hover:opacity-95">
+                <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit Profile
+              </Button>
+            )}
           </div>
         </div>
 
