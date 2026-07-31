@@ -329,24 +329,12 @@ export default function BrandDashboard() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <main className="mx-auto max-w-[1200px] px-6 py-10 space-y-8">
-        
-        {/* Navigation Tabs on top matching Dashboard style */}
-        <div className="flex border-b border-border overflow-x-auto whitespace-nowrap scrollbar-none mb-6">
-          {["dashboard", "gigs", "applications", "messages"].map((t) => (
-            <button
-              key={t}
-              onClick={() => setSearchParams({ tab: t })}
-              className={`pb-3 text-sm font-semibold tracking-tight px-4 border-b-2 transition-colors uppercase ${
-                activeTab === t 
-                  ? "border-foreground text-foreground" 
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
+      {/* Global navigation lives solely in the sidebar (Dashboard / My Gigs /
+          Applications / Messages all route here via ?tab=). The duplicate row
+          of header tabs that used to sit above this was removed — sidebar for
+          navigation, page for content and filters. Page-level tabs (the
+          applications sub-filters, the gig status filters) are unaffected. */}
+      <main className="mx-auto max-w-[1200px] px-6 py-8 space-y-8">
 
         {/* 1. Dashboard Overview Tab */}
         {activeTab === "dashboard" && (
