@@ -23,7 +23,7 @@ if (!connectionString) {
   process.exit(1);
 }
 
-const BRAND_EMAIL = 'demo.brand@youcollab.in';
+const BRAND_EMAIL = 'demo.brand+clerk_test@example.com';
 
 // Central Pune (Shivajinagar). The brand needs real coordinates or every gig
 // reports a null distance and radius filtering silently can't apply.

@@ -32,9 +32,21 @@ if (!connectionString) {
 // time with form_password_pwned even if account creation itself succeeds.
 const DEMO_PASSWORD = 'YcE52YjgZh!9';
 
+// Clerk's instance requires an email-code second factor on EVERY sign-in, not
+// just at sign-up. The previous demo addresses (@youcollab.in) are a domain
+// with no mailbox, so that code went nowhere and the accounts could not
+// actually be logged into.
+//
+// Addresses matching `+clerk_test@example.com` are handled specially by Clerk
+// on DEVELOPMENT instances: no mail is sent and the verification code is always
+// DEMO_OTP below. That makes these accounts usable without owning a mailbox.
+// Note this only works on development instances — a production Clerk instance
+// will need real, reachable addresses.
+const DEMO_OTP = '424242';
+
 const DEMO_ACCOUNTS = [
   {
-    email: 'demo.brand@youcollab.in',
+    email: 'demo.brand+clerk_test@example.com',
     role: 'BRAND',
     name: 'Demo Brand',
     profile: {
@@ -45,7 +57,7 @@ const DEMO_ACCOUNTS = [
     },
   },
   {
-    email: 'demo.creator@youcollab.in',
+    email: 'demo.creator+clerk_test@example.com',
     role: 'INFLUENCER',
     name: 'Demo Creator',
     profile: {
@@ -141,14 +153,15 @@ async function run() {
     }
 
     console.log('🎉 Demo accounts ready!\n');
-    console.log('   ┌─────────────┬──────────────────────────┬──────────────┐');
-    console.log('   │ Role        │ Email                     │ Password     │');
-    console.log('   ├─────────────┼──────────────────────────┼──────────────┤');
+    const w = Math.max(...DEMO_ACCOUNTS.map((a) => a.email.length));
+    console.log(`   ${'Role'.padEnd(11)} │ ${'Email'.padEnd(w)} │ ${'Password'.padEnd(12)} │ OTP`);
+    console.log(`   ${'-'.repeat(11)}─┼─${'-'.repeat(w)}─┼─${'-'.repeat(12)}─┼───────`);
     for (const a of DEMO_ACCOUNTS) {
-      console.log(`   │ ${a.role.padEnd(11)} │ ${a.email.padEnd(25)} │ ${DEMO_PASSWORD.padEnd(12)} │`);
+      console.log(`   ${a.role.padEnd(11)} │ ${a.email.padEnd(w)} │ ${DEMO_PASSWORD.padEnd(12)} │ ${DEMO_OTP}`);
     }
-    console.log('   └─────────────┴──────────────────────────┴──────────────┘');
     console.log('\n   Use /login (not /register) — these Clerk identities already exist and are pre-verified.');
+    console.log(`   This instance asks for an email code after the password; for these`);
+    console.log(`   +clerk_test addresses Clerk sends no mail and always accepts ${DEMO_OTP}.`);
   } finally {
     await client.end();
   }
