@@ -64,6 +64,7 @@ const handleCallback = asyncHandler(async (req, res) => {
       message: `Instagram connected successfully! Welcome, @${influencer.igUsername} 🎉`,
       instagram: {
         username: influencer.igUsername,
+        name: influencer.igName,
         profilePicUrl: influencer.igProfilePicUrl,
         followersCount: influencer.igFollowersCount,
         followingCount: influencer.igFollowingCount,
@@ -101,6 +102,7 @@ const getProfile = asyncHandler(async (req, res) => {
         ? {
             isConnected: profile.isIgVerified,
             username: profile.igUsername,
+            name: profile.igName,
             userId: profile.igUserId,
             profilePicUrl: profile.igProfilePicUrl,
             bio: profile.igBio,
@@ -135,6 +137,7 @@ const syncData = asyncHandler(async (req, res) => {
       instagram: {
         isConnected: updated.isIgVerified,
         username: updated.igUsername,
+        name: updated.igName,
         profilePicUrl: updated.igProfilePicUrl,
         bio: updated.igBio,
         followersCount: updated.igFollowersCount,

@@ -37,7 +37,7 @@ const INSTAGRAM_SCOPES = [
 const SUPPORTED_ACCOUNT_TYPES = ['BUSINESS', 'MEDIA_CREATOR'];
 
 const SELECT_FIELDS =
-  'id, igUserId, igUsername, igAccessToken, igTokenExpiresAt, igConnectedAt, isIgVerified, ' +
+  'id, igUserId, igUsername, igName, igAccessToken, igTokenExpiresAt, igConnectedAt, isIgVerified, ' +
   'igProfilePicUrl, igBio, igFollowersCount, igFollowingCount, igMediaCount, igLastSyncAt, ' +
   'igAccountType, igPermissionsGranted, igConnectionStatus, igLastRefreshAt';
 
@@ -272,6 +272,7 @@ const syncInfluencerIgData = async (userId) => {
   const updatePayload = {
     igUserId: profile.id,
     igUsername: profile.username,
+    igName: profile.name || null,
     igProfilePicUrl: profile.profile_picture_url || null,
     igBio: profile.biography || null,
     igFollowersCount: profile.followers_count ?? null,
@@ -475,6 +476,7 @@ const connectInstagram = async (userId, code) => {
   const updatePayload = {
     igUserId: profile.id,
     igUsername: profile.username,
+    igName: profile.name || null,
     igAccessToken: encryptSecret(longToken.access_token),
     igTokenExpiresAt: expiresAt.toISOString(),
     igConnectedAt: now,
@@ -519,6 +521,7 @@ const disconnectIg = async (userId) => {
     .update({
       igUserId: null,
       igUsername: null,
+      igName: null,
       igAccessToken: null,
       igTokenExpiresAt: null,
       igConnectedAt: null,
@@ -555,7 +558,7 @@ const getIgProfileFromDb = async (userId) => {
   const { data: influencer } = await supabase
     .from('influencers')
     .select(
-      'isIgVerified, igUsername, igUserId, igProfilePicUrl, igBio, igFollowersCount, igFollowingCount, ' +
+      'isIgVerified, igUsername, igName, igUserId, igProfilePicUrl, igBio, igFollowersCount, igFollowingCount, ' +
       'igMediaCount, igConnectedAt, igLastSyncAt, igTokenExpiresAt, igAccountType, igPermissionsGranted, ' +
       'igConnectionStatus, igLastRefreshAt'
     )

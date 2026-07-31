@@ -1,74 +1,125 @@
-import { Button } from "@/components/common/button";
 import { CheckCircle2, XCircle } from "lucide-react";
-import { instagramService } from "@/services/instagram";
+import { instagramService, IG_RETURN_TO_KEY } from "@/services/instagram";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/layout/Navbar";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+
+const DEFAULT_RETURN = "/dashboard/influencer";
+/** Long enough for the success tick to register, short enough not to feel like a wait. */
+const SUCCESS_DWELL_MS = 1100;
+
+const readReturnTo = () => {
+  const stored = sessionStorage.getItem(IG_RETURN_TO_KEY);
+  sessionStorage.removeItem(IG_RETURN_TO_KEY);
+  // Only ever return to an in-app path — never trust this to be an absolute URL.
+  return stored && stored.startsWith("/") && !stored.startsWith("//") ? stored : DEFAULT_RETURN;
+};
 
 export default function InstagramCallback() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  const { toast } = useToast();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [message, setMessage] = useState("");
+  // OAuth codes are single-use: React 18 StrictMode double-invokes effects in
+  // dev, and a second exchange of the same code always fails. Guard it.
+  const startedRef = useRef(false);
 
   useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+
     const code = params.get("code");
     const state = params.get("state");
     const oauthError = params.get("error");
     const errorReason = params.get("error_reason");
+    const errorDescription = params.get("error_description");
+
+    // Never strand the user on this route — every path below ends in a
+    // navigate() back into the app.
+    const failAndReturn = (msg: string) => {
+      setStatus("error");
+      setMessage(msg);
+      toast({ variant: "destructive", title: "Instagram connection failed", description: msg });
+      const dest = readReturnTo();
+      setTimeout(() => navigate(dest, { replace: true }), SUCCESS_DWELL_MS);
+    };
 
     if (oauthError) {
-      setStatus("error");
-      setMessage(errorReason === "user_denied" ? "You cancelled the Instagram connection." : "Instagram authorization failed.");
+      failAndReturn(
+        errorReason === "user_denied"
+          ? "You cancelled the Instagram connection."
+          : errorDescription || "Instagram authorization was denied."
+      );
       return;
     }
     if (!code || !state) {
-      setStatus("error"); setMessage("Missing authorization details from Instagram. Please try connecting again."); return;
+      failAndReturn("Missing authorization details from Instagram. Please try connecting again.");
+      return;
     }
+
     (async () => {
       try {
         await instagramService.callback(code, state);
+        // Refresh the cached profile so the card is already in its connected
+        // state by the time we land back on it — no manual page refresh.
+        await qc.invalidateQueries({ queryKey: ["instagramProfile"] });
         setStatus("success");
+        toast({ title: "Instagram connected ✨", description: "Your profile metrics are now syncing." });
+        const dest = readReturnTo();
+        setTimeout(() => navigate(dest, { replace: true }), SUCCESS_DWELL_MS);
       } catch (e) {
-        setStatus("error");
-        // Backend error envelope is { success:false, error:{ message, code } } — see
-        // Backend/src/middleware/errorHandler.js. .data.message (no `error`) is
-        // never actually populated, so reading it always fell through to the
-        // generic fallback regardless of the real reason (state mismatch,
-        // personal account detected, cancelled, etc).
-        const msg = (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
-          ?? "Connection failed. Please try again.";
-        setMessage(msg);
+        const msg =
+          (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ??
+          "Connection failed. Please try again.";
+        failAndReturn(msg);
       }
     })();
-  }, [params]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="relative min-h-screen overflow-hidden">
       <div className="absolute inset-0 neon-grid pointer-events-none" />
       <Navbar />
       <main className="relative mx-auto max-w-md px-4 pt-16">
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass-strong rounded-3xl p-8 text-center">
-          {status === "loading" && (<>
-            <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto" />
-            <h1 className="mt-4 text-xl font-semibold">Linking your Instagram…</h1>
-            <p className="text-sm text-muted-foreground mt-1">This should only take a second.</p>
-          </>)}
-          {status === "success" && (<>
-            <CheckCircle2 className="h-12 w-12 mx-auto text-success" />
-            <h1 className="mt-4 text-xl font-semibold">Instagram connected ✨</h1>
-            <p className="text-sm text-muted-foreground mt-1">Your metrics are syncing.</p>
-            <Button className="mt-5 bg-gradient-brand text-primary-foreground border-0" onClick={() => navigate("/dashboard/influencer")}>
-              Go to dashboard
-            </Button>
-          </>)}
-          {status === "error" && (<>
-            <XCircle className="h-12 w-12 mx-auto text-destructive" />
-            <h1 className="mt-4 text-xl font-semibold">Couldn't connect</h1>
-            <p className="text-sm text-muted-foreground mt-1">{message}</p>
-            <Button variant="outline" className="mt-5 glass" onClick={() => navigate("/dashboard/influencer")}>Back to dashboard</Button>
-          </>)}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-strong rounded-3xl p-8 text-center"
+        >
+          {status === "loading" && (
+            <>
+              <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto" />
+              <h1 className="mt-4 text-xl font-semibold">Linking your Instagram…</h1>
+              <p className="text-sm text-muted-foreground mt-1">This should only take a second.</p>
+            </>
+          )}
+          {status === "success" && (
+            <>
+              <motion.div
+                initial={{ scale: 0.6, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: "spring", stiffness: 260, damping: 18 }}
+              >
+                <CheckCircle2 className="h-12 w-12 mx-auto text-success" />
+              </motion.div>
+              <h1 className="mt-4 text-xl font-semibold">Instagram connected ✨</h1>
+              <p className="text-sm text-muted-foreground mt-1">Taking you back…</p>
+            </>
+          )}
+          {status === "error" && (
+            <>
+              <XCircle className="h-12 w-12 mx-auto text-destructive" />
+              <h1 className="mt-4 text-xl font-semibold">Couldn't connect</h1>
+              <p className="text-sm text-muted-foreground mt-1">{message}</p>
+              <p className="text-xs text-muted-foreground/70 mt-3">Returning you to the app…</p>
+            </>
+          )}
         </motion.div>
       </main>
     </div>

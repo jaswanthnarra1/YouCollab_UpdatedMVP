@@ -14,7 +14,7 @@ import {
   MapPin, Send, Loader2, Search, TrendingUp, Sparkles, MessageSquare, Coins, Clock, CheckCircle2,
   ArrowUpNarrowWide, ArrowDownWideNarrow, ArrowUpDown, X, AlertCircle
 } from "lucide-react";
-import { instagramService } from "@/services/instagram";
+import { instagramService, IG_RETURN_TO_KEY } from "@/services/instagram";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Textarea } from "@/components/common/textarea";
 import { useAuthStore } from "@/stores/authStore";
@@ -66,7 +66,14 @@ function InstagramCard() {
 
   const connect = useMutation({
     mutationFn: instagramService.connect,
-    onSuccess: (d) => { if (d?.url) window.location.href = d.url; },
+    onSuccess: (d) => {
+      if (d?.url) {
+        // Remember exactly where the user was so the callback can bring them
+        // back here rather than dumping them on a generic dashboard route.
+        sessionStorage.setItem(IG_RETURN_TO_KEY, window.location.pathname + window.location.search);
+        window.location.href = d.url;
+      }
+    },
     onError: (e) => toast({ variant: "destructive", title: "Couldn't start Instagram connect", description: extractErrorMessage(e, "Try again.") }),
   });
   const sync = useMutation({
@@ -113,22 +120,38 @@ function InstagramCard() {
           ) : connected ? (
             <>
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-[14px] font-semibold truncate">@{data?.username}</h3>
+                <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-success">
+                  <span className="h-1.5 w-1.5 rounded-full bg-success" /> Connected
+                </span>
                 <span className="inline-flex items-center gap-1 border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wider rounded-sm text-muted-foreground">
                   <BadgeCheck className="h-3 w-3" /> Verified{accountTypeLabel ? ` · ${accountTypeLabel}` : ""}
                 </span>
+              </div>
+              <div className="mt-1.5">
+                {data?.name && <h3 className="text-[14px] font-semibold truncate leading-tight">{data.name}</h3>}
+                <p className="text-[12px] text-muted-foreground truncate">@{data?.username}</p>
               </div>
               <div className="grid grid-cols-3 gap-3 mt-3">
                 <div><p className="text-base font-semibold">{(data?.followersCount ?? 0).toLocaleString()}</p><p className="text-[11px] uppercase tracking-wider text-muted-foreground">Followers</p></div>
                 <div><p className="text-base font-semibold">{(data?.followingCount ?? 0).toLocaleString()}</p><p className="text-[11px] uppercase tracking-wider text-muted-foreground">Following</p></div>
                 <div><p className="text-base font-semibold">{(data?.mediaCount ?? 0).toLocaleString()}</p><p className="text-[11px] uppercase tracking-wider text-muted-foreground">Posts</p></div>
               </div>
-              {data?.lastSyncAt && (
-                <p className="text-[10px] text-muted-foreground/70 mt-2">Last synced {timeAgo(data.lastSyncAt)}</p>
-              )}
+              <div className="mt-2 space-y-0.5">
+                {data?.connectedAt && (
+                  <p className="text-[10px] text-muted-foreground/70">
+                    Connected {new Date(data.connectedAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
+                  </p>
+                )}
+                {data?.lastSyncAt && (
+                  <p className="text-[10px] text-muted-foreground/70">Last synced {timeAgo(data.lastSyncAt)}</p>
+                )}
+              </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button size="sm" onClick={() => sync.mutate()} disabled={sync.isPending} className="h-8 text-[12px] rounded-sm">
                   {sync.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh</>}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => connect.mutate()} disabled={connect.isPending} className="h-8 text-[12px] rounded-sm">
+                  {connect.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Instagram className="h-3.5 w-3.5 mr-1" /> Reconnect</>}
                 </Button>
                 <ConfirmDialog
                   title="Disconnect Instagram?"

@@ -660,3 +660,14 @@ COMMENT ON COLUMN influencers."igAccountType"        IS 'BUSINESS or MEDIA_CREAT
 COMMENT ON COLUMN influencers."igPermissionsGranted" IS 'Comma-joined scopes actually granted at OAuth time';
 COMMENT ON COLUMN influencers."igLastRefreshAt"      IS 'Timestamp of last successful access-token refresh (manual or scheduled sweep)';
 COMMENT ON COLUMN influencers."igConnectionStatus"   IS 'CONNECTED / RECONNECT_REQUIRED (token refresh permanently failed) / DISCONNECTED';
+
+-- ============================================
+-- 18. Instagram display name
+-- ============================================
+-- The Graph API /me response already returns `name` (the account's display
+-- name, distinct from the @username handle) and the service already requests
+-- that field — it just had nowhere to land. The connected-state card shows
+-- both, so persist it.
+ALTER TABLE influencers ADD COLUMN IF NOT EXISTS "igName" TEXT;
+
+COMMENT ON COLUMN influencers."igName" IS 'Instagram account display name from Graph API `name` — distinct from igUsername (the @handle)';

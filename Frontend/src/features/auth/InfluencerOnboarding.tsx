@@ -2,7 +2,7 @@ import { Button } from "@/components/common/button";
 import { CheckCircle2, Instagram, Loader2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { Input } from "@/components/common/input";
-import { instagramService } from "@/services/instagram";
+import { instagramService, IG_RETURN_TO_KEY } from "@/services/instagram";
 import { Label } from "@/components/common/label";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/layout/Navbar";
@@ -51,7 +51,12 @@ export default function InfluencerOnboarding() {
 
   const connectIG = useMutation({
     mutationFn: instagramService.connect,
-    onSuccess: (d) => { if (d?.url) window.location.href = d.url; },
+    onSuccess: (d) => {
+      if (d?.url) {
+        sessionStorage.setItem(IG_RETURN_TO_KEY, window.location.pathname + window.location.search);
+        window.location.href = d.url;
+      }
+    },
     onError: (e: any) => toast({
       variant: "destructive",
       title: "Instagram connect failed",

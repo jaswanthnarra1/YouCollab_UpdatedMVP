@@ -1,6 +1,14 @@
 import { apiClient, unwrap } from "@/lib/api";
 import type { InstagramConnectionStatus, InstagramProfile } from "@/types";
 
+/**
+ * sessionStorage key holding the in-app path the user was on when they started
+ * the Instagram connect flow, so InstagramCallback can return them to exactly
+ * that page. Lives here (rather than in the lazy-loaded callback component) so
+ * importing it doesn't pull that chunk into the dashboard bundle.
+ */
+export const IG_RETURN_TO_KEY = "yc.ig.returnTo";
+
 export const instagramService = {
   connect: async (): Promise<{ url: string; state: string }> => {
     const { data } = await apiClient.get("/api/instagram/connect");

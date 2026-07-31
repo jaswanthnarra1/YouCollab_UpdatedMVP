@@ -99,6 +99,9 @@ export type InstagramConnectionStatus = "CONNECTED" | "RECONNECT_REQUIRED" | "DI
 export interface InstagramProfile {
   isConnected: boolean;
   username?: string;
+  /** Display name from the Graph API, distinct from the @handle in `username`. */
+  name?: string;
+  userId?: string;
   followersCount?: number;
   followingCount?: number;
   mediaCount?: number;
