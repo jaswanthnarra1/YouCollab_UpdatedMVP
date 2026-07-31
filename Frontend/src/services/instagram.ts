@@ -30,13 +30,18 @@ export const instagramService = {
     const { data } = await apiClient.get("/api/instagram/status");
     return unwrap(data);
   },
+  // Both endpoints wrap the profile one level deeper than unwrap() strips:
+  // the envelope is { success, data: { instagram: {...} } }, so unwrap() alone
+  // yields { instagram: {...} } and every field read off it was undefined —
+  // which is why the card stayed on its "not connected" branch even with a
+  // live, verified connection in the database.
   profile: async (): Promise<InstagramProfile> => {
     const { data } = await apiClient.get("/api/instagram/profile");
-    return unwrap<InstagramProfile>(data);
+    return unwrap<{ instagram: InstagramProfile }>(data).instagram;
   },
   sync: async (): Promise<InstagramProfile> => {
     const { data } = await apiClient.post("/api/instagram/sync");
-    return unwrap<InstagramProfile>(data);
+    return unwrap<{ instagram: InstagramProfile }>(data).instagram;
   },
   refresh: async (): Promise<{ tokenExpiresAt: string; lastRefreshAt: string; connectionStatus: InstagramConnectionStatus }> => {
     const { data } = await apiClient.post("/api/instagram/refresh");
