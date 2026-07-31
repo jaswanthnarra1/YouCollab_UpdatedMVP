@@ -316,7 +316,7 @@ function MessageDialog({ application, onClose }: { application: Application | nu
   const qc = useQueryClient();
   const [text, setText] = useState("");
 
-  const { data: messages = [] } = useQuery({
+  const { data: messages = [], isLoading: messagesLoading } = useQuery({
     queryKey: ["messages", application?.id],
     queryFn: () => applicationsService.getMessages(application!.id),
     enabled: !!application,
@@ -345,7 +345,9 @@ function MessageDialog({ application, onClose }: { application: Application | nu
               <p className="text-[11px] text-muted-foreground">{application.gig?.title}</p>
             </DialogHeader>
             <div className="flex-1 overflow-y-auto space-y-3 text-xs py-2">
-              {messages.length === 0 ? (
+              {messagesLoading ? (
+                <div className="flex justify-center py-8"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
+              ) : messages.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No messages yet. Say hello!</p>
               ) : (
                 messages.map((msg: Message) => {
@@ -413,7 +415,7 @@ export default function InfluencerDashboard() {
 
   const { data: gigsResult, isLoading: gigsLoading, isError: gigsFailed, error: gigsError, refetch: refetchGigs, isFetching: gigsFetching } =
     useQuery({ queryKey: ["gigs"], queryFn: () => gigsService.list() });
-  const { data: myApps = [] } = useQuery({ queryKey: ["myApplications"], queryFn: applicationsService.mine, retry: false });
+  const { data: myApps = [], isLoading: myAppsLoading } = useQuery({ queryKey: ["myApplications"], queryFn: applicationsService.mine, retry: false });
   const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: profileService.getProfile });
   const credits: number | null = (profile?.influencer as { credits?: number } | undefined)?.credits ?? null;
   const pincode: string | null = (profile?.influencer as { pincode?: string } | undefined)?.pincode ?? null;
@@ -598,7 +600,11 @@ export default function InfluencerDashboard() {
             </>
           ) : (
             <div>
-              {myApps.length === 0 ? (
+              {myAppsLoading ? (
+                <div className="border border-border rounded-sm p-10 text-center text-muted-foreground text-[13px]">
+                  <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                </div>
+              ) : myApps.length === 0 ? (
                 <div className="border border-border rounded-sm p-10 text-center text-muted-foreground text-[13px]">
                   You haven't pitched to any gigs yet. Available gigs will appear under the first tab!
                 </div>

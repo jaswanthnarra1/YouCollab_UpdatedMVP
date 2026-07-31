@@ -50,7 +50,7 @@ if (!CLERK_PUBLISHABLE_KEY) {
 
 const RouteFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
-    <div className="h-6 w-6 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin" />
+    <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
   </div>
 );
 

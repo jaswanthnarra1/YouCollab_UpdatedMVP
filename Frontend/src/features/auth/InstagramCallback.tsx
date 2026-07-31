@@ -1,5 +1,5 @@
 import { Button } from "@/components/common/button";
-import { CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { CheckCircle2, XCircle } from "lucide-react";
 import { instagramService } from "@/services/instagram";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/layout/Navbar";
@@ -51,7 +51,7 @@ export default function InstagramCallback() {
       <main className="relative mx-auto max-w-md px-4 pt-16">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass-strong rounded-3xl p-8 text-center">
           {status === "loading" && (<>
-            <Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" />
+            <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto" />
             <h1 className="mt-4 text-xl font-semibold">Linking your Instagram…</h1>
             <p className="text-sm text-muted-foreground mt-1">This should only take a second.</p>
           </>)}

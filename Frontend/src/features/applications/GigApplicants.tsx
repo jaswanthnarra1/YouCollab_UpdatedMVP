@@ -9,6 +9,7 @@ import { gigsService } from "@/services/gigs";
 import { Input } from "@/components/common/input";
 import { Link, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -61,7 +62,7 @@ export default function GigApplicants() {
   const { toast } = useToast();
   const [chatApp, setChatApp] = useState<Application | null>(null);
 
-  const { data: gig } = useQuery({ queryKey: ["gig", id], queryFn: () => gigsService.get(id), enabled: !!id });
+  const { data: gig, isLoading: gigLoading } = useQuery({ queryKey: ["gig", id], queryFn: () => gigsService.get(id), enabled: !!id });
   const { data: apps = [], isLoading } = useQuery({
     queryKey: ["applications", "gig", id], queryFn: () => applicationsService.forGig(id), enabled: !!id,
   });
@@ -88,12 +89,18 @@ export default function GigApplicants() {
         <Button asChild variant="ghost" size="sm" className="-ml-2"><Link to="/dashboard/brand"><ArrowLeft className="h-4 w-4 mr-1" /> Back</Link></Button>
         <div>
           <div className="chip mb-2">Applicants</div>
-          <h1 className="text-3xl font-semibold">{gig?.title ?? "Gig"}</h1>
+          {gigLoading ? (
+            <Skeleton className="h-9 w-64" />
+          ) : (
+            <h1 className="text-3xl font-semibold">{gig?.title ?? "Gig"}</h1>
+          )}
           <p className="text-sm text-muted-foreground mt-1">{apps.length} creator{apps.length === 1 ? "" : "s"} pitched.</p>
         </div>
 
         {isLoading ? (
-          <div className="glass rounded-2xl p-10 text-center text-sm text-muted-foreground">Loading applicants…</div>
+          <div className="glass rounded-2xl p-10 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading applicants…
+          </div>
         ) : apps.length === 0 ? (
           <div className="glass rounded-2xl p-10 text-center text-sm text-muted-foreground">No applicants yet.</div>
         ) : (

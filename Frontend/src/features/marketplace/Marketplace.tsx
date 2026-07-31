@@ -4,7 +4,7 @@ import { CATEGORIES } from "@/constants";
 import { gigsService } from "@/services/gigs";
 import { Input } from "@/components/common/input";
 import { Link } from "react-router-dom";
-import { Search, MapPin, IndianRupee, Calendar } from "lucide-react";
+import { Search, MapPin, IndianRupee, Calendar, Loader2 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -140,8 +140,8 @@ export default function Marketplace() {
 
         {/* Display briefs grid */}
         {isLoading ? (
-          <div className="border border-border rounded-sm p-20 text-center text-[13px] text-muted-foreground">
-            Loading marketplace briefs...
+          <div className="border border-border rounded-sm p-20 text-center text-[13px] text-muted-foreground flex flex-col items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading marketplace briefs...
           </div>
         ) : filteredGigs.length === 0 ? (
           <div className="border border-border rounded-sm p-20 text-center text-[13px] text-muted-foreground">

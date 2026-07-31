@@ -189,10 +189,8 @@ export default function GigEdit() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background text-foreground">
-        <div className="flex justify-center items-center h-[50vh]">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
       </div>
     );
   }

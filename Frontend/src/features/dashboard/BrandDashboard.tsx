@@ -24,6 +24,7 @@ import {
   MessageSquare,
   Check,
   X,
+  Loader2,
   TrendingUp,
   Bookmark,
   BookmarkCheck,
@@ -236,7 +237,7 @@ export default function BrandDashboard() {
   const [selectedChatPartner, setSelectedChatPartner] = useState<Application | null>(null);
   const [chatMessageText, setChatMessageText] = useState("");
 
-  const { data: threadMessages = [] } = useQuery({
+  const { data: threadMessages = [], isLoading: threadMessagesLoading } = useQuery({
     queryKey: ["messages", selectedChatPartner?.id],
     queryFn: () => applicationsService.getMessages(selectedChatPartner!.id),
     enabled: activeTab === "messages" && !!selectedChatPartner,
@@ -455,7 +456,9 @@ export default function BrandDashboard() {
               <div className="border border-border rounded-sm p-5 bg-background md:col-span-2 space-y-4">
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Recent Activity</h3>
                             {isLoadingApps || isLoadingGigs ? (
-                  <div className="text-center py-10 text-[12px] text-muted-foreground">Loading activity log...</div>
+                  <div className="text-center py-10 text-[12px] text-muted-foreground flex items-center justify-center gap-2">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading activity log...
+                  </div>
                 ) : recentActivities.length === 0 ? (
                   <div className="text-center py-10 text-[12px] text-muted-foreground border border-dashed border-border/50 rounded-sm">
                     No activity logs recorded. Post a gig to start receiving applications.
@@ -546,7 +549,9 @@ export default function BrandDashboard() {
 
             {/* Filtered gigs output */}
             {isLoadingGigs ? (
-              <div className="border border-border rounded-sm p-10 text-center text-xs text-muted-foreground">Loading campaigns...</div>
+              <div className="border border-border rounded-sm p-10 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading campaigns...
+              </div>
             ) : (
               (() => {
                 // Expired and draft campaigns stay reachable here rather than
@@ -808,8 +813,10 @@ export default function BrandDashboard() {
             </div>
 
             {/* Display list of applications */}
-            {isLoadingApps ? (
-              <div className="border border-border rounded-sm p-10 text-center text-xs text-muted-foreground">Loading applications...</div>
+            {isLoadingApps || isLoadingGigs ? (
+              <div className="border border-border rounded-sm p-10 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading applications...
+              </div>
             ) : (
               (() => {
                 // Filter by gig
@@ -1064,6 +1071,9 @@ export default function BrandDashboard() {
                       </div>
 
                       {/* Real message thread, backed by /api/applications/:id/messages */}
+                      {threadMessagesLoading && (
+                        <div className="flex justify-center py-3"><Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" /></div>
+                      )}
                       {threadMessages.map((msg: Message) => {
                         const fromMe = msg.senderId === user?.id;
                         return (
