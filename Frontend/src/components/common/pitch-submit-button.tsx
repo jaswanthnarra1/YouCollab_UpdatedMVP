@@ -20,6 +20,14 @@ type Phase = "idle" | "submitting" | "progress" | "reviewing" | "success" | "err
 
 const STAGE_MS = { submitting: 700, progress: 800, reviewing: 800 } as const;
 
+/** How long the green success chip stays on screen before onSuccess runs.
+ *  Without this the caller (which typically closes the dialog) tears the
+ *  component down in the same tick the success state is set, so the chip and
+ *  its checkmark pop are never actually seen. */
+const SUCCESS_DWELL_MS = 1000;
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 /** Ring that fills as the pitch advances — the reference image's status glyphs. */
@@ -124,6 +132,9 @@ export function PitchSubmitButton({ onSubmit, onSuccess, disabled, className }: 
       if (failed) return bail();
       setPhase("success");
       runningRef.current = false;
+      // Still hold briefly — the confirmation needs to be readable even when
+      // the transitions between stages are suppressed.
+      await sleep(SUCCESS_DWELL_MS);
       onSuccess?.();
       return;
     }
@@ -145,6 +156,8 @@ export function PitchSubmitButton({ onSubmit, onSuccess, disabled, className }: 
 
     setPhase("success");
     runningRef.current = false;
+    // Let the checkmark pop land and be read before handing back to the caller.
+    await sleep(SUCCESS_DWELL_MS);
     onSuccess?.();
   }, [onSubmit, onSuccess, reduce]);
 
