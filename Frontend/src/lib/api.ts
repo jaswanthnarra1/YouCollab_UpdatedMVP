@@ -56,14 +56,38 @@ apiClient.interceptors.request.use(async (config) => {
   return config;
 });
 
+/**
+ * Routes that are themselves *resolving* authentication. A 401 on these is a
+ * normal, expected outcome the page handles itself (showing a retry, an error,
+ * or a role picker) — it must NOT trigger the redirect below.
+ *
+ * This was the engine of a production infinite-redirect loop: a 401 on
+ * /oauth-role hard-reloaded the browser to /login, AuthPage saw Clerk's
+ * still-valid client session and immediately routed back to /oauth-role, which
+ * 401'd again — forever. Because window.location.href tears the page down
+ * synchronously, it also preempted /oauth-role's own error UI, so the failure
+ * could never surface to the user or be retried.
+ */
+const AUTH_FLOW_PATHS = [
+  "/login",
+  "/register",
+  "/oauth-role",
+  "/sso-callback",
+  "/verify-otp",
+  "/verify-login-otp",
+  "/forgot-password",
+];
+
+const isOnAuthFlowPage = () =>
+  typeof window !== "undefined" &&
+  AUTH_FLOW_PATHS.some((p) => window.location.pathname.startsWith(p));
+
 apiClient.interceptors.response.use(
   (r) => r,
   (error) => {
-    if (
-      error.response?.status === 401 &&
-      typeof window !== "undefined" &&
-      !window.location.pathname.startsWith("/login")
-    ) {
+    // Only bounce to /login for a session that expired *mid-session* on a real
+    // app page. Auth-flow pages own their own 401 handling.
+    if (error.response?.status === 401 && !isOnAuthFlowPage()) {
       window.location.href = "/login";
     }
     return Promise.reject(error);

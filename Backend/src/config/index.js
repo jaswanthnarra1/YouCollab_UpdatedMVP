@@ -5,6 +5,24 @@ if (!process.env.CLERK_SECRET_KEY) {
   throw new Error('FATAL: CLERK_SECRET_KEY must be set. Auth cannot function without it.');
 }
 
+/**
+ * A Clerk publishable key embeds its instance domain as base64 after the
+ * pk_test_/pk_live_ prefix. Decoding it lets the server announce which Clerk
+ * instance it's configured against at boot, so a frontend/backend instance
+ * mismatch — which makes every frontend-minted token unverifiable here and
+ * surfaces to users as an unexplained login loop — is visible in the deploy
+ * logs instead of only reproducible in a browser.
+ */
+const clerkInstanceFromKey = (publishableKey) => {
+  if (!publishableKey) return null;
+  try {
+    const encoded = publishableKey.replace(/^pk_(test|live)_/, '');
+    return Buffer.from(encoded, 'base64').toString('utf8').replace(/\$$/, '') || null;
+  } catch {
+    return null;
+  }
+};
+
 module.exports = {
   PORT: process.env.PORT || 5000,
   NODE_ENV: process.env.NODE_ENV || 'development',
@@ -13,6 +31,9 @@ module.exports = {
   CLERK: {
     SECRET_KEY: process.env.CLERK_SECRET_KEY,
     PUBLISHABLE_KEY: process.env.CLERK_PUBLISHABLE_KEY,
+    // Derived, for the boot-time announcement in src/index.js — null when
+    // CLERK_PUBLISHABLE_KEY isn't set on this environment.
+    INSTANCE: clerkInstanceFromKey(process.env.CLERK_PUBLISHABLE_KEY),
   },
 
   SUPABASE: {

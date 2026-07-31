@@ -117,6 +117,15 @@ app.use(errorHandler);
 // Start Server
 app.listen(config.PORT, () => {
   logger.info(`YouCollab server is buzzing on port ${config.PORT} in ${config.NODE_ENV} mode! 🐝🚀`);
+  // Announce the Clerk instance this server verifies tokens against. It MUST
+  // match the instance the frontend bundle was built with (its
+  // VITE_CLERK_PUBLISHABLE_KEY) — otherwise every token the frontend mints is
+  // unverifiable here and users get an unexplained login loop.
+  if (config.CLERK.INSTANCE) {
+    logger.info(`[auth] Clerk instance: ${config.CLERK.INSTANCE} — must match the frontend's publishable key.`);
+  } else {
+    logger.warn('[auth] CLERK_PUBLISHABLE_KEY not set — cannot verify this server matches the frontend Clerk instance.');
+  }
   // Background gig-expiry sweep. Expiry is also enforced on read and on apply,
   // so this keeps statuses truthful rather than being the gate itself.
   scheduler.start();
