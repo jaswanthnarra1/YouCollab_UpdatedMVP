@@ -8,23 +8,30 @@ interface ConfirmDialogProps {
   trigger: ReactNode;
   title: string;
   description: string;
+  /** Optional rich content rendered below the description (lists, callouts) — kept
+   *  separate from `description` since Radix's AlertDialogDescription renders a
+   *  <p>, which can't validly contain block-level children like <ul>/<div>. */
+  children?: ReactNode;
   confirmLabel: string;
   cancelLabel?: string;
   destructive?: boolean;
   onConfirm: () => void;
+  className?: string;
 }
 
 export function ConfirmDialog({
-  trigger, title, description, confirmLabel, cancelLabel = "Cancel", destructive, onConfirm,
+  trigger, title, description, children, confirmLabel, cancelLabel = "Cancel",
+  destructive, onConfirm, className,
 }: ConfirmDialogProps) {
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
-      <AlertDialogContent className="max-w-md">
+      <AlertDialogContent className={className ?? "max-w-md"}>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
+        {children}
         <AlertDialogFooter>
           <AlertDialogCancel>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction

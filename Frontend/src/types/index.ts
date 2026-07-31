@@ -94,6 +94,8 @@ export interface BrandOnboardingPayload {
   logoUrl?: string;
 }
 
+export type InstagramConnectionStatus = "CONNECTED" | "RECONNECT_REQUIRED" | "DISCONNECTED";
+
 export interface InstagramProfile {
   isConnected: boolean;
   username?: string;
@@ -104,6 +106,13 @@ export interface InstagramProfile {
   engagementRate?: number;
   profilePicUrl?: string;
   bio?: string;
+  accountType?: "BUSINESS" | "MEDIA_CREATOR";
+  permissionsGranted?: string;
+  connectionStatus?: InstagramConnectionStatus;
+  connectedAt?: string;
+  lastSyncAt?: string;
+  lastRefreshAt?: string;
+  tokenExpiresAt?: string;
 }
 
 export interface Gig {

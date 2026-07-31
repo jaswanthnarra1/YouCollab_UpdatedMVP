@@ -31,8 +31,19 @@ const contactLimiter = rateLimit({
   },
 });
 
+const instagramLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // connect/callback hit Meta's API directly — generous for retries, tight against abuse
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res, next) => {
+    next(new AppError('Too many Instagram connection attempts. Please wait a few minutes and try again.', 429, 'RATE_LIMITED'));
+  },
+});
+
 module.exports = {
   authLimiter,
   generalLimiter,
   contactLimiter,
+  instagramLimiter,
 };

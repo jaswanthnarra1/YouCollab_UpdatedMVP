@@ -49,7 +49,16 @@ module.exports = {
     APP_ID: process.env.INSTAGRAM_APP_ID,
     APP_SECRET: process.env.INSTAGRAM_APP_SECRET,
     REDIRECT_URI: process.env.INSTAGRAM_REDIRECT_URI || 'http://localhost:8080/instagram/callback',
+    // Proactive refresh threshold and background sweep cadence — same
+    // "sweep + enforce on read" pattern as GIG.EXPIRY_SWEEP_MINUTES.
+    REFRESH_BEFORE_EXPIRY_DAYS: parseInt(process.env.INSTAGRAM_REFRESH_BEFORE_EXPIRY_DAYS) || 7,
+    REFRESH_SWEEP_HOURS: parseInt(process.env.INSTAGRAM_REFRESH_SWEEP_HOURS) || 24,
   },
+
+  // 32-byte (64 hex char) key for AES-256-GCM encryption of stored Instagram
+  // access tokens — see Backend/src/utils/crypto.js. Generate with:
+  //   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+  TOKEN_ENCRYPTION_KEY: process.env.TOKEN_ENCRYPTION_KEY,
 
   // Bump (or override via env, for a same-day forced reacceptance without a
   // deploy) whenever Frontend/src/features/auth/termsContent.ts changes —

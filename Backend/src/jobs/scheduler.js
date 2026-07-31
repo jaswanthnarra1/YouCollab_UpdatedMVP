@@ -1,5 +1,7 @@
 const config = require('../config');
 const gigService = require('../services/gig.service');
+const instagramService = require('../services/instagram.service');
+const logger = require('../utils/logger');
 
 /**
  * Background sweeps.
@@ -21,6 +23,7 @@ const gigService = require('../services/gig.service');
  */
 
 let timer = null;
+let igRefreshTimer = null;
 
 const runExpirySweep = async () => {
   try {
@@ -31,6 +34,24 @@ const runExpirySweep = async () => {
   } catch (err) {
     // Never let a sweep failure take the process down.
     console.error('[scheduler] Expiry sweep failed:', err.message);
+  }
+};
+
+/**
+ * Daily(-ish) sweep: refreshes any CONNECTED Instagram account's token that's
+ * within INSTAGRAM.REFRESH_BEFORE_EXPIRY_DAYS of expiring, so a creator who
+ * never manually hits "Sync" doesn't silently lose their connection. Accounts
+ * where the refresh permanently fails are flagged RECONNECT_REQUIRED by the
+ * service itself — this sweep just needs to run and not crash the process.
+ */
+const runIgTokenRefreshSweep = async () => {
+  try {
+    const result = await instagramService.refreshExpiringTokens();
+    if (result.checked > 0) {
+      logger.info(result, '[scheduler] Instagram token refresh sweep complete');
+    }
+  } catch (err) {
+    logger.error({ err: err.message }, '[scheduler] Instagram token refresh sweep failed');
   }
 };
 
@@ -48,12 +69,22 @@ const start = () => {
   if (timer.unref) timer.unref();
 
   console.log(`[scheduler] Gig expiry sweep every ${config.GIG.EXPIRY_SWEEP_MINUTES}m (validity ${config.GIG.VALIDITY_DAYS}d).`);
+
+  const igEveryMs = config.INSTAGRAM.REFRESH_SWEEP_HOURS * 60 * 60 * 1000;
+  runIgTokenRefreshSweep();
+  igRefreshTimer = setInterval(runIgTokenRefreshSweep, igEveryMs);
+  if (igRefreshTimer.unref) igRefreshTimer.unref();
+
+  console.log(`[scheduler] Instagram token refresh sweep every ${config.INSTAGRAM.REFRESH_SWEEP_HOURS}h.`);
+
   return timer;
 };
 
 const stop = () => {
   if (timer) clearInterval(timer);
   timer = null;
+  if (igRefreshTimer) clearInterval(igRefreshTimer);
+  igRefreshTimer = null;
 };
 
-module.exports = { start, stop, runExpirySweep };
+module.exports = { start, stop, runExpirySweep, runIgTokenRefreshSweep };

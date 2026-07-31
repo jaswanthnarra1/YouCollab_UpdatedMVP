@@ -1,6 +1,7 @@
 import { Button } from "@/components/common/button";
+import { CheckCircle2, Instagram, Loader2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { Input } from "@/components/common/input";
-import { Instagram, Loader2 } from "lucide-react";
 import { instagramService } from "@/services/instagram";
 import { Label } from "@/components/common/label";
 import { motion } from "framer-motion";
@@ -51,7 +52,11 @@ export default function InfluencerOnboarding() {
   const connectIG = useMutation({
     mutationFn: instagramService.connect,
     onSuccess: (d) => { if (d?.url) window.location.href = d.url; },
-    onError: () => toast({ variant: "destructive", title: "Instagram connect failed" }),
+    onError: (e: any) => toast({
+      variant: "destructive",
+      title: "Instagram connect failed",
+      description: e?.response?.data?.error?.message ?? "Try again.",
+    }),
   });
 
   const countWords = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
@@ -123,15 +128,40 @@ export default function InfluencerOnboarding() {
             <div className="flex-1">
               <h3 className="text-[13px] font-semibold">Connect Instagram via Meta</h3>
               <p className="text-[12px] text-muted-foreground mt-0.5">Verified followers, engagement & average likes — instantly. Pune brands trust verified creators 3× more.</p>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => connectIG.mutate()}
-                disabled={connectIG.isPending}
-                className="mt-3 h-8 text-[12px] rounded-sm gap-1.5"
+              <ConfirmDialog
+                title="Connect your Instagram Professional Account"
+                description="Connect your Business or Creator account to verify your creator profile."
+                confirmLabel="Continue with Instagram"
+                onConfirm={() => connectIG.mutate()}
+                className="max-w-lg"
+                trigger={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={connectIG.isPending}
+                    className="mt-3 h-8 text-[12px] rounded-sm gap-1.5"
+                  >
+                    {connectIG.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Connect Instagram"}
+                  </Button>
+                }
               >
-                {connectIG.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Connect Instagram"}
-              </Button>
+                <div className="space-y-3 py-1">
+                  <ul className="space-y-1.5 text-[12.5px]">
+                    {["Verified Creator Badge", "Follower Insights", "Better Brand Matching", "Faster Collaboration Approval"].map((b) => (
+                      <li key={b} className="flex items-center gap-2">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" /> {b}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="border border-border rounded-sm p-3 bg-muted/40">
+                    <p className="text-[11px] font-semibold text-foreground">Important</p>
+                    <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                      Only Instagram Professional accounts (Business or Creator) are supported. Personal accounts
+                      cannot be connected because Meta no longer supports Personal Account API authentication.
+                    </p>
+                  </div>
+                </div>
+              </ConfirmDialog>
             </div>
           </div>
 

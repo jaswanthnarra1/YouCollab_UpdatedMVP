@@ -15,8 +15,16 @@ export default function InstagramCallback() {
   useEffect(() => {
     const code = params.get("code");
     const state = params.get("state");
+    const oauthError = params.get("error");
+    const errorReason = params.get("error_reason");
+
+    if (oauthError) {
+      setStatus("error");
+      setMessage(errorReason === "user_denied" ? "You cancelled the Instagram connection." : "Instagram authorization failed.");
+      return;
+    }
     if (!code || !state) {
-      setStatus("error"); setMessage("Missing OAuth params."); return;
+      setStatus("error"); setMessage("Missing authorization details from Instagram. Please try connecting again."); return;
     }
     (async () => {
       try {
@@ -24,7 +32,13 @@ export default function InstagramCallback() {
         setStatus("success");
       } catch (e) {
         setStatus("error");
-        const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Connection failed";
+        // Backend error envelope is { success:false, error:{ message, code } } — see
+        // Backend/src/middleware/errorHandler.js. .data.message (no `error`) is
+        // never actually populated, so reading it always fell through to the
+        // generic fallback regardless of the real reason (state mismatch,
+        // personal account detected, cancelled, etc).
+        const msg = (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
+          ?? "Connection failed. Please try again.";
         setMessage(msg);
       }
     })();

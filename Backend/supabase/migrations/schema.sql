@@ -639,3 +639,24 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_version TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accept_ip TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accept_browser TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accept_device TEXT;
+
+-- ============================================
+-- 17. Instagram connection — status tracking, account type, granted scopes
+-- ============================================
+-- camelCase-quoted, matching every other ig* column on influencers (set up
+-- by instagram_migration.sql — see Backend/src/services/instagram.service.js).
+-- igAccessToken already exists; its *contents* changed from plaintext to
+-- AES-256-GCM ciphertext (see Backend/src/utils/crypto.js) — no column
+-- change needed for that, since no row currently has a token stored (verified
+-- against the live DB before writing this migration).
+ALTER TABLE influencers ADD COLUMN IF NOT EXISTS "igAccountType" TEXT;
+ALTER TABLE influencers ADD COLUMN IF NOT EXISTS "igPermissionsGranted" TEXT;
+ALTER TABLE influencers ADD COLUMN IF NOT EXISTS "igLastRefreshAt" TIMESTAMPTZ;
+ALTER TABLE influencers ADD COLUMN IF NOT EXISTS "igConnectionStatus" TEXT NOT NULL DEFAULT 'DISCONNECTED';
+ALTER TABLE influencers ADD CONSTRAINT influencers_ig_connection_status_check
+  CHECK ("igConnectionStatus" IN ('CONNECTED', 'RECONNECT_REQUIRED', 'DISCONNECTED'));
+
+COMMENT ON COLUMN influencers."igAccountType"        IS 'BUSINESS or MEDIA_CREATOR from Graph API account_type — Personal accounts are rejected before this is ever set';
+COMMENT ON COLUMN influencers."igPermissionsGranted" IS 'Comma-joined scopes actually granted at OAuth time';
+COMMENT ON COLUMN influencers."igLastRefreshAt"      IS 'Timestamp of last successful access-token refresh (manual or scheduled sweep)';
+COMMENT ON COLUMN influencers."igConnectionStatus"   IS 'CONNECTED / RECONNECT_REQUIRED (token refresh permanently failed) / DISCONNECTED';

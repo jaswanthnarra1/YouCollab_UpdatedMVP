@@ -7,22 +7,16 @@
 
 const igService = require('../services/instagram.service');
 const asyncHandler = require('../utils/asyncHandler');
-const crypto = require('crypto');
+const AppError = require('../utils/AppError');
+const logger = require('../utils/logger');
 
 /**
  * GET /api/instagram/connect
- * Returns the Meta OAuth authorization URL + CSRF state.
- * Client should redirect the browser to the returned URL.
+ * Returns the Meta OAuth authorization URL + a signed CSRF state token
+ * bound to the requesting user (verified on callback).
  */
 const getConnectUrl = asyncHandler(async (req, res) => {
-  // Use a hash of the user ID as a CSRF state token
-  const state = crypto
-    .createHmac('sha256', req.user.id)
-    .update(Date.now().toString())
-    .digest('hex')
-    .slice(0, 16);
-
-  const url = igService.getOAuthUrl(state);
+  const { url, state } = igService.getOAuthUrl(req.user.id);
 
   res.status(200).json({
     success: true,
@@ -33,16 +27,33 @@ const getConnectUrl = asyncHandler(async (req, res) => {
 /**
  * GET /api/instagram/callback
  * Receives `code` and `state` from Meta OAuth redirect (proxied from frontend).
- * Exchanges code for tokens, fetches profile, and saves to DB.
+ * Validates state, exchanges code for tokens, fetches profile, and saves to DB.
  */
 const handleCallback = asyncHandler(async (req, res) => {
-  const { code, state } = req.query;
+  const { code, state, error: oauthError, error_reason: errorReason } = req.query;
+
+  // User declined on Meta's consent screen, or Meta itself reported a problem —
+  // both arrive as query params on the redirect rather than a thrown exception.
+  if (oauthError) {
+    logger.info({ userId: req.user.id, oauthError, errorReason }, '[instagram] OAuth declined/cancelled');
+    throw new AppError(
+      errorReason === 'user_denied' ? 'You cancelled the Instagram connection.' : 'Instagram authorization failed.',
+      400,
+      'INSTAGRAM_OAUTH_CANCELLED'
+    );
+  }
 
   if (!code) {
-    return res.status(400).json({
-      success: false,
-      error: { message: 'Missing authorization code from Instagram.', code: 'MISSING_CODE' },
-    });
+    throw new AppError('Missing authorization code from Instagram.', 400, 'INSTAGRAM_MISSING_CODE');
+  }
+
+  if (!state || !igService.verifyState(state, req.user.id)) {
+    logger.warn({ userId: req.user.id }, '[instagram] OAuth state validation failed');
+    throw new AppError(
+      'This connection request expired or could not be verified. Please try connecting again.',
+      400,
+      'INSTAGRAM_STATE_INVALID'
+    );
   }
 
   const influencer = await igService.connectInstagram(req.user.id, code);
@@ -58,11 +69,22 @@ const handleCallback = asyncHandler(async (req, res) => {
         followingCount: influencer.igFollowingCount,
         mediaCount: influencer.igMediaCount,
         bio: influencer.igBio,
+        accountType: influencer.igAccountType,
         connectedAt: influencer.igConnectedAt,
         isVerified: influencer.isIgVerified,
       },
     },
   });
+});
+
+/**
+ * GET /api/instagram/status
+ * Cheap connection check — no full profile payload, for gating checks.
+ */
+const getStatus = asyncHandler(async (req, res) => {
+  const status = await igService.getIgStatus(req.user.id);
+
+  res.status(200).json({ success: true, data: status });
 });
 
 /**
@@ -85,8 +107,12 @@ const getProfile = asyncHandler(async (req, res) => {
             followersCount: profile.igFollowersCount,
             followingCount: profile.igFollowingCount,
             mediaCount: profile.igMediaCount,
+            accountType: profile.igAccountType,
+            permissionsGranted: profile.igPermissionsGranted,
+            connectionStatus: profile.igConnectionStatus,
             connectedAt: profile.igConnectedAt,
             lastSyncAt: profile.igLastSyncAt,
+            lastRefreshAt: profile.igLastRefreshAt,
             tokenExpiresAt: profile.igTokenExpiresAt,
           }
         : { isConnected: false },
@@ -97,7 +123,7 @@ const getProfile = asyncHandler(async (req, res) => {
 /**
  * POST /api/instagram/sync
  * Triggers a fresh sync from the Instagram Graph API.
- * Also proactively refreshes the access token if expiring within 7 days.
+ * Also proactively refreshes the access token if it's within the expiry window.
  */
 const syncData = asyncHandler(async (req, res) => {
   const updated = await igService.syncInfluencerIgData(req.user.id);
@@ -114,8 +140,29 @@ const syncData = asyncHandler(async (req, res) => {
         followersCount: updated.igFollowersCount,
         followingCount: updated.igFollowingCount,
         mediaCount: updated.igMediaCount,
+        accountType: updated.igAccountType,
+        connectionStatus: updated.igConnectionStatus,
         lastSyncAt: updated.igLastSyncAt,
       },
+    },
+  });
+});
+
+/**
+ * POST /api/instagram/refresh
+ * Refreshes the stored access token only (no profile re-fetch) — lighter
+ * than /sync for callers that just need the connection kept alive.
+ */
+const refreshToken = asyncHandler(async (req, res) => {
+  const updated = await igService.refreshTokenOnly(req.user.id);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      message: 'Instagram token refreshed.',
+      tokenExpiresAt: updated.igTokenExpiresAt,
+      lastRefreshAt: updated.igLastRefreshAt,
+      connectionStatus: updated.igConnectionStatus,
     },
   });
 });
@@ -138,7 +185,9 @@ const disconnect = asyncHandler(async (req, res) => {
 module.exports = {
   getConnectUrl,
   handleCallback,
+  getStatus,
   getProfile,
   syncData,
+  refreshToken,
   disconnect,
 };

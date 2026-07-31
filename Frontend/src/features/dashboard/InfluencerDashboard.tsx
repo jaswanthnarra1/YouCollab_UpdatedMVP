@@ -57,6 +57,8 @@ function StatCard({ label, value, Icon, accent }: { label: string; value: string
   );
 }
 
+const IG_BENEFITS = ["Verified Creator Badge", "Follower Insights", "Better Brand Matching", "Faster Collaboration Approval"];
+
 function InstagramCard() {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -65,18 +67,22 @@ function InstagramCard() {
   const connect = useMutation({
     mutationFn: instagramService.connect,
     onSuccess: (d) => { if (d?.url) window.location.href = d.url; },
-    onError: () => toast({ variant: "destructive", title: "Couldn't start Instagram connect" }),
+    onError: (e) => toast({ variant: "destructive", title: "Couldn't start Instagram connect", description: extractErrorMessage(e, "Try again.") }),
   });
   const sync = useMutation({
     mutationFn: instagramService.sync,
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["instagramProfile"] }); toast({ title: "Synced!" }); },
+    onError: (e) => toast({ variant: "destructive", title: "Sync failed", description: extractErrorMessage(e, "Try again.") }),
   });
   const disconnect = useMutation({
     mutationFn: instagramService.disconnect,
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["instagramProfile"] }); toast({ title: "Disconnected" }); },
+    onError: (e) => toast({ variant: "destructive", title: "Disconnect failed", description: extractErrorMessage(e, "Try again.") }),
   });
 
-  const connected = !!data?.isConnected;
+  const needsReconnect = data?.connectionStatus === "RECONNECT_REQUIRED";
+  const connected = !!data?.isConnected && !needsReconnect;
+  const accountTypeLabel = data?.accountType === "MEDIA_CREATOR" ? "Creator" : data?.accountType === "BUSINESS" ? "Business" : null;
 
   return (
     <div className="border border-border rounded-sm p-5 bg-background">
@@ -91,12 +97,25 @@ function InstagramCard() {
         <div className="flex-1 min-w-0">
           {isLoading ? (
             <div className="h-12 flex items-center"><Loader2 className="h-4 w-4 animate-spin" /></div>
+          ) : needsReconnect ? (
+            <>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-[14px] font-semibold truncate">@{data?.username}</h3>
+                <span className="inline-flex items-center gap-1 border border-warning/30 px-1.5 py-0.5 text-[10px] uppercase tracking-wider rounded-sm text-warning bg-warning/10">
+                  <AlertCircle className="h-3 w-3" /> Reconnect required
+                </span>
+              </div>
+              <p className="text-[12px] text-muted-foreground mt-1">We couldn't refresh your Instagram connection. Reconnect to keep syncing your metrics.</p>
+              <Button size="sm" onClick={() => connect.mutate()} disabled={connect.isPending} className="mt-3 h-8 text-[12px] rounded-sm">
+                {connect.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Instagram className="h-3.5 w-3.5 mr-1" /> Reconnect Instagram</>}
+              </Button>
+            </>
           ) : connected ? (
             <>
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-[14px] font-semibold truncate">@{data?.username}</h3>
                 <span className="inline-flex items-center gap-1 border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wider rounded-sm text-muted-foreground">
-                  <BadgeCheck className="h-3 w-3" /> Verified
+                  <BadgeCheck className="h-3 w-3" /> Verified{accountTypeLabel ? ` · ${accountTypeLabel}` : ""}
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-3 mt-3">
@@ -104,22 +123,60 @@ function InstagramCard() {
                 <div><p className="text-base font-semibold">{(data?.followingCount ?? 0).toLocaleString()}</p><p className="text-[11px] uppercase tracking-wider text-muted-foreground">Following</p></div>
                 <div><p className="text-base font-semibold">{(data?.mediaCount ?? 0).toLocaleString()}</p><p className="text-[11px] uppercase tracking-wider text-muted-foreground">Posts</p></div>
               </div>
+              {data?.lastSyncAt && (
+                <p className="text-[10px] text-muted-foreground/70 mt-2">Last synced {timeAgo(data.lastSyncAt)}</p>
+              )}
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button size="sm" onClick={() => sync.mutate()} disabled={sync.isPending} className="h-8 text-[12px] rounded-sm">
-                  {sync.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><RefreshCw className="h-3.5 w-3.5 mr-1" /> Sync now</>}
+                  {sync.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh</>}
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => disconnect.mutate()} disabled={disconnect.isPending} className="h-8 text-[12px] rounded-sm">
-                  <Unlink className="h-3.5 w-3.5 mr-1" /> Disconnect
-                </Button>
+                <ConfirmDialog
+                  title="Disconnect Instagram?"
+                  description="Brands won't see your verified follower count or metrics until you reconnect."
+                  confirmLabel="Disconnect"
+                  destructive
+                  onConfirm={() => disconnect.mutate()}
+                  trigger={
+                    <Button size="sm" variant="outline" disabled={disconnect.isPending} className="h-8 text-[12px] rounded-sm">
+                      <Unlink className="h-3.5 w-3.5 mr-1" /> Disconnect
+                    </Button>
+                  }
+                />
               </div>
             </>
           ) : (
             <>
               <h3 className="text-[14px] font-semibold">Connect Instagram via Meta</h3>
               <p className="text-[12px] text-muted-foreground mt-1">Verified followers, engagement & average likes — Pune brands trust verified creators 3× more.</p>
-              <Button onClick={() => connect.mutate()} disabled={connect.isPending} className="mt-3 h-8 text-[12px] rounded-sm">
-                {connect.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Instagram className="h-3.5 w-3.5 mr-1" /> Connect Instagram</>}
-              </Button>
+              <ConfirmDialog
+                title="Connect your Instagram Professional Account"
+                description="Connect your Business or Creator account to verify your creator profile."
+                confirmLabel="Continue with Instagram"
+                onConfirm={() => connect.mutate()}
+                className="max-w-lg"
+                trigger={
+                  <Button disabled={connect.isPending} className="mt-3 h-8 text-[12px] rounded-sm">
+                    {connect.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Instagram className="h-3.5 w-3.5 mr-1" /> Connect Instagram</>}
+                  </Button>
+                }
+              >
+                <div className="space-y-3 py-1">
+                  <ul className="space-y-1.5 text-[12.5px]">
+                    {IG_BENEFITS.map((b) => (
+                      <li key={b} className="flex items-center gap-2">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" /> {b}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="border border-border rounded-sm p-3 bg-muted/40">
+                    <p className="text-[11px] font-semibold text-foreground">Important</p>
+                    <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                      Only Instagram Professional accounts (Business or Creator) are supported. Personal accounts
+                      cannot be connected because Meta no longer supports Personal Account API authentication.
+                    </p>
+                  </div>
+                </div>
+              </ConfirmDialog>
             </>
           )}
         </div>

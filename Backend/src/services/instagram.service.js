@@ -2,9 +2,9 @@
  * YouCollab — Instagram Graph API Service
  * ========================================
  * Handles all communication with Meta's Instagram Graph API:
- *  - OAuth URL generation
- *  - Token exchange (short-lived → long-lived)
- *  - Token refresh
+ *  - OAuth URL generation + stateless signed CSRF state
+ *  - Token exchange (short-lived → long-lived), encrypted at rest
+ *  - Token refresh (on-demand and via the scheduled sweep)
  *  - Profile & metrics fetching
  *  - DB sync and disconnect
  */
@@ -13,6 +13,8 @@ const https = require('https');
 const supabase = require('./supabase');
 const config = require('../config');
 const AppError = require('../utils/AppError');
+const logger = require('../utils/logger');
+const { encryptSecret, decryptSecret, signOAuthState, verifyOAuthState } = require('../utils/crypto');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -29,6 +31,15 @@ const INSTAGRAM_SCOPES = [
   'instagram_business_manage_insights',
 ].join(',');
 
+// Only Professional (Business or Creator) accounts are supported — Meta no
+// longer supports Personal-account API access, and the product itself
+// depends on follower/media metrics a Personal account doesn't expose.
+const SUPPORTED_ACCOUNT_TYPES = ['BUSINESS', 'MEDIA_CREATOR'];
+
+const SELECT_FIELDS =
+  'id, igUserId, igUsername, igAccessToken, igTokenExpiresAt, igConnectedAt, isIgVerified, ' +
+  'igProfilePicUrl, igBio, igFollowersCount, igFollowingCount, igMediaCount, igLastSyncAt, ' +
+  'igAccountType, igPermissionsGranted, igConnectionStatus, igLastRefreshAt';
 
 // ─── HTTP Helper ──────────────────────────────────────────────────────────────
 
@@ -106,14 +117,17 @@ const postForm = (url, params) => {
   });
 };
 
-// ─── OAuth URL ────────────────────────────────────────────────────────────────
+// ─── OAuth URL + CSRF state ─────────────────────────────────────────────────
 
 /**
- * Build the Meta OAuth authorization URL.
- * @param {string} state - CSRF prevention token (user's ID or random string)
- * @returns {string} Full URL to redirect the browser to
+ * Build the Meta OAuth authorization URL, with a stateless signed `state`
+ * param binding this attempt to `userId` (verified on callback — see
+ * verifyState below). No server-side session/store needed.
+ * @param {string} userId - YouCollab user ID initiating the connect flow
+ * @returns {{ url: string, state: string }}
  */
-const getOAuthUrl = (state) => {
+const getOAuthUrl = (userId) => {
+  const state = signOAuthState(userId, config.INSTAGRAM.APP_SECRET);
   const params = new URLSearchParams({
     client_id: config.INSTAGRAM.APP_ID,
     redirect_uri: config.INSTAGRAM.REDIRECT_URI,
@@ -121,15 +135,23 @@ const getOAuthUrl = (state) => {
     response_type: 'code',
     state,
   });
-  return `${META_AUTH_BASE}?${params.toString()}`;
+  return { url: `${META_AUTH_BASE}?${params.toString()}`, state };
 };
+
+/**
+ * Verify a callback's `state` was genuinely issued for `userId` and hasn't expired or been tampered with.
+ * @param {string} state
+ * @param {string} userId
+ * @returns {boolean}
+ */
+const verifyState = (state, userId) => verifyOAuthState(state, userId, config.INSTAGRAM.APP_SECRET);
 
 // ─── Token Exchange ───────────────────────────────────────────────────────────
 
 /**
  * Exchange the authorization code from the OAuth callback for a short-lived token.
  * @param {string} code
- * @returns {Promise<{ access_token: string, user_id: string }>}
+ * @returns {Promise<{ access_token: string, user_id: string, permissions?: string[] }>}
  */
 const exchangeCodeForToken = async (code) => {
   const result = await postForm(META_TOKEN_URL, {
@@ -144,7 +166,7 @@ const exchangeCodeForToken = async (code) => {
     throw new AppError('Failed to obtain Instagram access token.', 502, 'INSTAGRAM_TOKEN_ERROR');
   }
 
-  return result; // { access_token, user_id }
+  return result; // { access_token, user_id, permissions? }
 };
 
 /**
@@ -206,19 +228,29 @@ const fetchIgProfile = async (accessToken) => {
   return profile;
 };
 
+/** Reject Personal accounts up front — Meta no longer supports Personal-account API access, and this app needs follower/media metrics only Professional accounts expose. */
+const assertProfessionalAccount = (profile) => {
+  if (!SUPPORTED_ACCOUNT_TYPES.includes(profile.account_type)) {
+    throw new AppError(
+      'Only Instagram Business or Creator accounts can be connected. Switch to a Professional account in your Instagram app settings and try again.',
+      400,
+      'INSTAGRAM_PERSONAL_ACCOUNT_NOT_SUPPORTED'
+    );
+  }
+};
+
 // ─── DB Sync ──────────────────────────────────────────────────────────────────
 
 /**
  * Full sync: fetch latest profile data from API and update the influencer row.
- * Also proactively refreshes the token if expiring within 7 days.
+ * Also proactively refreshes the token if expiring within the configured window.
  * @param {string} userId - YouCollab user ID
  * @returns {Promise<object>} Updated influencer record
  */
 const syncInfluencerIgData = async (userId) => {
-  // 1. Fetch current token from DB
   const { data: influencer, error: fetchErr } = await supabase
     .from('influencers')
-    .select('id, igAccessToken, igTokenExpiresAt, igUserId, isIgVerified')
+    .select(SELECT_FIELDS)
     .eq('userId', userId)
     .maybeSingle();
 
@@ -230,41 +262,13 @@ const syncInfluencerIgData = async (userId) => {
     throw new AppError('Instagram account is not connected.', 400, 'INSTAGRAM_NOT_CONNECTED');
   }
 
-  let activeToken = influencer.igAccessToken;
+  let activeToken = decryptSecret(influencer.igAccessToken);
+  const refreshUpdate = await maybeRefreshToken(userId, activeToken, influencer.igTokenExpiresAt);
+  if (refreshUpdate) activeToken = refreshUpdate.plaintextToken;
 
-  // 2. Proactively refresh token if expiring within 7 days
-  if (influencer.igTokenExpiresAt) {
-    const expiresAt = new Date(influencer.igTokenExpiresAt);
-    const daysLeft = (expiresAt - new Date()) / (1000 * 60 * 60 * 24);
-
-    if (daysLeft < 7) {
-      try {
-        const refreshed = await refreshLongLivedToken(activeToken);
-        activeToken = refreshed.access_token;
-        const newExpiresAt = new Date();
-        newExpiresAt.setSeconds(newExpiresAt.getSeconds() + refreshed.expires_in);
-
-        await supabase
-          .from('influencers')
-          .update({
-            igAccessToken: activeToken,
-            igTokenExpiresAt: newExpiresAt.toISOString(),
-          })
-          .eq('userId', userId);
-      } catch (refreshErr) {
-        console.warn(`[Instagram] Token refresh failed for user ${userId}:`, refreshErr.message);
-      }
-    }
-  }
-
-  // 3. Fetch latest profile from Instagram Graph API
   const profile = await fetchIgProfile(activeToken);
+  const igLastSyncAt = new Date().toISOString();
 
-  // 4. Compute token expiry (if not refreshed above, keep existing)
-  const now = new Date();
-  const igLastSyncAt = now.toISOString();
-
-  // 5. Upsert the influencer row with latest metrics
   const updatePayload = {
     igUserId: profile.id,
     igUsername: profile.username,
@@ -273,6 +277,7 @@ const syncInfluencerIgData = async (userId) => {
     igFollowersCount: profile.followers_count ?? null,
     igFollowingCount: profile.follows_count ?? null,
     igMediaCount: profile.media_count ?? null,
+    igAccountType: profile.account_type || null,
     igLastSyncAt,
   };
 
@@ -287,37 +292,190 @@ const syncInfluencerIgData = async (userId) => {
     throw new AppError('Failed to sync Instagram data.', 500, 'DATABASE_ERROR');
   }
 
+  logger.info({ userId, igUsername: updated.igUsername }, '[instagram] profile synced');
   return updated;
+};
+
+/**
+ * Refresh `activeToken` in place (DB + return value) if it's within the
+ * configured expiry window. Shared by syncInfluencerIgData, the dedicated
+ * /refresh endpoint, and the scheduled sweep. Never throws — a refresh
+ * failure here is non-fatal to whatever the caller was actually doing
+ * (sync/profile fetch can still proceed on the still-valid current token).
+ * @returns {Promise<{ plaintextToken: string, expiresAt: string } | null>} null when no refresh was needed/attempted
+ */
+const maybeRefreshToken = async (userId, plaintextToken, currentExpiresAt) => {
+  if (!currentExpiresAt) return null;
+  const daysLeft = (new Date(currentExpiresAt) - new Date()) / (1000 * 60 * 60 * 24);
+  if (daysLeft >= config.INSTAGRAM.REFRESH_BEFORE_EXPIRY_DAYS) return null;
+
+  try {
+    const refreshed = await refreshLongLivedToken(plaintextToken);
+    const newExpiresAt = new Date();
+    newExpiresAt.setSeconds(newExpiresAt.getSeconds() + refreshed.expires_in);
+    const now = new Date().toISOString();
+
+    await supabase
+      .from('influencers')
+      .update({
+        igAccessToken: encryptSecret(refreshed.access_token),
+        igTokenExpiresAt: newExpiresAt.toISOString(),
+        igLastRefreshAt: now,
+        igConnectionStatus: 'CONNECTED',
+      })
+      .eq('userId', userId);
+
+    logger.info({ userId, expiresAt: newExpiresAt.toISOString() }, '[instagram] token refreshed');
+    return { plaintextToken: refreshed.access_token, expiresAt: newExpiresAt.toISOString() };
+  } catch (refreshErr) {
+    logger.warn({ userId, err: refreshErr.message }, '[instagram] token refresh failed');
+    return null;
+  }
+};
+
+/**
+ * Explicit refresh-only endpoint — refreshes the token without a full profile re-fetch.
+ * Throws if the account isn't connected or the refresh genuinely fails (unlike the
+ * best-effort maybeRefreshToken used inline during sync).
+ * @param {string} userId
+ */
+const refreshTokenOnly = async (userId) => {
+  const { data: influencer, error } = await supabase
+    .from('influencers')
+    .select('igAccessToken, isIgVerified')
+    .eq('userId', userId)
+    .maybeSingle();
+
+  if (error || !influencer?.isIgVerified || !influencer.igAccessToken) {
+    throw new AppError('Instagram account is not connected.', 400, 'INSTAGRAM_NOT_CONNECTED');
+  }
+
+  const plaintextToken = decryptSecret(influencer.igAccessToken);
+
+  try {
+    const refreshed = await refreshLongLivedToken(plaintextToken);
+    const newExpiresAt = new Date();
+    newExpiresAt.setSeconds(newExpiresAt.getSeconds() + refreshed.expires_in);
+    const now = new Date().toISOString();
+
+    const { data: updated, error: updateErr } = await supabase
+      .from('influencers')
+      .update({
+        igAccessToken: encryptSecret(refreshed.access_token),
+        igTokenExpiresAt: newExpiresAt.toISOString(),
+        igLastRefreshAt: now,
+        igConnectionStatus: 'CONNECTED',
+      })
+      .eq('userId', userId)
+      .select('igTokenExpiresAt, igLastRefreshAt, igConnectionStatus')
+      .single();
+
+    if (updateErr) throw new AppError('Failed to store refreshed token.', 500, 'DATABASE_ERROR');
+
+    logger.info({ userId }, '[instagram] manual token refresh succeeded');
+    return updated;
+  } catch (err) {
+    logger.error({ userId, err: err.message }, '[instagram] manual token refresh failed');
+    if (err instanceof AppError) throw err;
+    throw new AppError('Failed to refresh Instagram token. Try reconnecting your account.', 502, 'INSTAGRAM_TOKEN_ERROR');
+  }
+};
+
+/**
+ * Scheduled sweep (see jobs/scheduler.js): refreshes every CONNECTED account's
+ * token if it's within the expiry window, with one retry on failure. Accounts
+ * that fail both attempts are marked RECONNECT_REQUIRED so the dashboard can
+ * surface a clear "reconnect" call to action instead of silently degrading.
+ * @returns {Promise<{ checked: number, refreshed: number, reconnectRequired: number }>}
+ */
+const refreshExpiringTokens = async () => {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() + config.INSTAGRAM.REFRESH_BEFORE_EXPIRY_DAYS);
+
+  const { data: candidates, error } = await supabase
+    .from('influencers')
+    .select('userId, igAccessToken, igTokenExpiresAt')
+    .eq('igConnectionStatus', 'CONNECTED')
+    .not('igAccessToken', 'is', null)
+    .lte('igTokenExpiresAt', cutoff.toISOString());
+
+  if (error) {
+    logger.error({ err: error.message }, '[instagram] refresh sweep: failed to load candidates');
+    return { checked: 0, refreshed: 0, reconnectRequired: 0 };
+  }
+
+  let refreshed = 0;
+  let reconnectRequired = 0;
+
+  for (const row of candidates || []) {
+    const plaintextToken = decryptSecret(row.igAccessToken);
+    let ok = false;
+
+    // One retry — Meta's refresh endpoint occasionally has transient blips.
+    for (let attempt = 0; attempt < 2 && !ok; attempt += 1) {
+      try {
+        const refreshResult = await refreshLongLivedToken(plaintextToken);
+        const newExpiresAt = new Date();
+        newExpiresAt.setSeconds(newExpiresAt.getSeconds() + refreshResult.expires_in);
+
+        await supabase
+          .from('influencers')
+          .update({
+            igAccessToken: encryptSecret(refreshResult.access_token),
+            igTokenExpiresAt: newExpiresAt.toISOString(),
+            igLastRefreshAt: new Date().toISOString(),
+            igConnectionStatus: 'CONNECTED',
+          })
+          .eq('userId', row.userId);
+
+        ok = true;
+        refreshed += 1;
+      } catch (err) {
+        logger.warn({ userId: row.userId, attempt: attempt + 1, err: err.message }, '[instagram] sweep refresh attempt failed');
+      }
+    }
+
+    if (!ok) {
+      reconnectRequired += 1;
+      await supabase
+        .from('influencers')
+        .update({ igConnectionStatus: 'RECONNECT_REQUIRED' })
+        .eq('userId', row.userId);
+      logger.error({ userId: row.userId }, '[instagram] token refresh permanently failed — marked RECONNECT_REQUIRED');
+    }
+  }
+
+  return { checked: (candidates || []).length, refreshed, reconnectRequired };
 };
 
 // ─── Connect ──────────────────────────────────────────────────────────────────
 
 /**
- * Complete the OAuth flow: exchange code → get long-lived token → fetch profile → save to DB.
+ * Complete the OAuth flow: exchange code → get long-lived token → fetch profile
+ * (rejecting Personal accounts) → save to DB.
  * @param {string} userId - YouCollab user ID
  * @param {string} code - Authorization code from Meta callback
  * @returns {Promise<object>} Updated influencer record
  */
 const connectInstagram = async (userId, code) => {
-  // 1. Exchange code for short-lived token
   const shortToken = await exchangeCodeForToken(code);
-
-  // 2. Upgrade to long-lived token (60 days)
   const longToken = await getLongLivedToken(shortToken.access_token);
 
-  // 3. Compute expiry timestamp
   const expiresAt = new Date();
   expiresAt.setSeconds(expiresAt.getSeconds() + longToken.expires_in);
 
-  // 4. Fetch Instagram profile
   const profile = await fetchIgProfile(longToken.access_token);
+  assertProfessionalAccount(profile);
 
-  // 5. Save everything to DB
   const now = new Date().toISOString();
+  const permissionsGranted = Array.isArray(shortToken.permissions) && shortToken.permissions.length
+    ? shortToken.permissions.join(',')
+    : INSTAGRAM_SCOPES;
+
   const updatePayload = {
     igUserId: profile.id,
     igUsername: profile.username,
-    igAccessToken: longToken.access_token,
+    igAccessToken: encryptSecret(longToken.access_token),
     igTokenExpiresAt: expiresAt.toISOString(),
     igConnectedAt: now,
     isIgVerified: true,
@@ -326,7 +484,11 @@ const connectInstagram = async (userId, code) => {
     igFollowersCount: profile.followers_count ?? null,
     igFollowingCount: profile.follows_count ?? null,
     igMediaCount: profile.media_count ?? null,
+    igAccountType: profile.account_type,
+    igPermissionsGranted: permissionsGranted,
+    igConnectionStatus: 'CONNECTED',
     igLastSyncAt: now,
+    igLastRefreshAt: now,
   };
 
   const { data: updated, error } = await supabase
@@ -340,6 +502,7 @@ const connectInstagram = async (userId, code) => {
     throw new AppError('Failed to save Instagram connection.', 500, 'DATABASE_ERROR');
   }
 
+  logger.info({ userId, igUsername: updated.igUsername, accountType: profile.account_type }, '[instagram] account connected');
   return updated;
 };
 
@@ -365,19 +528,26 @@ const disconnectIg = async (userId) => {
       igFollowersCount: null,
       igFollowingCount: null,
       igMediaCount: null,
+      igAccountType: null,
+      igPermissionsGranted: null,
+      igConnectionStatus: 'DISCONNECTED',
       igLastSyncAt: null,
+      igLastRefreshAt: null,
     })
     .eq('userId', userId);
 
   if (error) {
     throw new AppError('Failed to disconnect Instagram.', 500, 'DATABASE_ERROR');
   }
+
+  logger.info({ userId }, '[instagram] account disconnected');
 };
 
-// ─── Get Profile ──────────────────────────────────────────────────────────────
+// ─── Read ─────────────────────────────────────────────────────────────────────
 
 /**
- * Retrieve cached Instagram profile data from the DB (no API call).
+ * Retrieve cached Instagram profile data from the DB (no API call). Never
+ * returns the access token itself.
  * @param {string} userId - YouCollab user ID
  * @returns {Promise<object|null>}
  */
@@ -385,7 +555,9 @@ const getIgProfileFromDb = async (userId) => {
   const { data: influencer } = await supabase
     .from('influencers')
     .select(
-      'isIgVerified, igUsername, igUserId, igProfilePicUrl, igBio, igFollowersCount, igFollowingCount, igMediaCount, igConnectedAt, igLastSyncAt, igTokenExpiresAt'
+      'isIgVerified, igUsername, igUserId, igProfilePicUrl, igBio, igFollowersCount, igFollowingCount, ' +
+      'igMediaCount, igConnectedAt, igLastSyncAt, igTokenExpiresAt, igAccountType, igPermissionsGranted, ' +
+      'igConnectionStatus, igLastRefreshAt'
     )
     .eq('userId', userId)
     .maybeSingle();
@@ -393,16 +565,34 @@ const getIgProfileFromDb = async (userId) => {
   return influencer || null;
 };
 
+/** Lightweight connection check — no profile fields, for cheap gating checks. */
+const getIgStatus = async (userId) => {
+  const { data: influencer } = await supabase
+    .from('influencers')
+    .select('isIgVerified, igConnectionStatus')
+    .eq('userId', userId)
+    .maybeSingle();
+
+  return {
+    isConnected: influencer?.isIgVerified ?? false,
+    connectionStatus: influencer?.igConnectionStatus ?? 'DISCONNECTED',
+  };
+};
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
   getOAuthUrl,
+  verifyState,
   exchangeCodeForToken,
   getLongLivedToken,
   refreshLongLivedToken,
   fetchIgProfile,
   connectInstagram,
   syncInfluencerIgData,
+  refreshTokenOnly,
+  refreshExpiringTokens,
   disconnectIg,
   getIgProfileFromDb,
+  getIgStatus,
 };
