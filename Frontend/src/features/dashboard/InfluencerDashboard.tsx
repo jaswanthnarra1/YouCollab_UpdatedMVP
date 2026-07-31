@@ -15,6 +15,7 @@ import {
   ArrowUpNarrowWide, ArrowDownWideNarrow, ArrowUpDown, X, AlertCircle
 } from "lucide-react";
 import { instagramService, IG_RETURN_TO_KEY, IG_LAST_ERROR_KEY } from "@/services/instagram";
+import { PitchSubmitButton } from "@/components/common/pitch-submit-button";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Textarea } from "@/components/common/textarea";
 import { useAuthStore } from "@/stores/authStore";
@@ -293,14 +294,21 @@ function ApplyDialog({ gig, onClose }: { gig: Gig | null; onClose: () => void })
   const apply = useMutation({
     mutationFn: () => applicationsService.apply(gig!.id, note),
     onSuccess: () => {
-      toast({ title: "Pitch sent", description: "The brand will review and reach out." });
+      // Cache refresh happens here, but the dialog stays open — the submit
+      // button owns closing it, once its success stage has been shown.
       qc.invalidateQueries({ queryKey: ["myApplications"] });
       qc.invalidateQueries({ queryKey: ["gigs"] });
-      setNote(""); onClose();
     },
     onError: (e) =>
       toast({ variant: "destructive", title: "Couldn't send pitch", description: extractErrorMessage(e, "Try again.") }),
   });
+
+  const finishAfterSuccessStage = () => {
+    toast({ title: "Pitch sent", description: "The brand will review and reach out." });
+    setNote("");
+    onClose();
+    apply.reset();
+  };
 
   return (
     <Dialog open={!!gig} onOpenChange={(o) => { if (!o) { apply.reset(); onClose(); } }}>
@@ -335,13 +343,11 @@ function ApplyDialog({ gig, onClose }: { gig: Gig | null; onClose: () => void })
                   {extractErrorMessage(apply.error, "Something went wrong. Try again.")}
                 </p>
               )}
-              <Button
-                onClick={() => apply.mutate()}
-                disabled={!note.trim() || apply.isPending}
-                className="w-full h-9 text-[13px] rounded-sm bg-gradient-brand text-primary-foreground border-0"
-              >
-                {apply.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Send className="h-3.5 w-3.5 mr-1" /> Send pitch</>}
-              </Button>
+              <PitchSubmitButton
+                onSubmit={() => apply.mutateAsync()}
+                onSuccess={finishAfterSuccessStage}
+                disabled={!note.trim()}
+              />
             </div>
           </>
         )}
