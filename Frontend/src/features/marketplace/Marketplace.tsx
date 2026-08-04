@@ -24,6 +24,7 @@ const PUNE_LOCATIONS = [
 export default function Marketplace() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [activeLocation, setActiveLocation] = useState<string>("All Areas");
+  const [maxDistance, setMaxDistance] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const { user } = useAuthStore();
   const [dismissedNudge, setDismissedNudge] = useState(false);
@@ -44,13 +45,17 @@ export default function Marketplace() {
         ? true
         : brandLoc.toLowerCase().includes(activeLocation.toLowerCase()) || g.city.toLowerCase().includes(activeLocation.toLowerCase());
 
+      const matchDistance = maxDistance === "ALL" || g.distanceKm == null
+        ? true
+        : g.distanceKm <= Number(maxDistance);
+
       const matchSearch = searchQuery
         ? (g.title + g.description + ((g as any).brand?.businessName || "")).toLowerCase().includes(searchQuery.toLowerCase())
         : true;
 
-      return matchCategory && matchLocation && matchSearch && resolveGigStatus(g) === "ACTIVE";
+      return matchCategory && matchLocation && matchDistance && matchSearch && resolveGigStatus(g) === "ACTIVE";
     });
-  }, [data, activeCategory, activeLocation, searchQuery]);
+  }, [data, activeCategory, activeLocation, maxDistance, searchQuery]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -101,6 +106,22 @@ export default function Marketplace() {
                 </select>
               </div>
 
+              {/* Max Distance filter dropdown */}
+              <div className="relative flex items-center gap-1.5 border border-border rounded-sm px-2.5 bg-background h-9">
+                <span className="text-[12px] text-muted-foreground font-medium">Radius:</span>
+                <select
+                  value={maxDistance}
+                  onChange={(e) => setMaxDistance(e.target.value)}
+                  className="bg-transparent text-[12px] text-foreground focus:outline-none cursor-pointer pr-1"
+                >
+                  <option value="ALL" className="bg-background text-foreground">Any Distance</option>
+                  <option value="2" className="bg-background text-foreground">Within 2 km</option>
+                  <option value="5" className="bg-background text-foreground">Within 5 km</option>
+                  <option value="10" className="bg-background text-foreground">Within 10 km</option>
+                  <option value="20" className="bg-background text-foreground">Within 20 km</option>
+                </select>
+              </div>
+
               {/* Search input field */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -145,7 +166,7 @@ export default function Marketplace() {
           </div>
         ) : filteredGigs.length === 0 ? (
           <div className="border border-border rounded-sm p-20 text-center text-[13px] text-muted-foreground">
-            No active campaigns match your current filters. Try resetting search or location categories.
+            No active campaigns match your current filters. Try resetting search, radius or location categories.
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -155,7 +176,13 @@ export default function Marketplace() {
                   <div className="flex items-center justify-between text-[11px] uppercase tracking-wider text-muted-foreground">
                     <span className="inline-flex items-center gap-1">
                       <MapPin className="h-3 w-3" /> {g.city || "Pune"}
-                      {g.distanceKm != null && <span className="text-foreground">· {g.distanceKm} km away</span>}
+                      {g.distanceKm != null ? (
+                        <span className="text-primary font-medium">· {g.distanceKm} km away</span>
+                      ) : g.radiusKm != null ? (
+                        <span className="text-muted-foreground">· {g.radiusKm} km radius</span>
+                      ) : (
+                        <span className="text-muted-foreground">· Pune-wide</span>
+                      )}
                     </span>
                     <span className="text-foreground font-medium">{g.category}</span>
                   </div>
