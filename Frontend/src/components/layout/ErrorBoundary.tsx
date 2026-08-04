@@ -35,6 +35,11 @@ export class ErrorBoundary extends Component<Props, State> {
             <p className="text-[13px] text-muted-foreground">
               This page hit an unexpected error. Your data is safe — try again, or head back to the dashboard.
             </p>
+            {this.state.error?.message && (
+              <div className="mt-3 bg-muted/40 border border-border/80 rounded-sm p-3 text-left font-mono text-[11px] text-destructive overflow-auto max-h-32">
+                {this.state.error.message}
+              </div>
+            )}
           </div>
           <div className="flex gap-2 justify-center pt-1">
             <Button size="sm" onClick={() => this.setState({ error: null })} className="h-8 text-[12px] rounded-sm">

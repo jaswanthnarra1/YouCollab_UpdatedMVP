@@ -91,21 +91,21 @@ export default function GigDetail() {
         {/* Header banner */}
         <div>
           <div className="flex flex-wrap items-center gap-2 mb-3">
-            <span className="inline-block border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground rounded-sm">{gig.category}</span>
-            {gig.platform && <span className="inline-block border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground rounded-sm">{gig.platform}</span>}
-            {gig.campaignType && <span className="inline-block border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground rounded-sm">{gig.campaignType}</span>}
+            <span className="inline-block border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground rounded-sm">{gig?.category}</span>
+            {gig?.platform && <span className="inline-block border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground rounded-sm">{gig.platform}</span>}
+            {gig?.campaignType && <span className="inline-block border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground rounded-sm">{gig.campaignType}</span>}
             <span className="inline-flex items-center gap-1 border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground rounded-sm">
-              <MapPin className="h-3 w-3" /> {gig.city} {gig.radiusKm ? `(${gig.radiusKm} km radius)` : "(Pune-wide)"}
+              <MapPin className="h-3 w-3" /> {gig?.city || "Pune"} {gig?.radiusKm ? `(${gig.radiusKm} km radius)` : "(Pune-wide)"}
             </span>
-            {gig.distanceKm != null && (
+            {gig?.distanceKm != null && (
               <span className="inline-flex items-center gap-1 border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-primary rounded-sm font-medium">
                 📍 {gig.distanceKm} km away
               </span>
             )}
             <GigStatusBadge gig={gig} className="tracking-[0.12em]" />
-            {resolveGigStatus(gig) === "ACTIVE" && daysUntilExpiry(gig.expiresAt) != null && (
+            {resolveGigStatus(gig) === "ACTIVE" && daysUntilExpiry(gig?.expiresAt) != null && (
               <span className="inline-block border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground rounded-sm">
-                {daysUntilExpiry(gig.expiresAt)}d left
+                {daysUntilExpiry(gig?.expiresAt)}d left
               </span>
             )}
           </div>
