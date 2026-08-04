@@ -92,6 +92,16 @@ export default function VerifyOtpPage() {
       return;
     }
 
+    if (!signUp || !signUp.id || signUp.status === "complete") {
+      toast({
+        variant: "destructive",
+        title: "Session expired",
+        description: "No active sign-up attempt found. Please try creating your account again.",
+      });
+      navigate("/register");
+      return;
+    }
+
     setLoading(true);
     try {
       const result = await signUp.attemptEmailAddressVerification({ code: otp });
@@ -119,6 +129,15 @@ export default function VerifyOtpPage() {
 
   const handleResend = async () => {
     if (countdown > 0 || !isLoaded) return;
+    if (!signUp || !signUp.id || signUp.status === "complete") {
+      toast({
+        variant: "destructive",
+        title: "Session expired",
+        description: "No active sign-up attempt found. Please try creating your account again.",
+      });
+      navigate("/register");
+      return;
+    }
     setResending(true);
     try {
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });

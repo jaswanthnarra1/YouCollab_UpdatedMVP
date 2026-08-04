@@ -102,14 +102,46 @@ export default function AuthPage({ mode }: Props) {
         navigate(dest);
       } else {
         if (!signUpLoaded) return;
-        await signUp.create({
-          emailAddress: email,
-          password,
-          unsafeMetadata: { role, name },
-        });
-        await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-        toast({ title: "Code sent! ✉️", description: "Please check your email for a 6-digit code." });
-        navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
+        let res;
+        try {
+          res = await signUp.create({
+            emailAddress: email,
+            password,
+            unsafeMetadata: { role, name },
+          });
+        } catch (createErr: any) {
+          const isStale =
+            createErr?.errors?.[0]?.code === "client_sign_up_not_found" ||
+            createErr?.errors?.[0]?.message?.includes("No sign up attempt was found") ||
+            createErr?.message?.includes("No sign up attempt was found");
+          if (isStale) {
+            console.warn("[AuthPage] Stale sign-up attempt detected — retrying signUp.create with fresh payload");
+            res = await signUp.create({
+              emailAddress: email,
+              password,
+              unsafeMetadata: { role, name },
+            });
+          } else {
+            throw createErr;
+          }
+        }
+
+        if (res.status === "complete") {
+          await setActiveSignIn({ session: res.createdSessionId });
+          const resMe = await authService.me();
+          if (!resMe?.user) throw new Error("Sign-up failed");
+          setUser(resMe.user);
+          const dest = resMe.user.needsTermsAcceptance
+            ? "/terms"
+            : !resMe.user.isOnboarded
+              ? resMe.user.role === "BRAND" ? "/onboarding/brand" : "/onboarding/influencer"
+              : resMe.user.role === "BRAND" ? "/dashboard/brand" : "/dashboard/influencer";
+          navigate(dest);
+        } else {
+          await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+          toast({ title: "Code sent! ✉️", description: "Please check your email for a 6-digit code." });
+          navigate(`/verify-otp?email=${encodeURIComponent(email)}`);
+        }
       }
     } catch (err) {
       const backendMsg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message;
