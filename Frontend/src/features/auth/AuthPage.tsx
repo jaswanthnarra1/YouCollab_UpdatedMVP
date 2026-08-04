@@ -26,7 +26,7 @@ export default function AuthPage({ mode }: Props) {
   const { setUser } = useAuthStore();
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const { signIn, setActive: setActiveSignIn, isLoaded: signInLoaded } = useSignIn();
-  const { signUp, isLoaded: signUpLoaded } = useSignUp();
+  const { signUp, setActive: setActiveSignUp, isLoaded: signUpLoaded } = useSignUp();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -127,7 +127,7 @@ export default function AuthPage({ mode }: Props) {
         }
 
         if (res.status === "complete") {
-          await setActiveSignIn({ session: res.createdSessionId });
+          await setActiveSignUp({ session: res.createdSessionId });
           const resMe = await authService.me();
           if (!resMe?.user) throw new Error("Sign-up failed");
           setUser(resMe.user);
