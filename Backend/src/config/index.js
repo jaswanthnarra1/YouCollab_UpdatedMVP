@@ -69,7 +69,7 @@ module.exports = {
   INSTAGRAM: {
     APP_ID: process.env.INSTAGRAM_APP_ID,
     APP_SECRET: process.env.INSTAGRAM_APP_SECRET,
-    REDIRECT_URI: process.env.INSTAGRAM_REDIRECT_URI || 'http://localhost:8080/instagram/callback',
+    REDIRECT_URI: process.env.INSTAGRAM_REDIRECT_URI || (process.env.CLIENT_URL ? `${process.env.CLIENT_URL.split(',')[0].trim()}/instagram/callback` : 'http://localhost:8080/instagram/callback'),
     // Proactive refresh threshold and background sweep cadence — same
     // "sweep + enforce on read" pattern as GIG.EXPIRY_SWEEP_MINUTES.
     REFRESH_BEFORE_EXPIRY_DAYS: parseInt(process.env.INSTAGRAM_REFRESH_BEFORE_EXPIRY_DAYS) || 7,
