@@ -19,8 +19,8 @@ const { encryptSecret, decryptSecret, signOAuthState, verifyOAuthState } = requi
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const GRAPH_API_BASE = 'https://graph.instagram.com';
-// Instagram OAuth authorize endpoint (for Business/Creator accounts)
-const META_AUTH_BASE = 'https://api.instagram.com/oauth/authorize';
+// Instagram OAuth authorize endpoint (for Business/Creator accounts via Instagram Business Login)
+const META_AUTH_BASE = 'https://www.instagram.com/oauth/authorize';
 const META_TOKEN_URL = 'https://api.instagram.com/oauth/access_token';
 const META_LONG_TOKEN_URL = `${GRAPH_API_BASE}/access_token`;
 const META_REFRESH_URL = `${GRAPH_API_BASE}/refresh_access_token`;
