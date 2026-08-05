@@ -16,7 +16,10 @@ const logger = require('../utils/logger');
  * bound to the requesting user (verified on callback).
  */
 const getConnectUrl = asyncHandler(async (req, res) => {
-  const { url, state } = igService.getOAuthUrl(req.user.id);
+  const rawOrigin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : null);
+  const customRedirectUri = rawOrigin ? `${rawOrigin.replace(/\/$/, '')}/instagram/callback` : null;
+  const { url, state, redirectUri } = igService.getOAuthUrl(req.user.id, customRedirectUri);
+  logger.info({ userId: req.user.id, redirectUri }, '[instagram] generated OAuth URL');
 
   res.status(200).json({
     success: true,
@@ -56,7 +59,9 @@ const handleCallback = asyncHandler(async (req, res) => {
     );
   }
 
-  const influencer = await igService.connectInstagram(req.user.id, code);
+  const rawOrigin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : null);
+  const customRedirectUri = rawOrigin ? `${rawOrigin.replace(/\/$/, '')}/instagram/callback` : null;
+  const influencer = await igService.connectInstagram(req.user.id, code, customRedirectUri);
 
   res.status(200).json({
     success: true,

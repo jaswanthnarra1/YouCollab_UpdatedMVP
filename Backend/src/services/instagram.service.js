@@ -126,16 +126,17 @@ const postForm = (url, params) => {
  * @param {string} userId - YouCollab user ID initiating the connect flow
  * @returns {{ url: string, state: string }}
  */
-const getOAuthUrl = (userId) => {
+const getOAuthUrl = (userId, customRedirectUri = null) => {
+  const redirectUri = customRedirectUri || config.INSTAGRAM.REDIRECT_URI;
   const state = signOAuthState(userId, config.INSTAGRAM.APP_SECRET);
   const params = new URLSearchParams({
     client_id: config.INSTAGRAM.APP_ID,
-    redirect_uri: config.INSTAGRAM.REDIRECT_URI,
+    redirect_uri: redirectUri,
     scope: INSTAGRAM_SCOPES,
     response_type: 'code',
     state,
   });
-  return { url: `${META_AUTH_BASE}?${params.toString()}`, state };
+  return { url: `${META_AUTH_BASE}?${params.toString()}`, state, redirectUri };
 };
 
 /**
@@ -151,14 +152,16 @@ const verifyState = (state, userId) => verifyOAuthState(state, userId, config.IN
 /**
  * Exchange the authorization code from the OAuth callback for a short-lived token.
  * @param {string} code
+ * @param {string} [customRedirectUri]
  * @returns {Promise<{ access_token: string, user_id: string, permissions?: string[] }>}
  */
-const exchangeCodeForToken = async (code) => {
+const exchangeCodeForToken = async (code, customRedirectUri = null) => {
+  const redirectUri = customRedirectUri || config.INSTAGRAM.REDIRECT_URI;
   const result = await postForm(META_TOKEN_URL, {
     client_id: config.INSTAGRAM.APP_ID,
     client_secret: config.INSTAGRAM.APP_SECRET,
     grant_type: 'authorization_code',
-    redirect_uri: config.INSTAGRAM.REDIRECT_URI,
+    redirect_uri: redirectUri,
     code,
   });
 
@@ -465,8 +468,8 @@ const refreshExpiringTokens = async () => {
  * @param {string} code - Authorization code from Meta callback
  * @returns {Promise<object>} Updated influencer record
  */
-const connectInstagram = async (userId, code) => {
-  const shortToken = await exchangeCodeForToken(code);
+const connectInstagram = async (userId, code, customRedirectUri = null) => {
+  const shortToken = await exchangeCodeForToken(code, customRedirectUri);
   const longToken = await getLongLivedToken(shortToken.access_token);
 
   const expiresAt = new Date();
