@@ -14,6 +14,24 @@ export interface AuthUser {
   hasAcceptedTerms?: boolean;
   termsAcceptedAt?: string | null;
   termsVersion?: string | null;
+  /** V1 admin gate — env-allowlisted Clerk user IDs, not a role. */
+  isAdmin?: boolean;
+}
+
+export type ReferralStatus = "SUBMITTED" | "UNDER_REVIEW" | "ELIGIBLE" | "NOT_ELIGIBLE" | "WINNER";
+
+export interface ReferralSubmission {
+  id: string;
+  reelUrl: string;
+  instagramUsername?: string | null;
+  status: ReferralStatus;
+  verifiedViews?: number | null;
+  isWinner: boolean;
+  rewardAmount?: number | null;
+  createdAt: string;
+  updatedAt: string;
+  /** Populated only on admin-list responses. */
+  influencer?: { id: string; name?: string; instagramHandle?: string };
 }
 
 export type AppStatus = "PENDING" | "ACCEPTED" | "REJECTED";
@@ -22,6 +40,7 @@ export interface Application {
   id: string;
   gigId: string;
   coverNote: string;
+  reelUrl?: string | null;
   status: AppStatus;
   createdAt?: string;
   distanceKm?: number | null;

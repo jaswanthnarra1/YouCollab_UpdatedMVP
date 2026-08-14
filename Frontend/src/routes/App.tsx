@@ -10,6 +10,7 @@ import { AuthBootstrap } from "@/features/auth/AuthBootstrap";
 import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import { RoleRoute } from "@/features/auth/RoleRoute";
 import { ProtectedRoute } from "@/features/auth/ProtectedRoute";
+import { AdminRoute } from "@/features/auth/AdminRoute";
 import SidebarLayout from "@/components/layout/SidebarLayout";
 import Landing from "@/features/marketplace/Landing";
 
@@ -31,6 +32,8 @@ const Marketplace = lazy(() => import("@/features/marketplace/Marketplace"));
 const GigDetail = lazy(() => import("@/features/gigs/GigDetail"));
 const InstagramCallback = lazy(() => import("@/features/auth/InstagramCallback"));
 const Settings = lazy(() => import("@/features/dashboard/Settings"));
+const ReferralPage = lazy(() => import("@/features/referrals/ReferralPage"));
+const AdminReferrals = lazy(() => import("@/features/admin/AdminReferrals"));
 const VerifyOtpPage = lazy(() => import("@/features/auth/VerifyOtpPage"));
 const VerifyLoginOtpPage = lazy(() => import("@/features/auth/VerifyLoginOtpPage"));
 const ForgotPasswordPage = lazy(() => import("@/features/auth/ForgotPasswordPage"));
@@ -124,6 +127,13 @@ const App = () => (
                   } />
                   <Route path="/settings" element={
                     <ProtectedRoute><Settings /></ProtectedRoute>
+                  } />
+
+                  <Route path="/referral" element={
+                    <RoleRoute role="INFLUENCER"><ReferralPage /></RoleRoute>
+                  } />
+                  <Route path="/admin/referrals" element={
+                    <AdminRoute><AdminReferrals /></AdminRoute>
                   } />
                 </Route>
 

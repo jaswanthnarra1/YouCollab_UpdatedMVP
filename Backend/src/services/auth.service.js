@@ -30,6 +30,9 @@ const toProfile = (user) => ({
   // on every /me call so bumping config.TERMS.VERSION alone re-prompts
   // everyone, with no per-user migration needed.
   needsTermsAcceptance: !user.terms_accepted || user.terms_version !== config.TERMS.VERSION,
+  // V1 admin gate — env-allowlisted Clerk user IDs, not a database role.
+  // See config.ADMIN and middleware/auth.js requireAdmin.
+  isAdmin: config.ADMIN.CLERK_USER_IDS.includes(user.clerk_user_id),
 });
 
 /**

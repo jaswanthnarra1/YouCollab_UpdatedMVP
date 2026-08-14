@@ -1,6 +1,6 @@
 import { applicationsService, type Application } from "@/services/applications";
 import {
-  BadgeCheck, Check, X, ArrowLeft, MessageSquareText, Send, Loader2, TrendingUp,
+  BadgeCheck, Check, X, ArrowLeft, MessageSquareText, Send, Loader2, TrendingUp, Film,
 } from "lucide-react";
 import { Button } from "@/components/common/button";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
@@ -152,6 +152,17 @@ export default function GigApplicants() {
                     <div className="mt-3 glass rounded-xl p-3">
                       <p className="text-xs text-muted-foreground mb-1">Cover note</p>
                       <p className="text-sm whitespace-pre-wrap">{a.coverNote}</p>
+                    </div>
+
+                    <div className="mt-3 glass rounded-xl p-3 flex items-center justify-between gap-3">
+                      <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Film className="h-3.5 w-3.5" /> Reel</p>
+                      {a.reelUrl ? (
+                        <a href={a.reelUrl} target="_blank" rel="noopener noreferrer">
+                          <Button size="sm" variant="outline" className="glass">View Reel</Button>
+                        </a>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No Reel submitted</span>
+                      )}
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-2">

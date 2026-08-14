@@ -1,6 +1,6 @@
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { useClerk } from "@clerk/clerk-react";
-import { LayoutGrid, Compass, FileText, User, Settings, LogOut, PlusSquare, MessageSquare, Briefcase, Users, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { LayoutGrid, Compass, FileText, User, Settings, LogOut, PlusSquare, MessageSquare, Briefcase, Users, ChevronsLeft, ChevronsRight, Gift, ShieldCheck } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Logo } from "@/components/ui/logo";
 import { useAuthStore } from "@/stores/authStore";
@@ -103,6 +103,12 @@ export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: Sid
           active: location.search.includes("tab=pitches"),
         },
         {
+          label: "Referral",
+          icon: Gift,
+          path: "/referral",
+          active: location.pathname === "/referral",
+        },
+        {
           label: "Profile",
           icon: User,
           path: "/profile/creator",
@@ -186,6 +192,24 @@ export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: Sid
             {!collapsed && <span>{item.label}</span>}
           </Link>
         ))}
+
+        {/* V1 admin gate — env-allowlisted, independent of BRAND/INFLUENCER role. */}
+        {user.isAdmin && (
+          <Link
+            to="/admin/referrals"
+            title={collapsed ? "Admin: Referrals" : undefined}
+            className={`flex items-center gap-3 px-3 py-2 text-xs font-medium uppercase tracking-wider transition-colors rounded-md ${
+              collapsed ? "justify-center" : ""
+            } ${
+              location.pathname === "/admin/referrals"
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                : "text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/60"
+            }`}
+          >
+            <ShieldCheck className="h-4 w-4 shrink-0" />
+            {!collapsed && <span>Admin: Referrals</span>}
+          </Link>
+        )}
       </nav>
 
       {/* User Footer Profile */}

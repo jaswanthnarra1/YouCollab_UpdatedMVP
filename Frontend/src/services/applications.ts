@@ -12,8 +12,8 @@ export interface Message {
 }
 
 export const applicationsService = {
-  apply: async (gigId: string, coverNote: string) => {
-    const { data } = await apiClient.post("/api/applications", { gigId, coverNote });
+  apply: async (gigId: string, coverNote: string, reelUrl: string) => {
+    const { data } = await apiClient.post("/api/applications", { gigId, coverNote, reelUrl });
     return unwrap<Application>(data);
   },
   mine: async (): Promise<Application[]> => {

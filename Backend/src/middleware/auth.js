@@ -1,6 +1,7 @@
 const { getAuth } = require('@clerk/express');
 const authService = require('../services/auth.service');
 const AppError = require('../utils/AppError');
+const config = require('../config');
 const logger = require('../utils/logger');
 
 /**
@@ -62,7 +63,25 @@ const requireRole = (...allowedRoles) => {
   };
 };
 
+/**
+ * V1 admin gate — checks the caller's Clerk user ID against an env
+ * allowlist (config.ADMIN.CLERK_USER_IDS), not a database role. Must run
+ * after `authenticate`, which populates req.user.clerkId.
+ */
+const requireAdmin = (req, res, next) => {
+  if (!req.user) {
+    return next(new AppError('Sign in to perform this action.', 401, 'UNAUTHORIZED'));
+  }
+
+  if (!config.ADMIN.CLERK_USER_IDS.includes(req.user.clerkId)) {
+    return next(new AppError("You don't have access to do that.", 403, 'FORBIDDEN'));
+  }
+
+  next();
+};
+
 module.exports = {
   authenticate,
   requireRole,
+  requireAdmin,
 };

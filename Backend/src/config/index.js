@@ -88,4 +88,12 @@ module.exports = {
   TERMS: {
     VERSION: process.env.TERMS_VERSION || '2026-07',
   },
+
+  // V1 admin access (Reel/Referral moderation): an env-allowlist of Clerk
+  // user IDs, not a database role — there is no ADMIN entry in users.role.
+  // Unset/empty means the allowlist is empty, so requireAdmin fails closed
+  // (blocks everyone) rather than open. See middleware/auth.js requireAdmin.
+  ADMIN: {
+    CLERK_USER_IDS: (process.env.ADMIN_CLERK_USER_IDS || '').split(',').map((s) => s.trim()).filter(Boolean),
+  },
 };

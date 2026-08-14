@@ -6,7 +6,10 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/common/button";
 import { gigsService } from "@/services/gigs";
+import { Input } from "@/components/common/input";
+import { Label } from "@/components/common/label";
 import { Textarea } from "@/components/common/textarea";
+import { isInstagramUrl } from "@/lib/instagramUrl";
 import { useAuthStore } from "@/stores/authStore";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams, Link } from "react-router-dom";
@@ -21,6 +24,7 @@ export default function GigDetail() {
   const { user } = useAuthStore();
 
   const [coverNote, setCoverNote] = useState("");
+  const [reelUrl, setReelUrl] = useState("");
 
   const { data: gig, isLoading, error } = useQuery({
     queryKey: ["gig", id],
@@ -29,12 +33,13 @@ export default function GigDetail() {
   });
 
   const apply = useMutation({
-    mutationFn: () => applicationsService.apply(id, coverNote),
+    mutationFn: () => applicationsService.apply(id, coverNote, reelUrl),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["gig", id] });
       qc.invalidateQueries({ queryKey: ["myApplications"] });
       toast({ title: "Pitch sent successfully! 🚀", description: "The brand will review your profile shortly." });
       setCoverNote("");
+      setReelUrl("");
     },
     onError: (err: { response?: { data?: { message?: string; error?: { message?: string } } } }) =>
       toast({
@@ -208,9 +213,20 @@ export default function GigDetail() {
                       placeholder="Hi brand! I have a strong following in Koregaon Park and specialize in culinary reviews..."
                       className="rounded-sm text-[13px] border-border"
                     />
+                    <div className="space-y-1">
+                      <Label htmlFor="reelUrl" className="text-[12px]">Reel Link</Label>
+                      <Input
+                        id="reelUrl"
+                        value={reelUrl}
+                        onChange={(e) => setReelUrl(e.target.value)}
+                        placeholder="Paste your Instagram Reel link"
+                        className="h-9 text-[13px] rounded-sm"
+                      />
+                      <p className="text-[11px] text-muted-foreground">Add a Reel that best represents your content and style.</p>
+                    </div>
                     <Button
                       onClick={() => apply.mutate()}
-                      disabled={!coverNote.trim() || apply.isPending}
+                      disabled={!coverNote.trim() || !isInstagramUrl(reelUrl) || apply.isPending}
                       className="w-full h-9 rounded-sm bg-gradient-brand text-primary-foreground border-0 text-[13px]"
                     >
                       {apply.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Send className="h-3.5 w-3.5 mr-1" /> Send Pitch brief</>}

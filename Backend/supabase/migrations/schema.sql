@@ -671,3 +671,90 @@ COMMENT ON COLUMN influencers."igConnectionStatus"   IS 'CONNECTED / RECONNECT_R
 ALTER TABLE influencers ADD COLUMN IF NOT EXISTS "igName" TEXT;
 
 COMMENT ON COLUMN influencers."igName" IS 'Instagram account display name from Graph API `name` — distinct from igUsername (the @handle)';
+
+-- ============================================
+-- 19. Fix instagramHandle NOT NULL trap on upsert
+-- ============================================
+-- "instagramHandle" TEXT NOT NULL has no DEFAULT (migration.sql). Onboarding
+-- deliberately omits it from its upsert (Meta is the sole source of truth for
+-- it, per section 17/18) — but Postgres validates NOT NULL on the proposed
+-- row for EVERY upsert, insert-or-update, before conflict resolution runs.
+-- Any upsert that omits this column throws 23502, even when the row already
+-- exists and the statement resolves to an UPDATE. Confirmed live: this broke
+-- creator onboarding entirely (every "Finish setup" failed with "Failed to
+-- create creator profile."). A DEFAULT closes the gap for every current and
+-- future call site, not just onboarding's.
+ALTER TABLE influencers ALTER COLUMN "instagramHandle" SET DEFAULT '';
+
+-- ============================================
+-- 20. Reel submission on Gig application
+-- ============================================
+-- Nullable, no default needed — validation-layer required only (see the
+-- instagramHandle NOT NULL/upsert lesson in section 19). Existing rows and
+-- any future write path that omits this column stay safe.
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS "reelUrl" TEXT;
+
+-- CREATE OR REPLACE does not cover an added parameter — drop the 3-arg
+-- overload first so it doesn't linger alongside the new 4-arg version.
+DROP FUNCTION IF EXISTS insert_application_with_capacity(UUID, UUID, TEXT);
+
+CREATE OR REPLACE FUNCTION insert_application_with_capacity(
+  p_gig_id        UUID,
+  p_influencer_id UUID,
+  p_cover_note    TEXT,
+  p_reel_url      TEXT DEFAULT NULL
+)
+RETURNS SETOF applications AS $$
+DECLARE
+  v_slots    INTEGER;
+  v_received INTEGER;
+BEGIN
+  SELECT "applicationSlots" INTO v_slots FROM gigs WHERE id = p_gig_id FOR UPDATE;
+  IF v_slots IS NULL THEN RETURN; END IF;
+  SELECT COUNT(*) INTO v_received FROM applications WHERE "gigId" = p_gig_id;
+  IF v_received >= v_slots THEN RETURN; END IF;
+
+  RETURN QUERY
+  INSERT INTO applications ("gigId", "influencerId", "coverNote", "reelUrl", status)
+  VALUES (p_gig_id, p_influencer_id, p_cover_note, p_reel_url, 'PENDING')
+  RETURNING *;
+END;
+$$ LANGUAGE plpgsql;
+
+GRANT EXECUTE ON FUNCTION insert_application_with_capacity(UUID, UUID, TEXT, TEXT) TO anon, authenticated;
+
+-- ============================================
+-- 21. Creator Referral Program V1
+-- ============================================
+CREATE TABLE IF NOT EXISTS referral_submissions (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "influencerId"       UUID NOT NULL REFERENCES influencers(id) ON DELETE CASCADE,
+  "reelUrl"            TEXT NOT NULL,
+  "instagramUsername"  TEXT,
+  status               TEXT NOT NULL DEFAULT 'SUBMITTED',
+  "verifiedViews"      INTEGER,
+  "isWinner"           BOOLEAN NOT NULL DEFAULT false,
+  "rewardAmount"       INTEGER,
+  "reviewedBy"         TEXT,           -- admin's Clerk user id, audit trail only
+  "reviewedAt"         TIMESTAMPTZ,
+  "createdAt"          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  "updatedAt"          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE("influencerId", "reelUrl")
+);
+
+CREATE INDEX IF NOT EXISTS idx_referral_submissions_influencer ON referral_submissions("influencerId");
+CREATE INDEX IF NOT EXISTS idx_referral_submissions_status ON referral_submissions(status);
+
+-- At-most-one-global-winner, enforced at the DB level.
+CREATE UNIQUE INDEX IF NOT EXISTS referral_one_winner_idx
+  ON referral_submissions ("isWinner") WHERE "isWinner" = true;
+
+DROP TRIGGER IF EXISTS update_referral_submissions_updated_at ON referral_submissions;
+CREATE TRIGGER update_referral_submissions_updated_at
+  BEFORE UPDATE ON referral_submissions
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+ALTER TABLE referral_submissions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "anon_all_referral_submissions" ON referral_submissions FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "auth_all_referral_submissions" ON referral_submissions FOR ALL TO authenticated USING (true) WITH CHECK (true);
+GRANT ALL ON referral_submissions TO anon, authenticated;

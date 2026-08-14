@@ -24,7 +24,7 @@ const getInfluencerByUserId = async (userId) => {
 /**
  * Apply to a Gig.
  */
-const apply = async (userId, gigId, coverNote) => {
+const apply = async (userId, gigId, coverNote, reelUrl) => {
   const influencer = await getInfluencerByUserId(userId);
 
   const { data: gig, error: gigError } = await supabase
@@ -100,6 +100,7 @@ const apply = async (userId, gigId, coverNote) => {
     p_gig_id: gigId,
     p_influencer_id: influencer.id,
     p_cover_note: coverNote,
+    p_reel_url: reelUrl,
   });
 
   if (appError) {
@@ -477,4 +478,5 @@ module.exports = {
   getMessages,
   sendMessage,
   withdrawApplication,
+  getInfluencerByUserId,
 };

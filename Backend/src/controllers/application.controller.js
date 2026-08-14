@@ -5,8 +5,8 @@ const asyncHandler = require('../utils/asyncHandler');
  * Influencer applies to a gig.
  */
 const apply = asyncHandler(async (req, res) => {
-  const { gigId, coverNote } = req.body;
-  const application = await applicationService.apply(req.user.id, gigId, coverNote);
+  const { gigId, coverNote, reelUrl } = req.body;
+  const application = await applicationService.apply(req.user.id, gigId, coverNote, reelUrl);
 
   res.status(201).json({
     success: true,
