@@ -95,8 +95,6 @@ const createGig = async (userId, data) => {
     publishedAt: isPublishing ? new Date().toISOString() : null,
     expiresAt: isPublishing ? expiryFromNow() : null,
   };
-  console.log(`[Create Gig Debug] Submitting payload to Supabase:`, JSON.stringify(payload));
-
   const { data: newGig, error } = await supabaseAdmin
     .from('gigs')
     .insert(payload)
@@ -144,7 +142,6 @@ const getRequesterCoords = async (user) => {
  * consumers already expect.
  */
 const getGigs = async (filters, user) => {
-  console.log(`[getGigs] Start. Filters:`, JSON.stringify(filters));
   const { cursor, limit } = parsePagination(filters, 12);
   const { search, category, sort } = filters;
 

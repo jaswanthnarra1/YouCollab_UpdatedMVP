@@ -33,13 +33,19 @@ app.use(
 // an exact match.
 const stripTrailingSlash = (url) => url.replace(/\/+$/, '');
 
-const allowedOrigins = [
+const devOrigins = [
   'http://localhost:8080',
   'http://127.0.0.1:8080',
   'http://localhost:5173',
   'http://localhost:5174',
   'http://127.0.0.1:5173',
   'http://127.0.0.1:5174',
+];
+
+const allowedOrigins = [
+  // Dev-only convenience origins — never allowed in production, regardless
+  // of what CLIENT_URL contains (CFG-01: these used to be unconditional).
+  ...(config.NODE_ENV === 'production' ? [] : devOrigins),
   // Production origins from CLIENT_URL env (comma-separated list supported)
   ...config.CLIENT_URL.split(',').map((u) => stripTrailingSlash(u.trim())).filter(Boolean),
 ];

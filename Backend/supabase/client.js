@@ -2,7 +2,20 @@
  * YouCollab — Centralized Supabase Database Client
  * ===============================================
  * Initializes connection to Supabase database.
- * Provides standard client (anon) and admin client (service_role).
+ *
+ * SECURITY: `supabase` and `supabaseAdmin` are BOTH backed by the
+ * service_role key — there is no real anon-key client here anymore. This app
+ * never uses Supabase Auth (Clerk is the sole identity provider — see
+ * CLAUDE.md), so a Postgres RLS policy has no `auth.uid()` to key off and
+ * cannot distinguish "this backend's own anon-role query" from "a browser
+ * calling Supabase's REST API directly with the public anon key." Express is
+ * this app's only authorization boundary (every service function checks
+ * ownership before it acts — see application/gig/notification/profile
+ * services), so the DB layer is trusted once a request reaches here. Giving
+ * the `anon`/`authenticated` Postgres roles real table access would only
+ * open a bypass of that boundary for anyone holding the public anon key —
+ * see the accompanying RLS-hardening migration, which revokes those grants
+ * entirely. Do not reintroduce an anon-key client without re-deriving this.
  *
  * Note: Supabase JS v2 requires Node.js 22+ for native WebSocket support.
  * We pass realtime: { enabled: false } to avoid the WebSocket requirement
@@ -13,11 +26,10 @@ const { createClient } = require('@supabase/supabase-js');
 const config = require('../src/config');
 
 const supabaseUrl = config.SUPABASE.URL;
-const supabaseKey = config.SUPABASE.KEY;
 const supabaseServiceKey = config.SUPABASE.SERVICE_ROLE_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
-  console.warn('⚠️  Warning: SUPABASE_URL or SUPABASE_KEY is not defined in environment variables.');
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.warn('⚠️  Warning: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not defined in environment variables.');
 }
 
 // Server-side client options — disable Realtime to avoid WebSocket requirement
@@ -38,19 +50,18 @@ const clientOptions = {
   },
 };
 
-// Centralized standard client connection
-const supabase = createClient(supabaseUrl, supabaseKey, {
-  ...clientOptions,
-  db: { schema: 'public' },
-});
-
-// Centralized admin connection (service_role)
+// Single centralized connection, service_role throughout — see the SECURITY
+// note above. `supabase` and `supabaseAdmin` are intentionally the same
+// client; both names are kept so every existing call site (which imports
+// one or the other) keeps working without a mass rename.
 const supabaseAdmin = supabaseServiceKey
   ? createClient(supabaseUrl, supabaseServiceKey, {
       ...clientOptions,
       db: { schema: 'public' },
     })
   : null;
+
+const supabase = supabaseAdmin;
 
 /**
  * Health check function to verify connectivity with Supabase database.

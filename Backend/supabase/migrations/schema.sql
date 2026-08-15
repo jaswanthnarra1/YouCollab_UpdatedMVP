@@ -758,3 +758,75 @@ ALTER TABLE referral_submissions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "anon_all_referral_submissions" ON referral_submissions FOR ALL TO anon USING (true) WITH CHECK (true);
 CREATE POLICY "auth_all_referral_submissions" ON referral_submissions FOR ALL TO authenticated USING (true) WITH CHECK (true);
 GRANT ALL ON referral_submissions TO anon, authenticated;
+
+-- ============================================
+-- 22. Production RLS hardening — SEC-01
+-- ============================================
+-- This app never uses Supabase Auth (Clerk is the sole identity provider —
+-- see CLAUDE.md), so the `authenticated` Postgres role is never reached by a
+-- real per-user session, and every one of the `anon`/`authenticated` grants
+-- and USING(true)/WITH CHECK(true) policies added across this file and
+-- migration.sql exist for a caller that doesn't exist — while remaining
+-- fully usable by anyone holding the public anon key (shipped as
+-- VITE_SUPABASE_PUBLISHABLE_KEY) to read/write every table directly via
+-- Supabase's REST API, completely bypassing the Express backend's
+-- ownership/role checks (application.service.js, gig.service.js, etc.).
+--
+-- The backend's own Supabase client (Backend/supabase/client.js) now runs
+-- exclusively as service_role, which bypasses RLS by design and is
+-- unaffected by anything revoked here — this migration only removes access
+-- that nothing legitimate was using.
+--
+-- Storage is the one deliberate exception: avatars/gig-media buckets are
+-- created `public: true` (this file, ~line 181) specifically so images can
+-- be rendered via direct public URLs in the UI — anon SELECT on
+-- storage.objects for those two buckets is a verified, intentional
+-- requirement and is left in place. Direct anon/authenticated INSERT/DELETE
+-- on storage is not: every real upload already goes through
+-- POST /api/upload (authenticate-gated, backend storage.js prefers
+-- supabaseAdmin), so open write/delete access on storage.objects was a pure
+-- bypass with no legitimate caller either.
+
+-- Drop every USING(true)/WITH CHECK(true) policy that granted anon or
+-- authenticated blanket access to application data.
+DROP POLICY IF EXISTS "anon_all_users" ON users;
+DROP POLICY IF EXISTS "auth_all_users" ON users;
+DROP POLICY IF EXISTS "anon_all_brands" ON brands;
+DROP POLICY IF EXISTS "auth_all_brands" ON brands;
+DROP POLICY IF EXISTS "anon_all_influencers" ON influencers;
+DROP POLICY IF EXISTS "auth_all_influencers" ON influencers;
+DROP POLICY IF EXISTS "anon_all_gigs" ON gigs;
+DROP POLICY IF EXISTS "auth_all_gigs" ON gigs;
+DROP POLICY IF EXISTS "anon_all_applications" ON applications;
+DROP POLICY IF EXISTS "auth_all_applications" ON applications;
+DROP POLICY IF EXISTS "anon_all_refresh_tokens" ON refresh_tokens;
+DROP POLICY IF EXISTS "auth_all_refresh_tokens" ON refresh_tokens;
+DROP POLICY IF EXISTS "anon_all_notifications" ON notifications;
+DROP POLICY IF EXISTS "auth_all_notifications" ON notifications;
+DROP POLICY IF EXISTS "anon_all_messages" ON messages;
+DROP POLICY IF EXISTS "auth_all_messages" ON messages;
+DROP POLICY IF EXISTS "anon_all_reviews" ON reviews;
+DROP POLICY IF EXISTS "auth_all_reviews" ON reviews;
+DROP POLICY IF EXISTS "read_plans" ON plans;
+DROP POLICY IF EXISTS "anon_all_referral_submissions" ON referral_submissions;
+DROP POLICY IF EXISTS "auth_all_referral_submissions" ON referral_submissions;
+
+-- Storage: keep public read (verified requirement, see note above), drop
+-- the anon/authenticated write/delete policies — nothing legitimate used them.
+DROP POLICY IF EXISTS "Anon upload avatars" ON storage.objects;
+DROP POLICY IF EXISTS "Anon delete avatars" ON storage.objects;
+DROP POLICY IF EXISTS "Anon upload gig-media" ON storage.objects;
+DROP POLICY IF EXISTS "Anon delete gig-media" ON storage.objects;
+
+-- Revoke the blanket grants (migration.sql + this file) that made the
+-- dropped policies reachable in the first place. This is the actual gate —
+-- Postgres checks the base GRANT before RLS policies are even evaluated, so
+-- this alone denies anon/authenticated regardless of any policy left
+-- standing anywhere else in either migration file.
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM anon, authenticated;
+REVOKE USAGE ON SCHEMA public FROM anon, authenticated;
+-- storage.objects INSERT/DELETE only — SELECT stays granted for the two
+-- public buckets via the policies retained above.
+REVOKE INSERT, UPDATE, DELETE ON storage.objects FROM anon, authenticated;
