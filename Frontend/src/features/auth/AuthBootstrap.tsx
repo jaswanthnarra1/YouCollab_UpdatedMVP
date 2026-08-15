@@ -21,7 +21,20 @@ export function AuthBootstrap({ children }: { children: React.ReactNode }) {
         return;
       }
       try {
-        const res = await authService.me();
+        let res;
+        try {
+          res = await authService.me();
+        } catch (err) {
+          // A 401 right here is almost always window.Clerk.session lagging a
+          // beat behind the isSignedIn flag that triggered this effect — the
+          // token genuinely isn't attachable yet, not an expired session. One
+          // short retry clears it instead of bouncing a just-logged-in user
+          // straight back to /login.
+          if ((err as { response?: { status?: number } })?.response?.status !== 401) throw err;
+          console.warn("[AuthBootstrap] /api/auth/me got 401 on first try — retrying once");
+          await new Promise((r) => setTimeout(r, 400));
+          res = await authService.me();
+        }
         if (mounted && res?.user) {
           setUser(res.user);
           console.log("[AuthBootstrap] user fetched — hydrated", { id: res.user.id, role: res.user.role });

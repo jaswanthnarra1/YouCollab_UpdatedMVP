@@ -4,15 +4,16 @@ import { Sheet, SheetContent } from "@/components/common/sheet";
 import { Logo } from "@/components/ui/logo";
 import { Menu } from "lucide-react";
 import { useState } from "react";
+import { RouteTransition } from "./RouteTransition";
 
 export default function SidebarLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
+    <div className="flex h-dvh w-screen overflow-hidden bg-background text-foreground">
       {/* Sidebar — persistent from md breakpoint up */}
-      <div className="hidden md:flex h-screen shrink-0">
+      <div className="hidden md:flex h-dvh shrink-0">
         <Sidebar collapsed={collapsed} onToggleCollapse={() => setCollapsed((c) => !c)} />
       </div>
 
@@ -39,7 +40,9 @@ export default function SidebarLayout() {
         </div>
 
         <main className="flex-1 overflow-y-auto min-h-0 relative">
-          <Outlet />
+          <RouteTransition>
+            <Outlet />
+          </RouteTransition>
         </main>
       </div>
     </div>
