@@ -214,7 +214,7 @@ export default function GigDetail() {
                       className="rounded-sm text-[13px] border-border"
                     />
                     <div className="space-y-1">
-                      <Label htmlFor="reelUrl" className="text-[12px]">Reel Link</Label>
+                      <Label htmlFor="reelUrl" className="text-[12px]">Reel Link <span className="text-muted-foreground font-normal">(optional)</span></Label>
                       <Input
                         id="reelUrl"
                         value={reelUrl}
@@ -222,11 +222,14 @@ export default function GigDetail() {
                         placeholder="Paste your Instagram Reel link"
                         className="h-9 text-[13px] rounded-sm"
                       />
-                      <p className="text-[11px] text-muted-foreground">Add a Reel that best represents your content and style.</p>
+                      <p className="text-[11px] text-muted-foreground">Add a Reel that best represents your content and style — you can also apply without one.</p>
+                      {reelUrl.trim() !== "" && !isInstagramUrl(reelUrl) && (
+                        <p className="text-[11px] text-destructive">That doesn't look like a valid Instagram Reel link.</p>
+                      )}
                     </div>
                     <Button
                       onClick={() => apply.mutate()}
-                      disabled={!coverNote.trim() || !isInstagramUrl(reelUrl) || apply.isPending}
+                      disabled={!coverNote.trim() || (reelUrl.trim() !== "" && !isInstagramUrl(reelUrl)) || apply.isPending}
                       className="w-full h-9 rounded-sm bg-gradient-brand text-primary-foreground border-0 text-[13px]"
                     >
                       {apply.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Send className="h-3.5 w-3.5 mr-1" /> Send Pitch brief</>}
