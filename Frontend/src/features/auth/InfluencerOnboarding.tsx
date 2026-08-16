@@ -96,7 +96,7 @@ export default function InfluencerOnboarding() {
               maxLength={6}
               className="h-9 text-[13px] rounded-sm max-w-[160px]"
             />
-            <p className="text-xs text-muted-foreground">See gigs near you. We currently support Pune PIN codes.</p>
+            <p className="text-xs text-muted-foreground">See gigs near you.</p>
           </div>
 
           <div className="space-y-1.5">

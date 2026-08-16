@@ -18,7 +18,13 @@ const geocodePincode = async (pincode) => {
   }
 
   if (!data) {
-    throw new AppError('We currently support Pune PIN codes only.', 400, 'UNSUPPORTED_PINCODE');
+    // Not in the offline lookup table (currently seeded with Pune PINs only,
+    // per the MVP scope note above) — still a valid Indian PIN code, already
+    // format-checked by the Zod schema before this runs. Accept it: radius
+    // matching for this user just stays disabled until it resolves to a
+    // known location, the same graceful state already used when a PIN is
+    // skipped entirely (see resolveLocationFields in onboarding.service.js).
+    return { pincode, city: null, latitude: null, longitude: null };
   }
 
   return data;

@@ -85,7 +85,7 @@ export default function BrandOnboarding() {
               maxLength={6}
               className="h-9 text-[13px] rounded-sm max-w-[160px]"
             />
-            <p className="text-xs text-muted-foreground">Powers radius matching for your collabs. We currently support Pune PIN codes.</p>
+            <p className="text-xs text-muted-foreground">Powers radius matching for your collabs.</p>
           </div>
           <div className="space-y-1.5">
             <Label className="text-[12px]">Bio <span className="text-muted-foreground">(min 3 words)</span></Label>

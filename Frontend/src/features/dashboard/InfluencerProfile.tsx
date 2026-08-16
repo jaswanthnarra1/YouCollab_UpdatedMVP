@@ -256,7 +256,7 @@ export default function CreatorProfile() {
               maxLength={6}
               className="h-9 text-[13px] rounded-sm max-w-[160px] disabled:opacity-70 disabled:cursor-not-allowed"
             />
-            <p className="text-xs text-muted-foreground">See collabs near you. We currently support Pune PIN codes.</p>
+            <p className="text-xs text-muted-foreground">See collabs near you.</p>
           </div>
 
           <div className="space-y-1.5">
