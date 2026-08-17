@@ -519,6 +519,13 @@ const connectInstagram = async (userId, code, customRedirectUri = null) => {
     .single();
 
   if (error) {
+    if (error.code === '23505') {
+      throw new AppError(
+        `This Instagram account (@${profile.username}) is already connected to another YouCollab profile. Disconnect it there first.`,
+        409,
+        'INSTAGRAM_ALREADY_LINKED'
+      );
+    }
     throw new AppError('Failed to save Instagram connection.', 500, 'DATABASE_ERROR');
   }
 
