@@ -168,11 +168,19 @@ const adminListPlanChangeRequests = async (filters = {}) => {
 /**
  * Admin: approve a pending request. Conditioned on status='PENDING' so two
  * admins racing the same request can't both approve it (mirrors
- * referral.service.js's adminMarkUnderReview pattern). Applies the change
- * by calling the existing adminUpdateBrandPlan — only the plan itself
- * changes; Campaign Credits/Application Slots/billing dates are left as
- * they are (unchanged by a plan switch under the existing V1 rules — the
- * only thing that grants fresh credits/slots is the renewal sweep).
+ * referral.service.js's adminMarkUnderReview pattern).
+ *
+ * Explicit business decision: approving grants usable capacity immediately
+ * rather than leaving the brand relabeled-but-unchanged until its next
+ * renewal (up to 30 days away) — approving an upgrade that grants nothing
+ * usable defeats the reason anyone requests one. The exact mechanic is to
+ * *add the difference* between the new and old plan's per-cycle grant to
+ * whatever the brand currently holds (never a flat reset to the new plan's
+ * number), so anything already rolled over is preserved — the same
+ * "rollover, never reset" principle the PRD already applies at renewal
+ * (section 21), just triggered by a plan change instead of time passing.
+ * Applied symmetrically for a downgrade too (the delta goes negative),
+ * clamped at 0 so it can never violate the brands_*_check constraints.
  */
 const adminApprovePlanChangeRequest = async (id, adminClerkId) => {
   const { data: request, error: updateError } = await supabase
@@ -186,9 +194,25 @@ const adminApprovePlanChangeRequest = async (id, adminClerkId) => {
   if (updateError) throw new AppError('Failed to approve request.', 500, 'DATABASE_ERROR');
   if (!request) throw new AppError('This request has already been reviewed.', 400, 'BAD_REQUEST');
 
-  const requestedPlan = await supabase.from('plans').select('name').eq('id', request.requestedPlanId).single();
+  const [{ data: brand }, { data: requestedPlan }, { data: currentPlan }] = await Promise.all([
+    supabase.from('brands').select('"campaignCreditsRemaining", "applicationSlotsRemaining"').eq('id', request.brandId).single(),
+    supabase.from('plans').select('name, "campaignLimit", "applicationSlotLimit"').eq('id', request.requestedPlanId).single(),
+    request.currentPlanId
+      ? supabase.from('plans').select('"campaignLimit", "applicationSlotLimit"').eq('id', request.currentPlanId).single()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  // No recorded prior plan (legacy edge case) treats "old" as a zero
+  // grant — the brand gets the new plan's full allocation on top of
+  // whatever they already have, rather than the approval silently no-oping.
+  const oldGrant = currentPlan || { campaignLimit: 0, applicationSlotLimit: 0 };
+  const creditDelta = requestedPlan.campaignLimit - oldGrant.campaignLimit;
+  const slotDelta = requestedPlan.applicationSlotLimit - oldGrant.applicationSlotLimit;
+
   await adminUpdateBrandPlan(request.brandId, {
-    planName: requestedPlan.data.name,
+    planName: requestedPlan.name,
+    campaignCredits: Math.max(0, brand.campaignCreditsRemaining + creditDelta),
+    applicationSlots: Math.max(0, brand.applicationSlotsRemaining + slotDelta),
     reason: `Plan change request ${id} approved`,
   });
 

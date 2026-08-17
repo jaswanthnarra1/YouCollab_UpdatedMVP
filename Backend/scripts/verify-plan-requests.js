@@ -73,14 +73,17 @@ const expectThrow = async (name, fn, code) => {
     check('getBrandUsageSummary surfaces the pending request', usage1.latestRequest?.id === req1.id);
     check('surfaced request is still PENDING', usage1.latestRequest?.status === 'PENDING');
 
-    console.log('\n--- admin approval ---');
+    console.log('\n--- admin approval grants the difference immediately (business decision) ---');
+    // Brand starts FREE (2 credits / 10 slots) -> requests GROWTH (10 / 48).
+    // Approval should add the *difference* on top of what they have:
+    // 2 + (10-2) = 10 credits, 10 + (48-10) = 48 slots.
     const approved = await planService.adminApprovePlanChangeRequest(req1.id, 'verify-admin-clerk-id');
     check('approve returns APPROVED status', approved.status === 'APPROVED', approved.status);
 
     const { data: brandAfterApproval } = await supabaseAdmin.from('brands').select('planId, "campaignCreditsRemaining", "applicationSlotsRemaining"').eq('id', brand.id).single();
     check('brand planId switched to the requested plan (GROWTH)', brandAfterApproval.planId === growth.id);
-    check('approval does NOT auto-grant new credits (existing V1 rule: only renewal grants)', brandAfterApproval.campaignCreditsRemaining === 2, `got ${brandAfterApproval.campaignCreditsRemaining}`);
-    check('approval does NOT auto-grant new slots either', brandAfterApproval.applicationSlotsRemaining === 10, `got ${brandAfterApproval.applicationSlotsRemaining}`);
+    check('approval grants the credit difference (2 + (10-2) = 10)', brandAfterApproval.campaignCreditsRemaining === 10, `got ${brandAfterApproval.campaignCreditsRemaining}`);
+    check('approval grants the slot difference (10 + (48-10) = 48)', brandAfterApproval.applicationSlotsRemaining === 48, `got ${brandAfterApproval.applicationSlotsRemaining}`);
 
     await expectThrow(
       'cannot approve the same request twice',
@@ -105,10 +108,23 @@ const expectThrow = async (name, fn, code) => {
       'BAD_REQUEST',
     );
 
+    console.log('\n--- downgrade approval: delta applies symmetrically, clamped at 0 ---');
+    // Artificially drop the brand's balance low enough that GROWTH(10/48)
+    // -> FREE(2/10)'s negative delta would go below zero, to prove the
+    // clamp actually engages rather than just happening not to matter.
+    await supabaseAdmin.from('brands').update({ campaignCreditsRemaining: 1, applicationSlotsRemaining: 1 }).eq('id', brand.id);
+    const req3 = await planService.requestPlanChange(brand.id, 'FREE');
+    check('downgrade request can be submitted', req3.status === 'PENDING');
+    await planService.adminApprovePlanChangeRequest(req3.id, 'verify-admin-clerk-id');
+    const { data: brandAfterDowngrade } = await supabaseAdmin.from('brands').select('planId, "campaignCreditsRemaining", "applicationSlotsRemaining"').eq('id', brand.id).single();
+    check('downgrade switches planId to FREE', brandAfterDowngrade.planId === free.id);
+    check('negative credit delta clamps at 0, not a negative balance (1 + (2-10) = -7 -> 0)', brandAfterDowngrade.campaignCreditsRemaining === 0, `got ${brandAfterDowngrade.campaignCreditsRemaining}`);
+    check('negative slot delta clamps at 0 too (1 + (10-48) = -37 -> 0)', brandAfterDowngrade.applicationSlotsRemaining === 0, `got ${brandAfterDowngrade.applicationSlotsRemaining}`);
+
     console.log('\n--- admin listing ---');
     const allRequests = await planService.adminListPlanChangeRequests();
     const ours = allRequests.filter((r) => r.brandId === brand.id);
-    check('admin list includes both requests for this brand', ours.length === 2, `found ${ours.length}`);
+    check('admin list includes all three requests for this brand', ours.length === 3, `found ${ours.length}`);
     check('admin list includes the brand name (joined)', ours.every((r) => r.brand?.businessName === 'Verify Plan Req Co'));
 
     const pendingOnly = await planService.adminListPlanChangeRequests({ status: 'PENDING' });
