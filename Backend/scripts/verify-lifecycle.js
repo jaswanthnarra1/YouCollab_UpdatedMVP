@@ -186,6 +186,11 @@ const expectThrow = async (name, fn, code) => {
     const u5 = await mkUser('INFLUENCER', `v-u5-${stamp}@verify.local`);
     await mkInfluencer(u5, 'U5', 500, 18.52, 73.855, '411001');
     await appService.apply(u5, g4.id, 'one of three');
+    // Backdate past the 1-hour window so this close is a genuine non-refund
+    // close (isolating the slot-release assertion below from the credit-
+    // refund path, which is tested separately) and so the reopen tests
+    // further down have a real "normally closed, never refunded" fixture.
+    await supabaseAdmin.from('gigs').update({ publishedAt: new Date(Date.now() - 65 * 60000).toISOString() }).eq('id', g4.id);
     let poolBefore = (await planService.getBrandUsageSummary(brandId)).applicationSlotsRemaining;
     await gigService.closeGig(g4.id, brandUser);
     let poolAfter = (await planService.getBrandUsageSummary(brandId)).applicationSlotsRemaining;
@@ -201,11 +206,33 @@ const expectThrow = async (name, fn, code) => {
     await supabaseAdmin.from('brands').update({ applicationSlotsRemaining: 0, campaignCreditsRemaining: 5 }).eq('id', brandId);
     await expectThrow('reopen blocked with 0 slots in pool', () => gigService.toggleGigStatus(g4.id, brandUser), 'INSUFFICIENT_SLOTS');
     await supabaseAdmin.from('brands').update({ applicationSlotsRemaining: 10 }).eq('id', brandId);
+    const { data: g4BeforeReopen } = await supabaseAdmin.from('gigs').select('creditConsumed, creditRefunded').eq('id', g4.id).single();
+    check('g4 was normally closed: creditConsumed stayed true, never refunded', g4BeforeReopen.creditConsumed === true && g4BeforeReopen.creditRefunded === false);
+    const creditsBeforeReopen = (await planService.getBrandUsageSummary(brandId)).campaignCreditsRemaining;
     const reopened = await gigService.toggleGigStatus(g4.id, brandUser);
     check('reopen succeeds once pool has room', reopened.status === 'ACTIVE', reopened.status);
     const { data: reopenedRow } = await supabaseAdmin.from('gigs').select('applicationSlotsUsed, slotsReleased').eq('id', g4.id).single();
     check('reopen resets applicationSlotsUsed to 0', reopenedRow.applicationSlotsUsed === 0);
     check('reopen resets slotsReleased to false', reopenedRow.slotsReleased === false);
+    const creditsAfterReopen = (await planService.getBrandUsageSummary(brandId)).campaignCreditsRemaining;
+    check('BUSINESS RULE: reopening a never-refunded Gig costs 0 Campaign Credits', creditsAfterReopen === creditsBeforeReopen, `before=${creditsBeforeReopen} after=${creditsAfterReopen}`);
+
+    console.log('\n--- Reopen after a refunded credit charges again ---');
+    const g4r = await gigService.createGig(brandUser, { ...base, applicationSlots: 1 });
+    ids.gigs.push(g4r.id);
+    const creditsBeforeRefundCycle = (await planService.getBrandUsageSummary(brandId)).campaignCreditsRemaining;
+    await supabaseAdmin.from('gigs').update({ publishedAt: new Date(Date.now() - 5 * 60000).toISOString() }).eq('id', g4r.id);
+    await gigService.closeGig(g4r.id, brandUser); // within 1hr -> refunded
+    const creditsAfterRefund = (await planService.getBrandUsageSummary(brandId)).campaignCreditsRemaining;
+    check('closing within 1hr refunded the credit', creditsAfterRefund === creditsBeforeRefundCycle + 1, `before=${creditsBeforeRefundCycle} after=${creditsAfterRefund}`);
+    const { data: g4rAfterRefund } = await supabaseAdmin.from('gigs').select('creditConsumed, creditRefunded').eq('id', g4r.id).single();
+    check('refunded Gig has creditConsumed=false, creditRefunded=true', g4rAfterRefund.creditConsumed === false && g4rAfterRefund.creditRefunded === true);
+    const reopenedAfterRefund = await gigService.toggleGigStatus(g4r.id, brandUser);
+    check('reopen after refund succeeds', reopenedAfterRefund.status === 'ACTIVE', reopenedAfterRefund.status);
+    const creditsAfterReopenOfRefunded = (await planService.getBrandUsageSummary(brandId)).campaignCreditsRemaining;
+    check('BUSINESS RULE: reopening a REFUNDED Gig charges 1 Campaign Credit again', creditsAfterReopenOfRefunded === creditsAfterRefund - 1, `before=${creditsAfterRefund} after=${creditsAfterReopenOfRefunded}`);
+    const { data: g4rAfterReopen } = await supabaseAdmin.from('gigs').select('creditConsumed, creditRefunded').eq('id', g4r.id).single();
+    check('reopened-after-refund Gig has creditConsumed=true, creditRefunded reset to false', g4rAfterReopen.creditConsumed === true && g4rAfterReopen.creditRefunded === false);
 
     console.log('\n--- 1-hour cancellation refund ---');
     const g5 = await gigService.createGig(brandUser, { ...base, applicationSlots: 1 });

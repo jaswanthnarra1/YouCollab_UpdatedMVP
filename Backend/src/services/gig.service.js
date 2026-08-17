@@ -544,9 +544,14 @@ const deleteGig = async (id, userId) => {
 
 /**
  * Toggle gig status: ACTIVE -> CLOSED, or CLOSED/EXPIRED -> ACTIVE (reopen).
- * Closing releases slots (+ possible 1hr refund). Reopening is a fresh
- * publish against the brand's *current* pool via publish_gig_with_credit —
- * it does not get its old slots back for free (PRD section 20).
+ * Closing releases slots (+ possible 1hr refund). Reopening re-checks
+ * Application Slots against the brand's *current* pool via
+ * publish_gig_with_credit — it does not get its old slots back for free
+ * (PRD section 20) — but does NOT spend another Campaign Credit unless this
+ * Gig's original credit was refunded (1-hour cancellation). Explicit
+ * business decision: 1 Campaign Credit pays for 1 Gig, not 1 ACTIVE
+ * transition — see the v_needs_credit comment in publish_gig_with_credit
+ * (schema.sql section 23e).
  */
 const toggleGigStatus = async (id, userId) => {
   const brand = await getBrandByUserId(userId);

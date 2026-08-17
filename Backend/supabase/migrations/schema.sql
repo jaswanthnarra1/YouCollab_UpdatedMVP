@@ -939,6 +939,15 @@ RETURNS TABLE(
 DECLARE
   v_gig RECORD;
   v_brand RECORD;
+  -- Explicit business decision (not the PRD's literal text, which is silent
+  -- on this): 1 Campaign Credit pays for 1 Gig, not 1 ACTIVE transition. A
+  -- reopen of a CLOSED/EXPIRED Gig that never had its credit refunded is
+  -- free — the credit is still "spent" on this Gig. A reopen of a Gig whose
+  -- credit *was* refunded (the 1-hour cancellation case) charges again,
+  -- because the brand already got that credit back once — creditConsumed is
+  -- the single flag both createGig's first publish and toggleGigStatus's
+  -- reopen check, so there is exactly one rule, not two.
+  v_needs_credit BOOLEAN;
 BEGIN
   IF p_slots < 1 THEN
     RAISE EXCEPTION 'INVALID_SLOTS';
@@ -949,15 +958,19 @@ BEGIN
     RAISE EXCEPTION 'GIG_NOT_FOUND';
   END IF;
   -- DRAFT: a first publish. CLOSED/EXPIRED: a reopen — PRD 20 says a reopen
-  -- must re-check the *current* pool exactly like a fresh publish, not
+  -- must re-check the *current* slot pool exactly like a fresh publish, not
   -- assume its old slots are still available, so this is the same atomic
-  -- path for both rather than a second copy of the same business rule.
+  -- path for both rather than a second copy of that business rule. Whether
+  -- it *also* spends a credit is decided by v_needs_credit above, not by
+  -- which of these three statuses the Gig started in.
   IF v_gig.status NOT IN ('DRAFT', 'CLOSED', 'EXPIRED') THEN
     RAISE EXCEPTION 'GIG_NOT_PUBLISHABLE';
   END IF;
 
+  v_needs_credit := NOT v_gig."creditConsumed";
+
   SELECT * INTO v_brand FROM brands WHERE id = p_brand_id FOR UPDATE;
-  IF v_brand."campaignCreditsRemaining" < 1 THEN
+  IF v_needs_credit AND v_brand."campaignCreditsRemaining" < 1 THEN
     RAISE EXCEPTION 'INSUFFICIENT_CAMPAIGN_CREDITS';
   END IF;
   IF v_brand."applicationSlotsRemaining" < p_slots THEN
@@ -965,7 +978,7 @@ BEGIN
   END IF;
 
   UPDATE brands SET
-    "campaignCreditsRemaining" = "campaignCreditsRemaining" - 1,
+    "campaignCreditsRemaining" = "campaignCreditsRemaining" - (CASE WHEN v_needs_credit THEN 1 ELSE 0 END),
     "applicationSlotsRemaining" = "applicationSlotsRemaining" - p_slots
   WHERE id = p_brand_id;
 
@@ -974,15 +987,23 @@ BEGIN
     "publishedAt" = now(),
     "expiresAt" = p_expires_at,
     "creditConsumed" = true,
+    -- Reset on every (re)publish, freely reopened or not: this Gig is live
+    -- again and eligible for its own fresh 1-hour cancellation window.
+    "creditRefunded" = false,
     "applicationSlots" = p_slots,
     "applicationSlotsUsed" = 0,
     "slotsReleased" = false
   WHERE id = p_gig_id;
 
-  INSERT INTO credit_transactions ("brandId", type, amount, "balanceBefore", "balanceAfter", "gigId", reason)
-  VALUES (p_brand_id, 'PUBLISH', -1, v_brand."campaignCreditsRemaining", v_brand."campaignCreditsRemaining" - 1, p_gig_id, 'Gig published');
+  IF v_needs_credit THEN
+    INSERT INTO credit_transactions ("brandId", type, amount, "balanceBefore", "balanceAfter", "gigId", reason)
+    VALUES (p_brand_id, 'PUBLISH', -1, v_brand."campaignCreditsRemaining", v_brand."campaignCreditsRemaining" - 1, p_gig_id,
+            CASE WHEN v_gig.status = 'DRAFT' THEN 'Gig published' ELSE 'Gig reopened (credit re-charged: prior credit was refunded)' END);
+  END IF;
 
-  RETURN QUERY SELECT (v_brand."campaignCreditsRemaining" - 1), (v_brand."applicationSlotsRemaining" - p_slots);
+  RETURN QUERY SELECT
+    (v_brand."campaignCreditsRemaining" - (CASE WHEN v_needs_credit THEN 1 ELSE 0 END)),
+    (v_brand."applicationSlotsRemaining" - p_slots);
 END;
 $$ LANGUAGE plpgsql;
 
