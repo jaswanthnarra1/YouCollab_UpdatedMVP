@@ -9,6 +9,7 @@ const { supabaseAdmin } = require('../src/services/supabase');
 const planService = require('../src/services/plan.service');
 const gigService = require('../src/services/gig.service');
 const appService = require('../src/services/application.service');
+const onboardingService = require('../src/services/onboarding.service');
 
 let pass = 0, fail = 0;
 const check = (name, ok, detail = '') => {
@@ -81,6 +82,48 @@ const expectThrow = async (name, fn, code) => {
       plans.find(p => p.name === 'GROWTH')?.price === 199 &&
       plans.find(p => p.name === 'GROWTH')?.campaignLimit === 10 &&
       plans.find(p => p.name === 'GROWTH')?.applicationSlotLimit === 48);
+
+    console.log('\n--- Real onboarding initializes plan/credits/billing-cycle (deployment-blocker regression) ---');
+    // Exercises the actual onboardBrand() path, not the mkBrand() test
+    // helper above (which sets these columns directly) — this is the one
+    // real gap a pure service-layer test of gigService/applicationService
+    // alone would never catch: a bare column DEFAULT (0 credits, NULL
+    // billing cycle) with no onboarding-time initialization would leave
+    // every brand who signs up after this migration permanently stuck at
+    // 0 Campaign Credits, since the renewal sweep explicitly excludes NULL
+    // billingCycleEnd and would never pick them up.
+    // mkUser() sets is_onboarded:true (it's built for scratch users that skip
+    // onboarding elsewhere in this suite) — onboardBrand() explicitly refuses
+    // an already-onboarded user, so this one real test needs a fresh,
+    // not-yet-onboarded row instead.
+    const { data: freshUserRow, error: freshUserErr } = await supabaseAdmin.from('users')
+      .insert({ email: `v-fresh-brand-${stamp}@verify.local`, role: 'BRAND', full_name: 'verify-fresh-BRAND', is_onboarded: false })
+      .select('id').single();
+    if (freshUserErr) throw new Error(`fresh user insert: ${freshUserErr.message}`);
+    const freshBrandUser = freshUserRow.id;
+    ids.users.push(freshBrandUser);
+    const onboarded = await onboardingService.onboardBrand(freshBrandUser, {
+      businessName: 'Fresh Onboard Co', category: 'Cafe', location: 'Pune', bio: 'verify onboarding',
+    });
+    ids.brands.push(onboarded.brand.id);
+    check('onboarding assigns a real planId (not null)', !!onboarded.brand.planId);
+    check('onboarding grants FREE plan credits (2)', onboarded.brand.campaignCreditsRemaining === 2, `got ${onboarded.brand.campaignCreditsRemaining}`);
+    check('onboarding grants FREE plan slots (10)', onboarded.brand.applicationSlotsRemaining === 10, `got ${onboarded.brand.applicationSlotsRemaining}`);
+    check('onboarding sets billingCycleStart', !!onboarded.brand.billingCycleStart);
+    check('onboarding sets a future billingCycleEnd', !!onboarded.brand.billingCycleEnd && new Date(onboarded.brand.billingCycleEnd) > new Date());
+    // Prove this brand is now reachable for a real publish, end to end.
+    const freshDraft = await gigService.createGig(freshBrandUser, {
+      title: 'Fresh Brand First Gig', description: 'x'.repeat(30), budgetMin: 100, budgetMax: 200,
+      deliverables: 'post', creatorRequirements: 'any', platform: 'Instagram', campaignType: 'Barter',
+      deadline: new Date(Date.now() + 6e8), category: 'Food', applicationSlots: 1,
+    });
+    ids.gigs.push(freshDraft.id);
+    check('freshly onboarded brand can publish immediately', freshDraft.status === 'ACTIVE', freshDraft.status);
+    // Not eligible for renewal yet — billingCycleEnd is 30 days out.
+    const { renewed: freshRenewedCount } = await planService.renewElapsedBillingCycles();
+    const { data: freshBrandRow } = await supabaseAdmin.from('brands').select('campaignCreditsRemaining').eq('id', onboarded.brand.id).single();
+    check('freshly onboarded brand is NOT immediately renewed at boot (not double-granted)', freshBrandRow.campaignCreditsRemaining === 1, `got ${freshBrandRow.campaignCreditsRemaining} (expected 2-1=1 after one publish, unchanged by renewal sweep)`);
+    void freshRenewedCount;
 
     console.log('\n--- Campaign Credits: draft is free ---');
     let usage = await planService.getBrandUsageSummary(brandId);

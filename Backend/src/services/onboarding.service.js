@@ -1,6 +1,8 @@
 const supabase = require('./supabase');
 const AppError = require('../utils/AppError');
 const { geocodePincode } = require('./geo.service');
+const planService = require('./plan.service');
+const config = require('../config');
 
 /**
  * Resolves an optional pincode into the {pincode, latitude, longitude}
@@ -13,6 +15,30 @@ const resolveLocationFields = async (pincode) => {
   }
   const resolved = await geocodePincode(pincode);
   return { pincode: resolved.pincode, latitude: resolved.latitude, longitude: resolved.longitude };
+};
+
+/**
+ * A brand-new brand's starting plan/credits/billing-cycle. Every brand
+ * column below has a bare column DEFAULT (0 / NULL) with no application-
+ * level fallback in the atomic credit RPCs — unlike the read-side
+ * `plan.service.js` fallback that treats a NULL planId as FREE, a NULL
+ * billingCycleEnd is explicitly excluded from the renewal sweep's WHERE
+ * clause, so a brand onboarded without this would sit at 0 Campaign
+ * Credits forever with no way to ever get its first grant. This mirrors
+ * exactly what the one-time production backfill (schema.sql section 23l)
+ * did for pre-existing brands, applied here at onboarding time instead.
+ */
+const initialPlanFields = async () => {
+  const free = await planService.getPlanByName('FREE');
+  const now = new Date();
+  const cycleEnd = new Date(now.getTime() + config.BILLING.CYCLE_DAYS * 24 * 60 * 60 * 1000);
+  return {
+    planId: free.id,
+    campaignCreditsRemaining: free.campaignLimit,
+    applicationSlotsRemaining: free.applicationSlotLimit,
+    billingCycleStart: now.toISOString(),
+    billingCycleEnd: cycleEnd.toISOString(),
+  };
 };
 
 /**
@@ -38,6 +64,7 @@ const onboardBrand = async (userId, data) => {
   }
 
   const locationFields = await resolveLocationFields(data.pincode);
+  const planFields = await initialPlanFields();
 
   // Create brand record
   const { data: brand, error: brandError } = await supabase
@@ -48,6 +75,7 @@ const onboardBrand = async (userId, data) => {
       category: data.category,
       location: data.location || 'Pune',
       ...locationFields,
+      ...planFields,
       bio: data.bio,
       logoUrl: data.logoUrl || null,
       website: data.website || null,
