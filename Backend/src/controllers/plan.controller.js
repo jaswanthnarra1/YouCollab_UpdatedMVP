@@ -23,24 +23,11 @@ const list = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: plans });
 });
 
-/** Current brand's plan + live campaign/slot usage. */
+/** Current brand's Campaign Credits / Application Slots / billing cycle. */
 const usage = asyncHandler(async (req, res) => {
   const brandId = await getBrandId(req.user.id);
-  const data = await planService.getBrandPlanUsage(brandId);
+  const data = await planService.getBrandUsageSummary(brandId);
   res.status(200).json({ success: true, data });
 });
 
-/** Assign a plan to the current brand (manual until billing exists). */
-const assign = asyncHandler(async (req, res) => {
-  const { planName } = req.body;
-  if (!planName) {
-    throw new AppError('planName is required.', 400, 'VALIDATION_ERROR');
-  }
-
-  const brandId = await getBrandId(req.user.id);
-  const data = await planService.assignPlan(brandId, planName);
-
-  res.status(200).json({ success: true, data, message: `Switched to the ${planName} plan.` });
-});
-
-module.exports = { list, usage, assign };
+module.exports = { list, usage };

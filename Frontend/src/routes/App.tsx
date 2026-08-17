@@ -34,6 +34,7 @@ const InstagramCallback = lazy(() => import("@/features/auth/InstagramCallback")
 const Settings = lazy(() => import("@/features/dashboard/Settings"));
 const ReferralPage = lazy(() => import("@/features/referrals/ReferralPage"));
 const AdminReferrals = lazy(() => import("@/features/admin/AdminReferrals"));
+const AdminBrandPlans = lazy(() => import("@/features/admin/AdminBrandPlans"));
 const VerifyOtpPage = lazy(() => import("@/features/auth/VerifyOtpPage"));
 const VerifyLoginOtpPage = lazy(() => import("@/features/auth/VerifyLoginOtpPage"));
 const ForgotPasswordPage = lazy(() => import("@/features/auth/ForgotPasswordPage"));
@@ -134,6 +135,9 @@ const App = () => (
                   } />
                   <Route path="/admin/referrals" element={
                     <AdminRoute><AdminReferrals /></AdminRoute>
+                  } />
+                  <Route path="/admin/plans" element={
+                    <AdminRoute><AdminBrandPlans /></AdminRoute>
                   } />
                 </Route>
 

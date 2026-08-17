@@ -157,8 +157,13 @@ export interface Gig {
   status?: GigStatus;
   publishedAt?: string | null;
   expiresAt?: string | null;
+  /** Total applications this campaign can accept (spent from the brand's slot pool at publish time). */
   applicationSlots?: number;
+  /** How many of applicationSlots have been used by received applications. */
+  applicationSlotsUsed?: number;
   applicationsReceived?: number;
+  /** Whether this Gig currently holds a spent Campaign Credit (false once refunded). */
+  creditConsumed?: boolean;
 }
 
 /** DRAFT/ACTIVE/EXPIRED/CLOSED replaced the old binary OPEN/CLOSED. */
@@ -168,17 +173,34 @@ export interface Plan {
   id: string;
   name: string;
   price: number;
+  /** Campaign Credits granted per billing cycle (rolls over, doesn't reset). */
   campaignLimit: number;
+  /** Application Slots granted per billing cycle (rolls over, doesn't reset). */
   applicationSlotLimit: number;
 }
 
+/** One currently-ACTIVE campaign's slot usage, for the "6/10 applications" breakdown. */
+export interface PlanUsageCampaign {
+  id: string;
+  title: string;
+  applicationSlotsAllotted: number;
+  applicationSlotsUsed: number;
+}
+
+/**
+ * V1 Campaign Credit / Application Slot model. `campaignCreditsRemaining` /
+ * `applicationSlotsRemaining` are the brand's own live balances (the source
+ * of truth — see Backend/src/services/plan.service.js
+ * getBrandUsageSummary) — not derived from `plan`, which only describes the
+ * per-cycle grant amount.
+ */
 export interface PlanUsage {
-  plan: Plan;
-  campaignsUsed: number;
-  campaignsRemaining: number;
-  slotsAllocated: number;
-  slotsRemaining: number;
-  applicationsReceived: number;
+  plan: { id: string; name: string; price: number; campaignCredits: number; applicationSlots: number };
+  campaignCreditsRemaining: number;
+  applicationSlotsRemaining: number;
+  billingCycleStart: string | null;
+  billingCycleEnd: string | null;
+  campaigns: PlanUsageCampaign[];
 }
 
 export interface CreateGigPayload {

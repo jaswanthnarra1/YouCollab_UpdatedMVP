@@ -1,9 +1,7 @@
 const { supabase, supabaseAdmin } = require('./supabase');
 const AppError = require('../utils/AppError');
 const { parsePagination, paginateResults } = require('../utils/pagination');
-const { GIG_POST_COST } = require('../utils/credits');
 const config = require('../config');
-const planService = require('./plan.service');
 
 /** Publication window for a newly published gig, from backend config. */
 const expiryFromNow = () =>
@@ -16,6 +14,45 @@ const expiryFromNow = () =>
  */
 const isGigOpenForApplications = (gig) =>
   gig.status === 'ACTIVE' && (!gig.expiresAt || new Date(gig.expiresAt) > new Date());
+
+/**
+ * Maps a publish_gig_with_credit / close_gig_and_release / reallocate RPC
+ * error message to the right HTTP status/code. All of these RPCs RAISE
+ * EXCEPTION with a bare code string (see schema.sql section 23) rather than
+ * a client-safe message, so this is the one place that turns them into the
+ * app's usual { message, statusCode, code } shape.
+ */
+const PUBLISH_ERROR_MAP = {
+  GIG_NOT_FOUND: ['This collab does not exist or has been deleted.', 404, 'NOT_FOUND'],
+  GIG_NOT_PUBLISHABLE: ['This collab is already live.', 400, 'ALREADY_ACTIVE'],
+  GIG_NOT_DRAFT: ['This collab is already live.', 400, 'ALREADY_ACTIVE'],
+  INVALID_SLOTS: ['Every active campaign needs at least 1 application slot.', 400, 'INVALID_SLOTS'],
+  INSUFFICIENT_CAMPAIGN_CREDITS: [
+    'You have no Campaign Credits remaining. Please request an upgrade or top-up from the YouCollab team.',
+    402,
+    'INSUFFICIENT_CAMPAIGN_CREDITS',
+  ],
+  INSUFFICIENT_SLOTS: [
+    "That's more Application Slots than you have available. Free some up or request more from the YouCollab team.",
+    402,
+    'INSUFFICIENT_SLOTS',
+  ],
+  SLOTS_BELOW_RECEIVED: [
+    'This campaign already received applications — allocate at least that many slots.',
+    400,
+    'SLOTS_BELOW_RECEIVED',
+  ],
+};
+
+const throwFromRpcError = (error) => {
+  const code = (error?.message || '').trim();
+  const mapped = PUBLISH_ERROR_MAP[code];
+  if (mapped) {
+    throw new AppError(mapped[0], mapped[1], mapped[2]);
+  }
+  console.error('[gig.service] Unexpected RPC error:', error);
+  throw new AppError('Something went wrong. Try again.', 500, 'DATABASE_ERROR');
+};
 
 /**
  * Helper to retrieve brand associated with userId.
@@ -31,20 +68,26 @@ const getBrandByUserId = async (userId) => {
     console.error(`[getBrandByUserId] Supabase database error:`, error);
     throw new AppError(`Database profile query failed: ${error.message}`, 500, 'DATABASE_ERROR');
   }
-  
+
   if (!brand) {
     console.warn(`[getBrandByUserId] No brand profile found for user ID: ${userId}`);
     throw new AppError('Complete your brand onboarding to perform this action.', 400, 'ONBOARDING_REQUIRED');
   }
-  
+
   return brand;
 };
 
 /**
- * Create a new Gig.
+ * Create a new Gig. Always inserts as DRAFT first — a draft costs nothing,
+ * so this step alone can never fail on credits/slots. If the caller asked
+ * for it to go live immediately (status omitted or "ACTIVE"), the atomic
+ * publish_gig_with_credit RPC runs right after: on success the response is
+ * the live gig; on failure (no credits, no slots) the gig is *not* deleted
+ * — it's left sitting as a DRAFT so the brand doesn't lose what they wrote
+ * and can top up and publish it later, exactly the PRD's "credit unchanged,
+ * Gig remains Draft" rule for a failed publish.
  */
 const createGig = async (userId, data) => {
-
   const brand = await getBrandByUserId(userId);
 
   // A radius gig needs the brand's own coordinates to measure distance from
@@ -53,28 +96,8 @@ const createGig = async (userId, data) => {
     throw new AppError('Add your PIN code to your brand profile before setting a collab radius.', 400, 'LOCATION_REQUIRED');
   }
 
-  // DRAFT gigs are not published, so they consume neither a campaign nor slots.
-  const isPublishing = (data.status || 'ACTIVE') !== 'DRAFT';
+  const wantsPublish = (data.status || 'ACTIVE') !== 'DRAFT';
   const requestedSlots = data.applicationSlots ?? 1;
-
-  // Enforce plan limits *before* spending credits — otherwise a rejected
-  // publish would still bill the brand.
-  if (isPublishing) {
-    await planService.assertCanPublishCampaign(brand.id);
-    await planService.assertSlotsWithinPlan(brand.id, requestedSlots);
-  }
-
-  // Posting a collab spends trial credits — atomic DB-side decrement so two
-  // concurrent posts from the same brand can't both slip past a stale JS
-  // balance check (same pattern as the hire-credit debit).
-  const { data: debitRows, error: debitError } = await supabaseAdmin.rpc('debit_brand_credits', {
-    p_brand_id: brand.id,
-    p_amount: GIG_POST_COST,
-  });
-
-  if (debitError || !debitRows?.length) {
-    throw new AppError(`Not enough trial credits to post a collab — this costs ${GIG_POST_COST} credits.`, 402, 'INSUFFICIENT_CREDITS');
-  }
 
   const payload = {
     brandId: brand.id,
@@ -89,11 +112,11 @@ const createGig = async (userId, data) => {
     deadline: data.deadline,
     category: data.category,
     city: data.city || 'Pune',
-    status: isPublishing ? 'ACTIVE' : 'DRAFT',
+    status: 'DRAFT',
     radiusKm: data.radiusKm ?? null,
     applicationSlots: requestedSlots,
-    publishedAt: isPublishing ? new Date().toISOString() : null,
-    expiresAt: isPublishing ? expiryFromNow() : null,
+    publishedAt: null,
+    expiresAt: null,
   };
   const { data: newGig, error } = await supabaseAdmin
     .from('gigs')
@@ -103,12 +126,36 @@ const createGig = async (userId, data) => {
 
   if (error) {
     console.error(`[Create Gig Debug] Supabase error:`, error);
-    // Refund — the credits were spent but no gig actually got created.
-    await supabaseAdmin.rpc('credit_brand_credits', { p_brand_id: brand.id, p_amount: GIG_POST_COST });
     throw new AppError(`Failed to create gig: ${error.message}`, 500, 'DATABASE_ERROR');
   }
 
-  return newGig;
+  if (!wantsPublish) {
+    return newGig;
+  }
+
+  const { data: publishRows, error: publishError } = await supabaseAdmin.rpc('publish_gig_with_credit', {
+    p_gig_id: newGig.id,
+    p_brand_id: brand.id,
+    p_slots: requestedSlots,
+    p_expires_at: expiryFromNow(),
+  });
+
+  if (publishError || !publishRows?.length) {
+    // Draft already exists and is returned as-is — nothing to roll back.
+    throwFromRpcError(publishError);
+  }
+
+  const { data: publishedGig, error: refetchError } = await supabaseAdmin
+    .from('gigs')
+    .select('*, brand:brands(*)')
+    .eq('id', newGig.id)
+    .single();
+
+  if (refetchError) {
+    throw new AppError(`Failed to load published collab: ${refetchError.message}`, 500, 'DATABASE_ERROR');
+  }
+
+  return publishedGig;
 };
 
 /**
@@ -272,7 +319,7 @@ const getGigById = async (id, userId) => {
     console.error(`[getGigById] Database error:`, error);
     throw new AppError(`Failed to fetch gig details: ${error.message}`, 500, 'DATABASE_ERROR');
   }
-  
+
   if (!gig) {
     console.warn(`[getGigById] No gig record found for ID: ${id}`);
     throw new AppError('This collab does not exist or has been deleted.', 404, 'NOT_FOUND');
@@ -324,7 +371,12 @@ const getGigById = async (id, userId) => {
 };
 
 /**
- * Update an existing Gig.
+ * Update an existing Gig. Deliberately cannot touch `status` — every status
+ * transition (publish, close, reopen) must go through its own atomic,
+ * credit/slot-checked endpoint below. A generic status pass-through here
+ * used to let a DRAFT go ACTIVE for free with no plan or credit check at
+ * all; removing the field is what actually closes that gap, not a guard
+ * that could be missed on the next edit.
  */
 const updateGig = async (id, userId, data) => {
   const brand = await getBrandByUserId(userId);
@@ -358,7 +410,6 @@ const updateGig = async (id, userId, data) => {
   if (data.campaignType !== undefined) updateData.campaignType = data.campaignType;
   if (data.deadline !== undefined) updateData.deadline = data.deadline;
   if (data.category !== undefined) updateData.category = data.category;
-  if (data.status !== undefined) updateData.status = data.status;
   if (data.radiusKm !== undefined) updateData.radiusKm = data.radiusKm;
 
   const { data: updatedGig, error: updateError } = await supabaseAdmin
@@ -377,14 +428,16 @@ const updateGig = async (id, userId, data) => {
 };
 
 /**
- * Soft-close a Gig (sets status to CLOSED).
+ * Soft-close a Gig. Atomically releases any unused application slots back
+ * to the brand's pool, and refunds 1 Campaign Credit if this happens within
+ * 1 hour of publish (close_gig_and_release, schema.sql section 23f).
  */
 const closeGig = async (id, userId) => {
   const brand = await getBrandByUserId(userId);
 
   const { data: gig, error: findError } = await supabaseAdmin
     .from('gigs')
-    .select('*')
+    .select('id, brandId')
     .eq('id', id)
     .maybeSingle();
 
@@ -396,18 +449,18 @@ const closeGig = async (id, userId) => {
     throw new AppError("You don't have permission to close this collab.", 403, 'FORBIDDEN');
   }
 
-  const { data: updatedGig, error: updateError } = await supabaseAdmin
-    .from('gigs')
-    .update({ status: 'CLOSED' })
-    .eq('id', id)
-    .select('*')
-    .single();
+  const { error: rpcError } = await supabaseAdmin.rpc('close_gig_and_release', {
+    p_gig_id: id,
+    p_brand_id: brand.id,
+    p_new_status: 'CLOSED',
+  });
 
-  if (updateError) {
-    console.error(`[closeGig] Supabase error:`, updateError);
-    throw new AppError(`Failed to close collab: ${updateError.message}`, 500, 'DATABASE_ERROR');
+  if (rpcError) {
+    console.error(`[closeGig] RPC error:`, rpcError);
+    throw new AppError(`Failed to close collab: ${rpcError.message}`, 500, 'DATABASE_ERROR');
   }
 
+  const { data: updatedGig } = await supabaseAdmin.from('gigs').select('*').eq('id', id).single();
   return updatedGig;
 };
 
@@ -444,6 +497,9 @@ const getMyGigs = async (userId) => {
 
 /**
  * Hard delete a Gig (permanently removes it and cascades applications).
+ * Releases slots / refunds the 1-hour-window credit first — deleting an
+ * ACTIVE gig should behave at least as generously as closing it, since the
+ * effect (no longer live, capacity gone) is the same or stronger.
  */
 const deleteGig = async (id, userId) => {
   const brand = await getBrandByUserId(userId);
@@ -462,6 +518,18 @@ const deleteGig = async (id, userId) => {
     throw new AppError("You don't have permission to delete this collab.", 403, 'FORBIDDEN');
   }
 
+  if (gig.status === 'ACTIVE') {
+    const { error: rpcError } = await supabaseAdmin.rpc('close_gig_and_release', {
+      p_gig_id: id,
+      p_brand_id: brand.id,
+      p_new_status: 'CLOSED',
+    });
+    if (rpcError) {
+      console.error(`[deleteGig] release error:`, rpcError);
+      throw new AppError(`Failed to delete collab: ${rpcError.message}`, 500, 'DATABASE_ERROR');
+    }
+  }
+
   // Delete applications first (cascade), then the gig
   await supabaseAdmin.from('applications').delete().eq('gigId', id);
   const { error: deleteError } = await supabaseAdmin.from('gigs').delete().eq('id', id);
@@ -475,7 +543,10 @@ const deleteGig = async (id, userId) => {
 };
 
 /**
- * Toggle gig status between OPEN and CLOSED.
+ * Toggle gig status: ACTIVE -> CLOSED, or CLOSED/EXPIRED -> ACTIVE (reopen).
+ * Closing releases slots (+ possible 1hr refund). Reopening is a fresh
+ * publish against the brand's *current* pool via publish_gig_with_credit —
+ * it does not get its old slots back for free (PRD section 20).
  */
 const toggleGigStatus = async (id, userId) => {
   const brand = await getBrandByUserId(userId);
@@ -494,38 +565,38 @@ const toggleGigStatus = async (id, userId) => {
     throw new AppError("You don't have permission to update this collab.", 403, 'FORBIDDEN');
   }
 
-  // Re-opening a CLOSED or EXPIRED gig is a fresh publication: it has to fit
-  // the plan again and gets a new validity window, otherwise closing/reopening
-  // would be a way to sidestep campaign limits and keep a stale expiry.
   const reopening = gig.status !== 'ACTIVE';
+
   if (reopening) {
-    await planService.assertCanPublishCampaign(brand.id);
-    await planService.assertSlotsWithinPlan(brand.id, gig.applicationSlots || 1, gig.id);
+    const { data: publishRows, error: publishError } = await supabaseAdmin.rpc('publish_gig_with_credit', {
+      p_gig_id: id,
+      p_brand_id: brand.id,
+      p_slots: gig.applicationSlots || 1,
+      p_expires_at: expiryFromNow(),
+    });
+    if (publishError || !publishRows?.length) {
+      throwFromRpcError(publishError);
+    }
+  } else {
+    const { error: rpcError } = await supabaseAdmin.rpc('close_gig_and_release', {
+      p_gig_id: id,
+      p_brand_id: brand.id,
+      p_new_status: 'CLOSED',
+    });
+    if (rpcError) {
+      console.error(`[toggleGigStatus] close error:`, rpcError);
+      throw new AppError(`Failed to toggle collab status: ${rpcError.message}`, 500, 'DATABASE_ERROR');
+    }
   }
 
-  const update = reopening
-    ? { status: 'ACTIVE', publishedAt: gig.publishedAt || new Date().toISOString(), expiresAt: expiryFromNow() }
-    : { status: 'CLOSED' };
-
-  const { data: updatedGig, error: updateError } = await supabaseAdmin
-    .from('gigs')
-    .update(update)
-    .eq('id', id)
-    .select('*')
-    .single();
-
-  if (updateError) {
-    console.error(`[toggleGigStatus] Update error:`, updateError);
-    throw new AppError(`Failed to toggle collab status: ${updateError.message}`, 500, 'DATABASE_ERROR');
-  }
-
+  const { data: updatedGig } = await supabaseAdmin.from('gigs').select('*').eq('id', id).single();
   return updatedGig;
 };
 
 /**
- * Publish a DRAFT gig: ACTIVE + publishedAt + expiresAt (config-driven).
- * Idempotent-ish — republishing an already-ACTIVE gig is rejected rather than
- * silently extending its window.
+ * Publish a DRAFT gig: atomically checks + spends 1 Campaign Credit and the
+ * gig's application-slot allotment, then marks it ACTIVE. Republishing an
+ * already-ACTIVE gig is rejected rather than silently extending its window.
  */
 const publishGig = async (id, userId) => {
   const brand = await getBrandByUserId(userId);
@@ -535,85 +606,69 @@ const publishGig = async (id, userId) => {
   if (gig.brandId !== brand.id) {
     throw new AppError("You don't have permission to publish this collab.", 403, 'FORBIDDEN');
   }
-  if (gig.status === 'ACTIVE') {
-    throw new AppError('This collab is already live.', 400, 'ALREADY_ACTIVE');
+
+  const { data: publishRows, error: publishError } = await supabaseAdmin.rpc('publish_gig_with_credit', {
+    p_gig_id: id,
+    p_brand_id: brand.id,
+    p_slots: gig.applicationSlots || 1,
+    p_expires_at: expiryFromNow(),
+  });
+
+  if (publishError || !publishRows?.length) {
+    throwFromRpcError(publishError);
   }
 
-  await planService.assertCanPublishCampaign(brand.id);
-  await planService.assertSlotsWithinPlan(brand.id, gig.applicationSlots || 1, gig.id);
-
-  const { data: updated, error } = await supabaseAdmin
-    .from('gigs')
-    .update({
-      status: 'ACTIVE',
-      publishedAt: new Date().toISOString(),
-      expiresAt: expiryFromNow(),
-    })
-    .eq('id', id)
-    .select('*')
-    .single();
-
-  if (error) throw new AppError(`Failed to publish collab: ${error.message}`, 500, 'DATABASE_ERROR');
+  const { data: updated, error } = await supabaseAdmin.from('gigs').select('*').eq('id', id).single();
+  if (error) throw new AppError(`Failed to load published collab: ${error.message}`, 500, 'DATABASE_ERROR');
   return updated;
 };
 
-/** Allocate application slots to one campaign, validated against the plan. */
+/**
+ * Reallocate application slots on an already-published campaign. Atomically
+ * spends/refunds the difference against the brand's slot pool
+ * (reallocate_gig_slots, schema.sql section 23m) — this is a live campaign
+ * resource change, not a free edit.
+ */
 const allocateSlots = async (id, userId, slots) => {
   const brand = await getBrandByUserId(userId);
 
-  const { data: gig } = await supabaseAdmin.from('gigs').select('*').eq('id', id).maybeSingle();
+  const { data: gig } = await supabaseAdmin.from('gigs').select('id, brandId').eq('id', id).maybeSingle();
   if (!gig) throw new AppError('Collab not found.', 404, 'NOT_FOUND');
   if (gig.brandId !== brand.id) {
     throw new AppError("You don't have permission to update this collab.", 403, 'FORBIDDEN');
   }
 
-  // Can't allocate below what the gig has already received, or the capacity
-  // readout would show a negative remainder.
-  const { count: received } = await supabase
-    .from('applications')
-    .select('id', { count: 'exact', head: true })
-    .eq('gigId', id);
+  const { error: rpcError } = await supabaseAdmin.rpc('reallocate_gig_slots', {
+    p_gig_id: id,
+    p_brand_id: brand.id,
+    p_new_slots: slots,
+  });
 
-  if (slots < (received || 0)) {
-    throw new AppError(
-      `This campaign already received ${received} applications — allocate at least that many slots.`,
-      400,
-      'SLOTS_BELOW_RECEIVED',
-    );
+  if (rpcError) {
+    throwFromRpcError(rpcError);
   }
 
-  await planService.assertSlotsWithinPlan(brand.id, slots, id);
-
-  const { data: updated, error } = await supabaseAdmin
-    .from('gigs')
-    .update({ applicationSlots: slots })
-    .eq('id', id)
-    .select('*')
-    .single();
-
+  const { data: updated, error } = await supabaseAdmin.from('gigs').select('*').eq('id', id).single();
   if (error) throw new AppError(`Failed to allocate slots: ${error.message}`, 500, 'DATABASE_ERROR');
   return updated;
 };
 
 /**
- * Flip every lapsed ACTIVE gig to EXPIRED. Runs on a schedule and is safe to
- * call concurrently — the WHERE clause is the guard, so a double run is a no-op
- * rather than a double write.
+ * Flip every lapsed ACTIVE gig to EXPIRED, releasing each one's unused slots
+ * to its own brand's pool (expire_lapsed_gigs, schema.sql section 23g) — a
+ * per-row operation now that expiry also has to move resources, not the old
+ * single blind bulk UPDATE.
  */
 const expireLapsedGigs = async () => {
-  const { data, error } = await supabaseAdmin
-    .from('gigs')
-    .update({ status: 'EXPIRED' })
-    .eq('status', 'ACTIVE')
-    .lte('expiresAt', new Date().toISOString())
-    .select('id');
+  const { data, error } = await supabaseAdmin.rpc('expire_lapsed_gigs');
 
   if (error) {
     console.error('[expireLapsedGigs] Failed:', error.message);
     throw new AppError('Failed to expire gigs.', 500, 'DATABASE_ERROR');
   }
 
-  return { expired: data?.length || 0, ids: (data || []).map((g) => g.id) };
+  const ids = (data || []).map((row) => row.expired_gig_id);
+  return { expired: ids.length, ids };
 };
 
 module.exports = {

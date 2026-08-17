@@ -9,13 +9,11 @@ export const plansService = {
     const { data } = await apiClient.get("/api/plans");
     return unwrap<Plan[]>(data) ?? [];
   },
-  /** Current brand's plan plus live campaign/slot usage. */
+  /** Current brand's Campaign Credits / Application Slots / billing cycle. */
   usage: async (): Promise<PlanUsage> => {
     const { data } = await apiClient.get("/api/plans/usage");
     return unwrap<PlanUsage>(data);
   },
-  assign: async (planName: string): Promise<PlanUsage> => {
-    const { data } = await apiClient.patch("/api/plans/assign", { planName });
-    return unwrap<PlanUsage>(data);
-  },
+  // No self-service assign in V1 — plan changes are manual, made by an admin
+  // via /api/admin/brands/:brandId/plan. See services/admin.ts.
 };

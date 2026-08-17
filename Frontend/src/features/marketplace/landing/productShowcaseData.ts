@@ -8,8 +8,8 @@ export const MOCK_PLAN_USAGE = {
   planName: "STARTER",
   campaignsUsed: 2,
   campaignLimit: 5,
-  slotsAllocated: 18,
-  slotLimit: 36,
+  slotsAllocated: 12,
+  slotLimit: 22,
 };
 
 export const MOCK_GIGS = [

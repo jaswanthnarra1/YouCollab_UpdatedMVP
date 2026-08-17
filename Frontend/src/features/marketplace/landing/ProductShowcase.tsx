@@ -32,7 +32,7 @@ function DashboardMockup() {
         <div className="mt-4 space-y-4">
           <div>
             <div className="flex justify-between text-[12px] text-slate-600 dark:text-white/60 mb-1.5">
-              <span>Campaigns</span>
+              <span>Campaign Credits</span>
               <span className="tabular-nums">{MOCK_PLAN_USAGE.campaignsUsed}/{MOCK_PLAN_USAGE.campaignLimit}</span>
             </div>
             <ProgressBar used={MOCK_PLAN_USAGE.campaignsUsed} limit={MOCK_PLAN_USAGE.campaignLimit} />

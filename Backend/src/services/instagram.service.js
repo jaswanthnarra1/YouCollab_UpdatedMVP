@@ -277,10 +277,9 @@ const syncInfluencerIgData = async (userId) => {
     igUsername: profile.username,
     igName: profile.name || null,
     // Mirror into the legacy creator-profile columns, which are what the rest
-    // of the app reads: brand-facing creator cards, and getTier() — which sets
-    // the credit cost of hiring this creator. Meta is the only writer of these
-    // now (users can no longer edit them), so mirroring here keeps every
-    // existing consumer correct without a risky refactor of the billing path.
+    // of the app reads: brand-facing creator cards and follower-range
+    // filtering. Meta is the only writer of these now (users can no longer
+    // edit them), so mirroring here keeps every existing consumer correct.
     instagramHandle: profile.username,
     followerCount: profile.followers_count ?? 0,
     igProfilePicUrl: profile.profile_picture_url || null,
@@ -488,10 +487,9 @@ const connectInstagram = async (userId, code, customRedirectUri = null) => {
     igUsername: profile.username,
     igName: profile.name || null,
     // Mirror into the legacy creator-profile columns, which are what the rest
-    // of the app reads: brand-facing creator cards, and getTier() — which sets
-    // the credit cost of hiring this creator. Meta is the only writer of these
-    // now (users can no longer edit them), so mirroring here keeps every
-    // existing consumer correct without a risky refactor of the billing path.
+    // of the app reads: brand-facing creator cards and follower-range
+    // filtering. Meta is the only writer of these now (users can no longer
+    // edit them), so mirroring here keeps every existing consumer correct.
     instagramHandle: profile.username,
     followerCount: profile.followers_count ?? 0,
     igAccessToken: encryptSecret(longToken.access_token),

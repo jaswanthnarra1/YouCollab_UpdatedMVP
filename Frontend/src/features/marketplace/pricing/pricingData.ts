@@ -50,9 +50,9 @@ export const ENTERPRISE_PLAN = {
 
 /** Used only if the public /api/plans call fails, so the landing page never breaks for a signed-out visitor. */
 export const FALLBACK_PLANS: Plan[] = [
-  { id: "free", name: "FREE", price: 0, campaignLimit: 2, applicationSlotLimit: 12 },
-  { id: "starter", name: "STARTER", price: 99, campaignLimit: 5, applicationSlotLimit: 36 },
-  { id: "growth", name: "GROWTH", price: 299, campaignLimit: 10, applicationSlotLimit: 64 },
+  { id: "free", name: "FREE", price: 0, campaignLimit: 2, applicationSlotLimit: 10 },
+  { id: "starter", name: "STARTER", price: 99, campaignLimit: 5, applicationSlotLimit: 22 },
+  { id: "growth", name: "GROWTH", price: 199, campaignLimit: 10, applicationSlotLimit: 48 },
 ];
 
 /** Cosmetic yearly framing only — plans have one real `price` field, no separate yearly column. */

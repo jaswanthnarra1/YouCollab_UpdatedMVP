@@ -11,7 +11,7 @@ import { Input } from "@/components/common/input";
 import type { Application } from "@/types";
 import {
   Instagram, BadgeCheck, RefreshCw, Unlink, IndianRupee, Calendar,
-  MapPin, Send, Loader2, Search, TrendingUp, Sparkles, MessageSquare, Coins, Clock, CheckCircle2,
+  MapPin, Send, Loader2, Search, TrendingUp, Sparkles, MessageSquare, Clock, CheckCircle2,
   ArrowUpNarrowWide, ArrowDownWideNarrow, ArrowUpDown, X, AlertCircle
 } from "lucide-react";
 import { instagramService, IG_RETURN_TO_KEY, IG_LAST_ERROR_KEY } from "@/services/instagram";
@@ -462,7 +462,7 @@ export default function InfluencerDashboard() {
     useQuery({ queryKey: ["gigs"], queryFn: () => gigsService.list() });
   const { data: myApps = [], isLoading: myAppsLoading } = useQuery({ queryKey: ["myApplications"], queryFn: applicationsService.mine, retry: false });
   const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: profileService.getProfile });
-  const credits: number | null = (profile?.influencer as { credits?: number } | undefined)?.credits ?? null;
+  // V1: Creators are free — no Creator credit balance exists to show here.
   const pincode: string | null = (profile?.influencer as { pincode?: string } | undefined)?.pincode ?? null;
 
   const withdrawPitch = useMutation({
@@ -522,11 +522,10 @@ export default function InfluencerDashboard() {
           </div>
         </div>
 
-        <div className="grid sm:grid-cols-4 gap-3">
+        <div className="grid sm:grid-cols-3 gap-3">
           <StatCard label="Total pitches sent" value={String(myApps.length)} Icon={Send} />
           <StatCard label="Pending reviews" value={String(pending)} Icon={Clock} />
           <StatCard label="Accepted collabs" value={String(accepted)} Icon={CheckCircle2} />
-          <StatCard label="Credits earned" value={credits !== null ? String(credits) : "…"} Icon={Coins} accent />
         </div>
 
         <InstagramCard />

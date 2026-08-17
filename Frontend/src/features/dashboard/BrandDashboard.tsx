@@ -1,6 +1,5 @@
 import { applicationsService, type Application, type Message } from "@/services/applications";
 import { profileService } from "@/services/profile";
-import { getTier, TIER_COST } from "@/lib/credits";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import { Button } from "@/components/common/button";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
@@ -66,7 +65,9 @@ export default function BrandDashboard() {
     queryKey: ["plans", "usage"],
     queryFn: plansService.usage,
   });
-  const credits: number | null = (profile?.brand as { credits?: number } | undefined)?.credits ?? null;
+  // Campaign Credits / Application Slots are the brand's live pool, from
+  // /api/plans/usage (planUsage below) — never the old deprecated
+  // profile.brand.credits, which no longer drives any V1 business rule.
   const pincode: string | null = (profile?.brand as { pincode?: string } | undefined)?.pincode ?? null;
 
   // Fetch applications for all gigs
@@ -105,7 +106,14 @@ export default function BrandDashboard() {
       qc.invalidateQueries({ queryKey: ["plans", "usage"] });
       toast({ title: data.status === "ACTIVE" ? "Campaign is now live! 🎉" : "Campaign paused." });
     },
-    onError: () => toast({ variant: "destructive", title: "Action failed" }),
+    // Reopening spends a Campaign Credit + slots just like a fresh publish —
+    // surface the real reason (e.g. no credits left) instead of a generic message.
+    onError: (e: { response?: { data?: { error?: { message?: string } } } }) =>
+      toast({
+        variant: "destructive",
+        title: "Action failed",
+        description: e?.response?.data?.error?.message,
+      }),
   });
 
   const deleteGig = useMutation({
@@ -364,8 +372,8 @@ export default function BrandDashboard() {
               </div>
             </div>
 
-            {/* Plan & capacity. Every number here comes from /api/plans/usage —
-                limits are never hardcoded in the component. */}
+            {/* Plan, Campaign Credits & Application Slots. Every number here
+                comes from /api/plans/usage — never hardcoded in the component. */}
             {isLoadingPlan ? (
               <div className="border border-border rounded-sm p-4 bg-background">
                 <div className="h-4 w-40 bg-border/40 rounded-sm animate-pulse" />
@@ -383,26 +391,35 @@ export default function BrandDashboard() {
                     </span>
                   </div>
                   <div className="flex items-center gap-5 text-[12px]">
-                    <span className="text-muted-foreground">
-                      Campaigns{" "}
-                      <span className="font-semibold text-foreground">
-                        {planUsage.campaignsUsed}/{planUsage.plan.campaignLimit}
-                      </span>
+                    <span className={planUsage.campaignCreditsRemaining === 0 ? "text-warning" : "text-muted-foreground"}>
+                      Campaign Credits{" "}
+                      <span className="font-semibold text-foreground">{planUsage.campaignCreditsRemaining}</span>
                     </span>
                     <span className="text-muted-foreground">
-                      Slots{" "}
-                      <span className="font-semibold text-foreground">
-                        {planUsage.slotsAllocated}/{planUsage.plan.applicationSlotLimit}
-                      </span>
+                      Application Slots{" "}
+                      <span className="font-semibold text-foreground">{planUsage.applicationSlotsRemaining}</span>
                     </span>
-                    <span className={planUsage.campaignsRemaining === 0 ? "text-warning" : "text-muted-foreground"}>
-                      {planUsage.campaignsRemaining} campaign{planUsage.campaignsRemaining === 1 ? "" : "s"} left
-                    </span>
+                    {/* V1: plan changes are manual — no self-service upgrade. */}
+                    <Link to="/contact" className="text-[11px] text-primary hover:underline">
+                      Request Plan Change
+                    </Link>
                   </div>
                 </div>
-                {planUsage.campaignsRemaining === 0 && (
+                {planUsage.campaigns.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-border/60 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-muted-foreground">
+                    {planUsage.campaigns.map((c) => (
+                      <span key={c.id} className="truncate max-w-[200px]">
+                        {c.title}{" "}
+                        <span className="font-medium text-foreground">
+                          {c.applicationSlotsUsed}/{c.applicationSlotsAllotted}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {planUsage.campaignCreditsRemaining === 0 && (
                   <p className="mt-2 text-[11px] text-warning">
-                    You've used every campaign on the {planUsage.plan.name} plan. Close one or upgrade to publish another.
+                    You have no Campaign Credits remaining. Please request an upgrade or top-up from the YouCollab team.
                   </p>
                 )}
               </div>
@@ -431,8 +448,8 @@ export default function BrandDashboard() {
                   <Coins className="h-4 w-4 text-primary" />
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Trial Credits</p>
-                  <p className="text-xl font-semibold tracking-tight mt-0.5 text-primary">{credits ?? "…"}</p>
+                  <p className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Campaign Credits</p>
+                  <p className="text-xl font-semibold tracking-tight mt-0.5 text-primary">{planUsage?.campaignCreditsRemaining ?? "…"}</p>
                 </div>
               </div>
             </div>
@@ -1151,55 +1168,18 @@ export default function BrandDashboard() {
 
       </main>
 
-      {/* Confirmation approval modal workflow */}
+      {/* Confirmation approval modal workflow. Hiring is free under the V1
+          model — the Campaign Credit was already spent when this Gig was
+          published, so there's no cost math here anymore, just the
+          contact-sharing confirmation. */}
       <Dialog open={confirmApproveOpen} onOpenChange={setConfirmApproveOpen}>
         <DialogContent className="border-border text-foreground max-w-sm rounded-sm bg-background">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-foreground">Approve & hire this creator?</DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground leading-relaxed pt-1">
-              Approving <strong>{(selectedAppToApprove?.influencer as any)?.name}</strong> charges your trial credits for this hire and shares contact emails both ways. Are you sure?
+              Approving <strong>{(selectedAppToApprove?.influencer as any)?.name}</strong> shares contact emails both ways so you can kick things off. Are you sure?
             </DialogDescription>
           </DialogHeader>
-
-          {selectedAppToApprove && (() => {
-            const followerCount = (selectedAppToApprove.influencer as any)?.followerCount ?? 0;
-            const tier = getTier(followerCount);
-            const locked = tier === "MID";
-            const cost = locked ? null : TIER_COST[tier];
-            const insufficient = !locked && credits !== null && cost !== null && credits < cost;
-            const remainingAfter = !locked && credits !== null && cost !== null ? credits - cost : null;
-
-            return (
-              <div className="rounded-sm border border-border bg-muted/20 p-3 text-xs space-y-1.5">
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Creator tier</span>
-                  <span className="font-medium text-foreground">
-                    {tier === "NANO" ? "Nano (< 1K)" : tier === "MICRO" ? "Micro (1K–10K)" : "Mid-tier (10K+)"}
-                  </span>
-                </div>
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Hire cost</span>
-                  <span className="font-medium text-foreground">{locked ? "—" : `− ${cost} credits`}</span>
-                </div>
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Current balance</span>
-                  <span className="font-medium text-foreground">{credits ?? "…"}</span>
-                </div>
-                <div className="flex justify-between border-t border-border/60 pt-1.5 mt-1.5">
-                  <span className="text-muted-foreground">Remaining after this hire</span>
-                  <span className={`font-semibold ${insufficient ? "text-destructive" : "text-primary"}`}>
-                    {locked ? "—" : remainingAfter}
-                  </span>
-                </div>
-                {locked && (
-                  <p className="text-warning pt-1">Mid-tier creators unlock after the trial pack — can't hire yet.</p>
-                )}
-                {insufficient && (
-                  <p className="text-warning pt-1">Not enough trial credits left for this hire.</p>
-                )}
-              </div>
-            );
-          })()}
 
           <DialogFooter className="gap-2 sm:gap-0 mt-3">
             <Button
@@ -1211,12 +1191,7 @@ export default function BrandDashboard() {
             </Button>
             <Button
               onClick={handleConfirmApprove}
-              disabled={
-                updateAppStatus.isPending ||
-                !selectedAppToApprove ||
-                getTier((selectedAppToApprove?.influencer as any)?.followerCount ?? 0) === "MID" ||
-                (credits !== null && credits < TIER_COST[getTier((selectedAppToApprove?.influencer as any)?.followerCount ?? 0) as "NANO" | "MICRO"])
-              }
+              disabled={updateAppStatus.isPending || !selectedAppToApprove}
               className="h-9 text-xs rounded-sm bg-gradient-brand text-primary-foreground border-0 shadow-md hover:opacity-95 disabled:opacity-50"
             >
               Approve
@@ -1304,7 +1279,7 @@ export default function BrandDashboard() {
             const current = slotEditorGig.applicationSlots ?? 1;
             // Freeing this gig's own allocation back into the pool is what makes
             // the ceiling "everything not committed to *other* campaigns".
-            const poolMax = planUsage ? planUsage.slotsRemaining + current : undefined;
+            const poolMax = planUsage ? planUsage.applicationSlotsRemaining + current : undefined;
             const value = slotDraft === "" ? 0 : Number(slotDraft);
             const tooFew = value < Math.max(1, received);
             const tooMany = poolMax != null && value > poolMax;
@@ -1338,7 +1313,7 @@ export default function BrandDashboard() {
                 )}
                 {planUsage && !tooFew && !tooMany && (
                   <p className="text-[11px] text-muted-foreground">
-                    {planUsage.slotsAllocated} of {planUsage.plan.applicationSlotLimit} slots allocated across your campaigns.
+                    {poolMax} application slot{poolMax === 1 ? "" : "s"} available for this campaign right now.
                   </p>
                 )}
 

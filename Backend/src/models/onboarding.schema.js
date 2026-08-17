@@ -26,10 +26,11 @@ const brandOnboardingSchema = z.object({
  * integration (see services/instagram.service.js), which writes them from the
  * Meta Graph API after a verified OAuth connection.
  *
- * This is a correctness AND a security boundary: `followerCount` determines the
- * creator's pricing tier via getTier(), which decides how many credits a brand
- * is charged to hire them (services/application.service.js). A user-supplied
- * value would let a creator move their own tier and change what brands pay.
+ * This is a correctness boundary: brand-facing creator cards and search/
+ * filtering depend on `followerCount` being real, verified Meta data — a
+ * self-reported value would be trivially inflatable. (It no longer gates a
+ * credit cost — hiring is free for every follower range under the V1
+ * business model, see application.service.js.)
  *
  * Zod strips unknown keys by default, so a client sending these fields has them
  * silently discarded rather than the request failing — the desired behaviour

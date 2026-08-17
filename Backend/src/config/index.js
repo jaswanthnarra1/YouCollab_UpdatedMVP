@@ -89,6 +89,15 @@ module.exports = {
     VERSION: process.env.TERMS_VERSION || '2026-07',
   },
 
+  // V1 Campaign Credit billing cycle. No payment provider — this only
+  // advances credits/slots/dates for brands whose 30-day cycle has elapsed
+  // (rollover, not reset). See jobs/scheduler.js runBillingRenewalSweep and
+  // services/plan.service.js.
+  BILLING: {
+    CYCLE_DAYS: parseInt(process.env.BILLING_CYCLE_DAYS) || 30,
+    RENEWAL_SWEEP_HOURS: parseInt(process.env.BILLING_RENEWAL_SWEEP_HOURS) || 6,
+  },
+
   // V1 admin access (Reel/Referral moderation): an env-allowlist of Clerk
   // user IDs, not a database role — there is no ADMIN entry in users.role.
   // Unset/empty means the allowlist is empty, so requireAdmin fails closed

@@ -830,3 +830,514 @@ REVOKE USAGE ON SCHEMA public FROM anon, authenticated;
 -- storage.objects INSERT/DELETE only — SELECT stays granted for the two
 -- public buckets via the policies retained above.
 REVOKE INSERT, UPDATE, DELETE ON storage.objects FROM anon, authenticated;
+
+-- ============================================
+-- 23. V1 Campaign Credit / Application Slot business model
+-- ============================================
+-- Replaces the old "brands.credits spent on both gig-posting (250) and
+-- follower-tier hiring (100/300)" model. New rule, decided in the V1 PRD:
+--   - Brands pay, Creators are free (no Creator credits are earned anymore).
+--   - 1 Campaign Credit = 1 published Gig. Hiring costs nothing.
+--   - Application Slots are a separate pool from Campaign Credits.
+--   - Campaign Credits AND unused Application Slots roll over at renewal.
+--   - Cancelling a published Gig within 1 hour refunds its Campaign Credit.
+--
+-- The old `brands.credits` / `influencers.credits` columns and the old
+-- debit_brand_credits / credit_brand_credits / credit_influencer_earnings
+-- functions are DEPRECATED, not dropped (Rule 6: no destructive ops on
+-- production data without explicit justification; Rule 3: this migration
+-- stops all *active* business logic from using them, so there is exactly
+-- one authoritative credit model going forward — see application.service.js
+-- and gig.service.js, which no longer call any of the three functions above
+-- after this migration). They remain as inert historical/audit data.
+
+-- --- 23a. Brand fields ------------------------------------------------------
+ALTER TABLE brands ADD COLUMN IF NOT EXISTS "campaignCreditsRemaining" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE brands ADD COLUMN IF NOT EXISTS "applicationSlotsRemaining" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE brands ADD COLUMN IF NOT EXISTS "billingCycleStart" TIMESTAMPTZ;
+ALTER TABLE brands ADD COLUMN IF NOT EXISTS "billingCycleEnd" TIMESTAMPTZ;
+
+ALTER TABLE brands DROP CONSTRAINT IF EXISTS brands_campaign_credits_check;
+ALTER TABLE brands ADD CONSTRAINT brands_campaign_credits_check CHECK ("campaignCreditsRemaining" >= 0);
+ALTER TABLE brands DROP CONSTRAINT IF EXISTS brands_slots_remaining_check;
+ALTER TABLE brands ADD CONSTRAINT brands_slots_remaining_check CHECK ("applicationSlotsRemaining" >= 0);
+
+-- --- 23b. Gig fields ---------------------------------------------------------
+-- applicationSlotsAllotted reuses the existing "applicationSlots" column
+-- (same meaning: total applications this campaign can accept) rather than
+-- duplicating it — see gig.service.js, which now reads/writes
+-- "applicationSlots" as the allotment.
+ALTER TABLE gigs ADD COLUMN IF NOT EXISTS "creditConsumed" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE gigs ADD COLUMN IF NOT EXISTS "creditRefunded" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE gigs ADD COLUMN IF NOT EXISTS "applicationSlotsUsed" INTEGER NOT NULL DEFAULT 0;
+-- Idempotency guard so a repeated close/expire (double API call, or a close
+-- followed by the expiry sweep on the same row) can never release the same
+-- unused slots back to the brand's pool twice.
+ALTER TABLE gigs ADD COLUMN IF NOT EXISTS "slotsReleased" BOOLEAN NOT NULL DEFAULT false;
+
+-- --- 23c. Credit ledger (audit history — NOT the source of truth) ----------
+-- brands."campaignCreditsRemaining" remains the one authoritative balance.
+-- This table exists purely so "why did my balance change" has an answer.
+CREATE TABLE IF NOT EXISTS credit_transactions (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "brandId"       UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  type            TEXT NOT NULL CHECK (type IN ('PUBLISH', 'REFUND', 'RENEWAL', 'ADMIN_ADJUSTMENT')),
+  amount          INTEGER NOT NULL, -- signed: -1 publish, +1 refund/renewal-per-credit, +/- admin
+  "balanceBefore" INTEGER NOT NULL,
+  "balanceAfter"  INTEGER NOT NULL,
+  "gigId"         UUID REFERENCES gigs(id) ON DELETE SET NULL,
+  reason          TEXT,
+  "createdAt"     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_credit_transactions_brand ON credit_transactions("brandId", "createdAt" DESC);
+
+-- --- 23d. Plan values, corrected to the V1 PRD ------------------------------
+-- These columns already meant "how much this plan grants" under the old
+-- model (a concurrency cap); under V1 the same columns mean "how much this
+-- plan grants per billing cycle" (a rollover-able balance) — same shape,
+-- reused rather than renamed (Rule 2).
+UPDATE plans SET price = 0,   "campaignLimit" = 2,  "applicationSlotLimit" = 10 WHERE name = 'FREE';
+UPDATE plans SET price = 99,  "campaignLimit" = 5,  "applicationSlotLimit" = 22 WHERE name = 'STARTER';
+UPDATE plans SET price = 199, "campaignLimit" = 10, "applicationSlotLimit" = 48 WHERE name = 'GROWTH';
+INSERT INTO plans (name, price, "campaignLimit", "applicationSlotLimit") VALUES
+  ('FREE',    0,   2,  10),
+  ('STARTER', 99,  5,  22),
+  ('GROWTH',  199, 10, 48)
+ON CONFLICT (name) DO NOTHING;
+
+-- Any brand still missing a plan (should only be pre-plans-table legacy
+-- rows) resolves to FREE, finishing what section 14b's backfill started.
+UPDATE brands SET "planId" = (SELECT id FROM plans WHERE name = 'FREE') WHERE "planId" IS NULL;
+
+-- --- 23e. Atomic publish: check + debit + activate, one transaction --------
+-- Single plpgsql function = single implicit Postgres transaction, so a
+-- failure at any point leaves both the gig and the brand's balances
+-- completely unchanged (PRD: "credit remains unchanged, Gig remains Draft").
+-- Row locks (FOR UPDATE) on both the gig and the brand serialize concurrent
+-- publish attempts, so two racing requests for the same gig — or two
+-- racing publishes from the same brand — can never both succeed.
+-- DROP first: CREATE OR REPLACE cannot change an existing function's output
+-- column names/types (only the body), and this signature's output columns
+-- were renamed to fix the ambiguity noted above.
+DROP FUNCTION IF EXISTS publish_gig_with_credit(UUID, UUID, INTEGER, TIMESTAMPTZ);
+CREATE OR REPLACE FUNCTION publish_gig_with_credit(
+  p_gig_id UUID,
+  p_brand_id UUID,
+  p_slots INTEGER,
+  p_expires_at TIMESTAMPTZ
+)
+-- Output columns are prefixed (out_...) rather than named after the actual
+-- brands columns — plpgsql implicitly declares a variable per RETURNS TABLE
+-- column, and a same-named variable makes every unqualified reference to
+-- that column inside this function's own UPDATE...SET statements ambiguous
+-- ("column reference is ambiguous", SQLSTATE 42702). Applies to every
+-- function below with a RETURNS TABLE clause.
+RETURNS TABLE(
+  out_campaign_credits_remaining INTEGER,
+  out_application_slots_remaining INTEGER
+) AS $$
+DECLARE
+  v_gig RECORD;
+  v_brand RECORD;
+BEGIN
+  IF p_slots < 1 THEN
+    RAISE EXCEPTION 'INVALID_SLOTS';
+  END IF;
+
+  SELECT * INTO v_gig FROM gigs WHERE id = p_gig_id AND "brandId" = p_brand_id FOR UPDATE;
+  IF v_gig IS NULL THEN
+    RAISE EXCEPTION 'GIG_NOT_FOUND';
+  END IF;
+  -- DRAFT: a first publish. CLOSED/EXPIRED: a reopen — PRD 20 says a reopen
+  -- must re-check the *current* pool exactly like a fresh publish, not
+  -- assume its old slots are still available, so this is the same atomic
+  -- path for both rather than a second copy of the same business rule.
+  IF v_gig.status NOT IN ('DRAFT', 'CLOSED', 'EXPIRED') THEN
+    RAISE EXCEPTION 'GIG_NOT_PUBLISHABLE';
+  END IF;
+
+  SELECT * INTO v_brand FROM brands WHERE id = p_brand_id FOR UPDATE;
+  IF v_brand."campaignCreditsRemaining" < 1 THEN
+    RAISE EXCEPTION 'INSUFFICIENT_CAMPAIGN_CREDITS';
+  END IF;
+  IF v_brand."applicationSlotsRemaining" < p_slots THEN
+    RAISE EXCEPTION 'INSUFFICIENT_SLOTS';
+  END IF;
+
+  UPDATE brands SET
+    "campaignCreditsRemaining" = "campaignCreditsRemaining" - 1,
+    "applicationSlotsRemaining" = "applicationSlotsRemaining" - p_slots
+  WHERE id = p_brand_id;
+
+  UPDATE gigs SET
+    status = 'ACTIVE',
+    "publishedAt" = now(),
+    "expiresAt" = p_expires_at,
+    "creditConsumed" = true,
+    "applicationSlots" = p_slots,
+    "applicationSlotsUsed" = 0,
+    "slotsReleased" = false
+  WHERE id = p_gig_id;
+
+  INSERT INTO credit_transactions ("brandId", type, amount, "balanceBefore", "balanceAfter", "gigId", reason)
+  VALUES (p_brand_id, 'PUBLISH', -1, v_brand."campaignCreditsRemaining", v_brand."campaignCreditsRemaining" - 1, p_gig_id, 'Gig published');
+
+  RETURN QUERY SELECT (v_brand."campaignCreditsRemaining" - 1), (v_brand."applicationSlotsRemaining" - p_slots);
+END;
+$$ LANGUAGE plpgsql;
+
+-- ponytail: the two functions immediately below (close_gig_and_release,
+-- expire_lapsed_gigs) return unrelated column names (unused_slots,
+-- credit_refunded, expired_gig_id) that don't collide with any brands/gigs
+-- column, so they're unaffected by the ambiguity issue noted above.
+
+-- --- 23f. Atomic close/expire: idempotent slot release + 1-hour refund ----
+-- Used by: manual close (brand-initiated, p_brand_id set → ownership
+-- enforced by the WHERE), the expiry sweep (p_brand_id NULL → no ownership
+-- filter, the scheduler is trusted), and hard delete (called first, then
+-- the row is deleted). Server-side `now()` throughout — never a
+-- client-supplied timestamp — for the 1-hour refund window.
+CREATE OR REPLACE FUNCTION close_gig_and_release(
+  p_gig_id UUID,
+  p_brand_id UUID,
+  p_new_status TEXT
+)
+RETURNS TABLE(
+  unused_slots INTEGER,
+  credit_refunded BOOLEAN
+) AS $$
+DECLARE
+  v_gig RECORD;
+  v_unused INTEGER;
+  v_refund BOOLEAN := false;
+BEGIN
+  IF p_new_status NOT IN ('CLOSED', 'EXPIRED') THEN
+    RAISE EXCEPTION 'INVALID_STATUS';
+  END IF;
+
+  SELECT * INTO v_gig FROM gigs WHERE id = p_gig_id
+    AND (p_brand_id IS NULL OR "brandId" = p_brand_id) FOR UPDATE;
+  IF v_gig IS NULL THEN
+    RAISE EXCEPTION 'GIG_NOT_FOUND';
+  END IF;
+
+  -- Idempotent no-op: slots (and any 1hr refund) were already resolved for
+  -- this gig by an earlier call. Still safe to re-run — nothing double-pays.
+  IF v_gig."slotsReleased" THEN
+    UPDATE gigs SET status = p_new_status WHERE id = p_gig_id AND status NOT IN ('CLOSED', 'EXPIRED');
+    RETURN QUERY SELECT 0, false;
+    RETURN;
+  END IF;
+
+  v_unused := GREATEST(0, COALESCE(v_gig."applicationSlots", 0) - COALESCE(v_gig."applicationSlotsUsed", 0));
+
+  -- 1-hour cancellation refund: manual close only (never the scheduler's
+  -- EXPIRED sweep — an expiry is never a "cancel"), only if a credit was
+  -- actually spent and not already refunded, only within 1 hour of publish.
+  IF p_new_status = 'CLOSED' AND v_gig."creditConsumed" AND NOT v_gig."creditRefunded"
+     AND v_gig."publishedAt" IS NOT NULL
+     AND now() - v_gig."publishedAt" <= INTERVAL '1 hour' THEN
+    v_refund := true;
+  END IF;
+
+  UPDATE gigs SET
+    status = p_new_status,
+    "slotsReleased" = true,
+    "creditConsumed" = CASE WHEN v_refund THEN false ELSE "creditConsumed" END,
+    "creditRefunded" = CASE WHEN v_refund THEN true ELSE "creditRefunded" END
+  WHERE id = p_gig_id;
+
+  UPDATE brands SET
+    "applicationSlotsRemaining" = "applicationSlotsRemaining" + v_unused,
+    "campaignCreditsRemaining" = "campaignCreditsRemaining" + (CASE WHEN v_refund THEN 1 ELSE 0 END)
+  WHERE id = v_gig."brandId";
+
+  IF v_refund THEN
+    INSERT INTO credit_transactions ("brandId", type, amount, "balanceBefore", "balanceAfter", "gigId", reason)
+    SELECT v_gig."brandId", 'REFUND', 1, b."campaignCreditsRemaining" - 1, b."campaignCreditsRemaining", p_gig_id,
+           'Cancelled within 1 hour of publish'
+    FROM brands b WHERE b.id = v_gig."brandId";
+  END IF;
+
+  RETURN QUERY SELECT v_unused, v_refund;
+END;
+$$ LANGUAGE plpgsql;
+
+-- --- 23g. Expiry sweep, rewritten to release slots per-gig -----------------
+-- The old expireLapsedGigs() did one blind bulk UPDATE. That no longer works
+-- once expiring a gig must also compute and release *that gig's* unused
+-- slots to *that gig's brand* — a per-row operation. This function loops
+-- lapsed gigs and reuses close_gig_and_release for each, in one DB call.
+CREATE OR REPLACE FUNCTION expire_lapsed_gigs()
+RETURNS TABLE(expired_gig_id UUID) AS $$
+DECLARE
+  v_row RECORD;
+BEGIN
+  FOR v_row IN
+    SELECT id FROM gigs WHERE status = 'ACTIVE' AND "expiresAt" <= now()
+  LOOP
+    PERFORM close_gig_and_release(v_row.id, NULL, 'EXPIRED');
+    expired_gig_id := v_row.id;
+    RETURN NEXT;
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
+-- --- 23h. Application-slot consumption, rewritten against the new counter -
+-- Same FOR UPDATE row-lock pattern as before, now checked against the
+-- persisted applicationSlotsUsed counter (23b) instead of a live COUNT —
+-- required so close_gig_and_release can compute "unused" without a second
+-- query, and so this and the release path can never disagree.
+DROP FUNCTION IF EXISTS insert_application_with_capacity(UUID, UUID, TEXT, TEXT);
+CREATE OR REPLACE FUNCTION insert_application_with_capacity(
+  p_gig_id        UUID,
+  p_influencer_id UUID,
+  p_cover_note    TEXT,
+  p_reel_url      TEXT DEFAULT NULL
+)
+RETURNS SETOF applications AS $$
+DECLARE
+  v_allotted INTEGER;
+  v_used     INTEGER;
+BEGIN
+  SELECT "applicationSlots", "applicationSlotsUsed" INTO v_allotted, v_used
+  FROM gigs WHERE id = p_gig_id FOR UPDATE;
+
+  IF v_allotted IS NULL THEN
+    RETURN;
+  END IF;
+
+  IF v_used >= v_allotted THEN
+    RETURN;
+  END IF;
+
+  UPDATE gigs SET "applicationSlotsUsed" = "applicationSlotsUsed" + 1 WHERE id = p_gig_id;
+
+  RETURN QUERY
+  INSERT INTO applications ("gigId", "influencerId", "coverNote", "reelUrl", status)
+  VALUES (p_gig_id, p_influencer_id, p_cover_note, p_reel_url, 'PENDING')
+  RETURNING *;
+END;
+$$ LANGUAGE plpgsql;
+
+-- --- 23i. Withdrawal frees the slot it held ---------------------------------
+-- Mirrors the old live-COUNT behaviour (a withdrawn PENDING application
+-- stopped counting automatically) now that usage is a persisted counter —
+-- without this, a withdrawal would permanently strand a slot as "used".
+CREATE OR REPLACE FUNCTION withdraw_application_and_release_slot(
+  p_application_id UUID,
+  p_influencer_id UUID
+)
+RETURNS SETOF applications AS $$
+DECLARE
+  v_app RECORD;
+BEGIN
+  SELECT * INTO v_app FROM applications
+    WHERE id = p_application_id AND "influencerId" = p_influencer_id AND status = 'PENDING'
+    FOR UPDATE;
+  IF v_app IS NULL THEN
+    RETURN;
+  END IF;
+
+  UPDATE gigs SET "applicationSlotsUsed" = GREATEST(0, "applicationSlotsUsed" - 1) WHERE id = v_app."gigId";
+
+  RETURN QUERY DELETE FROM applications WHERE id = p_application_id AND status = 'PENDING' RETURNING *;
+END;
+$$ LANGUAGE plpgsql;
+
+-- --- 23j. Billing renewal: rollover, not reset ------------------------------
+-- Adds the plan's per-cycle grant on top of whatever's left (PRD: 2 unused +
+-- 5 new = 7, not 5). No automated payment collection anywhere here — V1 has
+-- no billing provider; this only advances credits/slots/dates for brands
+-- whose cycle has genuinely elapsed, same "sweep" pattern as gig expiry.
+DROP FUNCTION IF EXISTS renew_brand_billing_cycle(UUID);
+CREATE OR REPLACE FUNCTION renew_brand_billing_cycle(p_brand_id UUID)
+RETURNS TABLE(
+  out_campaign_credits_remaining INTEGER,
+  out_application_slots_remaining INTEGER
+) AS $$
+DECLARE
+  v_brand RECORD;
+  v_plan RECORD;
+BEGIN
+  SELECT * INTO v_brand FROM brands WHERE id = p_brand_id FOR UPDATE;
+  IF v_brand IS NULL THEN
+    RAISE EXCEPTION 'BRAND_NOT_FOUND';
+  END IF;
+
+  SELECT * INTO v_plan FROM plans WHERE id = v_brand."planId";
+  IF v_plan IS NULL THEN
+    SELECT * INTO v_plan FROM plans WHERE name = 'FREE';
+  END IF;
+
+  UPDATE brands SET
+    "campaignCreditsRemaining" = "campaignCreditsRemaining" + v_plan."campaignLimit",
+    "applicationSlotsRemaining" = "applicationSlotsRemaining" + v_plan."applicationSlotLimit",
+    "billingCycleStart" = COALESCE("billingCycleEnd", now()),
+    "billingCycleEnd" = COALESCE("billingCycleEnd", now()) + INTERVAL '30 days'
+  WHERE id = p_brand_id;
+
+  INSERT INTO credit_transactions ("brandId", type, amount, "balanceBefore", "balanceAfter", reason)
+  VALUES (p_brand_id, 'RENEWAL', v_plan."campaignLimit", v_brand."campaignCreditsRemaining",
+          v_brand."campaignCreditsRemaining" + v_plan."campaignLimit", 'Monthly plan renewal');
+
+  RETURN QUERY SELECT
+    (v_brand."campaignCreditsRemaining" + v_plan."campaignLimit"),
+    (v_brand."applicationSlotsRemaining" + v_plan."applicationSlotLimit");
+END;
+$$ LANGUAGE plpgsql;
+
+-- --- 23k. Admin-only balance/plan adjustment (audited) ---------------------
+-- The only path allowed to set arbitrary values on these fields — see
+-- middleware/auth.js requireAdmin and admin.routes.js. Records an
+-- ADMIN_ADJUSTMENT ledger row whenever campaign credits change.
+CREATE OR REPLACE FUNCTION admin_adjust_brand_plan(
+  p_brand_id UUID,
+  p_plan_id UUID,
+  p_campaign_credits INTEGER,
+  p_application_slots INTEGER,
+  p_billing_cycle_start TIMESTAMPTZ,
+  p_billing_cycle_end TIMESTAMPTZ,
+  p_reason TEXT
+)
+RETURNS brands AS $$
+DECLARE
+  v_before INTEGER;
+  v_after brands;
+BEGIN
+  SELECT "campaignCreditsRemaining" INTO v_before FROM brands WHERE id = p_brand_id FOR UPDATE;
+  IF v_before IS NULL THEN
+    RAISE EXCEPTION 'BRAND_NOT_FOUND';
+  END IF;
+
+  UPDATE brands SET
+    "planId" = COALESCE(p_plan_id, "planId"),
+    "campaignCreditsRemaining" = COALESCE(p_campaign_credits, "campaignCreditsRemaining"),
+    "applicationSlotsRemaining" = COALESCE(p_application_slots, "applicationSlotsRemaining"),
+    "billingCycleStart" = COALESCE(p_billing_cycle_start, "billingCycleStart"),
+    "billingCycleEnd" = COALESCE(p_billing_cycle_end, "billingCycleEnd")
+  WHERE id = p_brand_id
+  RETURNING * INTO v_after;
+
+  IF p_campaign_credits IS NOT NULL AND p_campaign_credits != v_before THEN
+    INSERT INTO credit_transactions ("brandId", type, amount, "balanceBefore", "balanceAfter", reason)
+    VALUES (p_brand_id, 'ADMIN_ADJUSTMENT', p_campaign_credits - v_before, v_before, p_campaign_credits,
+            COALESCE(p_reason, 'Admin adjustment'));
+  END IF;
+
+  RETURN v_after;
+END;
+$$ LANGUAGE plpgsql;
+
+-- --- 23l. Production data backfill ------------------------------------------
+-- Decided policy (explicit business approval obtained before running this):
+--   - Every existing brand's new campaignCreditsRemaining is reset to its
+--     plan's fresh per-cycle allotment. The OLD `credits` balance is a
+--     different currency (it could be spent on hiring, which costs nothing
+--     now) and is NOT converted — it is left in place, untouched, as
+--     historical/deprecated data only.
+--   - applicationSlotsRemaining is set to the plan's fresh allotment MINUS
+--     slots already held by that brand's currently-ACTIVE gigs (their
+--     applicationSlots/allotment), so the pool stays internally consistent:
+--     an active gig's held slots must stay reserved out of the pool, or the
+--     brand would end up with more total slots in circulation than its plan
+--     allows the moment that gig later closes and "returns" them.
+--   - Every brand gets a fresh 30-day billing cycle starting now.
+--   - Existing gigs are NOT retroactively charged a Campaign Credit — only
+--     backfilled with the new bookkeeping fields so future close/expire
+--     events on them behave correctly:
+--       * ACTIVE   -> creditConsumed = true (already "paid" under the old
+--                     model), applicationSlotsUsed = real received-
+--                     application count, slotsReleased = false (still live).
+--       * CLOSED/EXPIRED -> creditConsumed = true, applicationSlotsUsed =
+--                     real received count, slotsReleased = true (already
+--                     resolved — no historical "unused slot" credit is
+--                     granted into the fresh pool; see applicationSlots-
+--                     Remaining note above, this is a clean-slate reset).
+--       * DRAFT (none existed in production at the time this migration was
+--                     written) -> creditConsumed = false, unaffected.
+-- This block only ever touches rows that still have billingCycleStart IS
+-- NULL, so it is safe to re-run (idempotent) — a brand that has already
+-- been through this backfill, or onboarded after it, is left alone.
+
+UPDATE gigs SET
+  "applicationSlotsUsed" = LEAST("applicationSlots", COALESCE((
+    SELECT COUNT(*) FROM applications a WHERE a."gigId" = gigs.id
+  ), 0)),
+  "creditConsumed" = true,
+  "slotsReleased" = (status IN ('CLOSED', 'EXPIRED'))
+WHERE status IN ('ACTIVE', 'CLOSED', 'EXPIRED') AND "publishedAt" IS NOT NULL;
+
+-- Postgres does not allow the UPDATE target's own alias inside a JOIN...ON
+-- within its FROM clause, so the join happens entirely inside this CTE
+-- first; the outer UPDATE...FROM then matches on a single derived table.
+WITH plan_alloc AS (
+  SELECT
+    b.id AS brand_id,
+    p."campaignLimit",
+    p."applicationSlotLimit",
+    COALESCE(a.held, 0) AS held
+  FROM brands b
+  JOIN plans p ON p.id = b."planId"
+  LEFT JOIN (
+    SELECT "brandId", COALESCE(SUM("applicationSlots"), 0) AS held
+    FROM gigs WHERE status = 'ACTIVE'
+    GROUP BY "brandId"
+  ) a ON a."brandId" = b.id
+  WHERE b."billingCycleStart" IS NULL
+)
+UPDATE brands b SET
+  "campaignCreditsRemaining" = pa."campaignLimit",
+  "applicationSlotsRemaining" = GREATEST(0, pa."applicationSlotLimit" - pa.held),
+  "billingCycleStart" = now(),
+  "billingCycleEnd" = now() + INTERVAL '30 days'
+FROM plan_alloc pa
+WHERE b.id = pa.brand_id;
+
+-- --- 23m. Reallocate slots on an already-published gig ---------------------
+-- Pre-existing feature (allocateSlots), rewired against the new pool: raising
+-- a live campaign's allotment spends more from the brand's pool, lowering it
+-- refunds the difference back — both atomically, in the same statement as
+-- the gig's own allotment change, so the pool and the gig can never drift
+-- out of sync with each other.
+DROP FUNCTION IF EXISTS reallocate_gig_slots(UUID, UUID, INTEGER);
+CREATE OR REPLACE FUNCTION reallocate_gig_slots(
+  p_gig_id UUID,
+  p_brand_id UUID,
+  p_new_slots INTEGER
+)
+RETURNS TABLE(out_application_slots_remaining INTEGER) AS $$
+DECLARE
+  v_gig RECORD;
+  v_brand RECORD;
+  v_delta INTEGER;
+BEGIN
+  IF p_new_slots < 1 THEN
+    RAISE EXCEPTION 'INVALID_SLOTS';
+  END IF;
+
+  SELECT * INTO v_gig FROM gigs WHERE id = p_gig_id AND "brandId" = p_brand_id FOR UPDATE;
+  IF v_gig IS NULL THEN
+    RAISE EXCEPTION 'GIG_NOT_FOUND';
+  END IF;
+  IF p_new_slots < v_gig."applicationSlotsUsed" THEN
+    RAISE EXCEPTION 'SLOTS_BELOW_RECEIVED';
+  END IF;
+
+  v_delta := p_new_slots - COALESCE(v_gig."applicationSlots", 0);
+  IF v_delta = 0 THEN
+    RETURN QUERY SELECT "applicationSlotsRemaining" FROM brands WHERE id = p_brand_id;
+    RETURN;
+  END IF;
+
+  SELECT * INTO v_brand FROM brands WHERE id = p_brand_id FOR UPDATE;
+  IF v_delta > 0 AND v_brand."applicationSlotsRemaining" < v_delta THEN
+    RAISE EXCEPTION 'INSUFFICIENT_SLOTS';
+  END IF;
+
+  UPDATE brands SET "applicationSlotsRemaining" = "applicationSlotsRemaining" - v_delta WHERE id = p_brand_id;
+  UPDATE gigs SET "applicationSlots" = p_new_slots WHERE id = p_gig_id;
+
+  RETURN QUERY SELECT (v_brand."applicationSlotsRemaining" - v_delta);
+END;
+$$ LANGUAGE plpgsql;

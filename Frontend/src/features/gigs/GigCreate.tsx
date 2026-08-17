@@ -67,6 +67,9 @@ export default function GigCreate() {
       console.log("[Create Gig Debug] Success Supabase response:", data);
       qc.invalidateQueries({ queryKey: ["gigs"] });
       qc.invalidateQueries({ queryKey: ["plans", "usage"] });
+      // Publishing spends a Campaign Credit — without this, the dashboard's
+      // credit readout stays stale until something else happens to refetch it.
+      qc.invalidateQueries({ queryKey: ["profile"] });
       toast({ title: data.status === "DRAFT" ? "Gig saved as draft 📁" : "Gig published successfully! 🚀" });
       navigate("/dashboard/brand");
     },
@@ -369,45 +372,64 @@ export default function GigCreate() {
             </div>
           </div>
 
-          {/* Application slots — limits come from the brand's plan, fetched
-              from the API rather than hardcoded here. */}
+          {/* Application slots — the pool comes from the brand's live
+              Application Slots balance, fetched from the API rather than
+              hardcoded here. Separate resource from Campaign Credits. */}
           <div className="space-y-1.5">
             <Label className="text-[12px]">Application slots</Label>
             <Input
               type="number"
               min={1}
-              max={planUsage?.slotsRemaining || undefined}
+              max={planUsage?.applicationSlotsRemaining || undefined}
               value={applicationSlots}
               onChange={(e) => setApplicationSlots(e.target.value === "" ? "" : Number(e.target.value))}
               className="h-9 text-[13px] rounded-sm max-w-[160px]"
             />
             <p className="text-[11px] text-muted-foreground">
               {planUsage
-                ? `How many creators can apply. ${planUsage.slotsRemaining} of ${planUsage.plan.applicationSlotLimit} slots left on your ${planUsage.plan.name} plan.`
+                ? `How many creators can apply. ${planUsage.applicationSlotsRemaining} slots available in your pool.`
                 : "How many creators can apply to this campaign. Minimum 1."}
             </p>
-            {planUsage && planUsage.campaignsRemaining === 0 && (
-              <p className="text-[11px] text-warning">
-                You've used all {planUsage.plan.campaignLimit} campaigns on {planUsage.plan.name}. Close one or save this as a draft.
-              </p>
-            )}
           </div>
+
+          {/* Publish cost preview — PRD: show the Campaign Credit spend and
+              remaining balance before the brand commits, and block publish
+              outright at zero credits (draft is always free, no gate here). */}
+          {planUsage && (
+            <div className="rounded-sm border border-border bg-muted/20 p-3 text-[12px] space-y-1">
+              <div className="flex justify-between text-muted-foreground">
+                <span>Publishing uses</span>
+                <span className="font-medium text-foreground">1 Campaign Credit</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Credits remaining</span>
+                <span className={`font-medium ${planUsage.campaignCreditsRemaining === 0 ? "text-destructive" : "text-foreground"}`}>
+                  {planUsage.campaignCreditsRemaining}
+                </span>
+              </div>
+              {planUsage.campaignCreditsRemaining === 0 && (
+                <p className="text-warning pt-1">
+                  You have no Campaign Credits remaining. Please request an upgrade or top-up from the YouCollab team — you can still save this as a draft.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Action Row */}
           <div className="flex justify-end gap-2.5 pt-2">
-            <Button 
-              disabled={create.isPending} 
-              onClick={() => handlePostGig("DRAFT")} 
+            <Button
+              disabled={create.isPending}
+              onClick={() => handlePostGig("DRAFT")}
               variant="outline"
               className="h-9 text-[13px] rounded-sm"
             >
               {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save as Draft"}
             </Button>
-            
-            <Button 
-              disabled={create.isPending} 
-              onClick={() => handlePostGig("ACTIVE")} 
-              className="h-9 text-[13px] rounded-sm bg-gradient-brand text-primary-foreground border-0 shadow-md hover:opacity-95"
+
+            <Button
+              disabled={create.isPending || (planUsage != null && planUsage.campaignCreditsRemaining === 0)}
+              onClick={() => handlePostGig("ACTIVE")}
+              className="h-9 text-[13px] rounded-sm bg-gradient-brand text-primary-foreground border-0 shadow-md hover:opacity-95 disabled:opacity-50"
             >
               {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Publish"}
             </Button>

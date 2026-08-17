@@ -2,7 +2,6 @@ const supabase = require('./supabase');
 const { supabaseAdmin } = require('./supabase');
 const AppError = require('../utils/AppError');
 const { parsePagination, paginateResults } = require('../utils/pagination');
-const { TIER_COST, getTier } = require('../utils/credits');
 const { haversineKm } = require('./geo.service');
 
 /**
@@ -82,15 +81,13 @@ const apply = async (userId, gigId, coverNote, reelUrl) => {
     throw new AppError("You've already applied to this collab! Sit tight.", 409, 'CONFLICT');
   }
 
-  // Capacity: applications received must stay under the gig's allocated slots.
-  const { count: received } = await supabase
-    .from('applications')
-    .select('id', { count: 'exact', head: true })
-    .eq('gigId', gigId);
-
+  // Fail-fast capacity pre-check against the gig's own persisted counters
+  // (Applications closed once applicationSlotsUsed reaches its allotment) —
+  // the atomic RPC below is what actually enforces this under concurrency;
+  // this is just a friendlier error before attempting the write.
   const slots = gig.applicationSlots ?? 1;
-  if ((received || 0) >= slots) {
-    throw new AppError('This collaboration has reached its application limit.', 409, 'CAPACITY_REACHED');
+  if ((gig.applicationSlotsUsed ?? 0) >= slots) {
+    throw new AppError('Applications closed — this collaboration has reached its application limit.', 409, 'CAPACITY_REACHED');
   }
 
   // Create the application through the capacity-checked RPC: it locks the gig
@@ -113,7 +110,7 @@ const apply = async (userId, gigId, coverNote, reelUrl) => {
   }
 
   if (!inserted?.length) {
-    throw new AppError('This collaboration has reached its application limit.', 409, 'CAPACITY_REACHED');
+    throw new AppError('Applications closed — this collaboration has reached its application limit.', 409, 'CAPACITY_REACHED');
   }
 
   const appRecord = inserted[0];
@@ -279,16 +276,11 @@ const updateStatus = async (applicationId, userId, status) => {
     throw new AppError('This application has already been processed.', 400, 'BAD_REQUEST');
   }
 
-  // Hiring a creator spends trial credits, priced by their follower tier.
-  let tierCost = 0;
-  if (status === 'ACCEPTED') {
-    const tier = getTier(application.influencer.followerCount);
-    if (tier === 'MID') {
-      throw new AppError('Mid-tier creators (10K+ followers) unlock after the trial pack.', 400, 'TIER_LOCKED');
-    }
-    tierCost = TIER_COST[tier];
-  }
-
+  // V1 business model: hiring is free. The Campaign Credit was already spent
+  // when the Gig was published — accepting or rejecting a pitch never moves
+  // credits, for either the brand or the creator (there is no Creator
+  // credit balance at all — see docs/credit-migration.md).
+  //
   // Conditioned on status still being PENDING at write time — the atomic guard
   // that closes the gap between the read above and this write, so two
   // concurrent accepts on the same application can't both go through.
@@ -302,32 +294,6 @@ const updateStatus = async (applicationId, userId, status) => {
 
   if (updateError || !updatedApplication) {
     throw new AppError('This application has already been processed.', 400, 'BAD_REQUEST');
-  }
-
-  if (status === 'ACCEPTED') {
-    // Atomic DB-side decrement — avoids the lost-update race a JS-computed
-    // "credits - tierCost" would have if this brand has two hires in flight.
-    const { data: debitRows, error: debitError } = await supabase.rpc('debit_brand_credits', {
-      p_brand_id: brand.id,
-      p_amount: tierCost,
-    });
-
-    if (debitError || !debitRows?.length) {
-      // Roll back — the hire didn't actually go through.
-      await supabase.from('applications').update({ status: 'PENDING' }).eq('id', applicationId);
-      throw new AppError('Not enough trial credits for this hire.', 402, 'INSUFFICIENT_CREDITS');
-    }
-
-    // The same hire credits the creator's earned balance — the brand's spend
-    // and the creator's earning are one transaction, not two disconnected numbers.
-    const { error: creditError } = await supabase.rpc('credit_influencer_earnings', {
-      p_influencer_id: application.influencer.id,
-      p_amount: tierCost,
-    });
-
-    if (creditError) {
-      console.error('Failed to credit influencer earnings:', creditError);
-    }
   }
 
   // Notify the Influencer
@@ -434,9 +400,11 @@ const sendMessage = async (applicationId, userId, content) => {
 };
 
 /**
- * Influencer withdraws their own pending pitch. Hard delete — only PENDING
- * pitches qualify (nothing's been spent or messaged yet), and it frees the
- * (gigId, influencerId) unique slot so they can pitch again later.
+ * Influencer withdraws their own pending pitch. Only PENDING pitches
+ * qualify (nothing's been spent or messaged yet). Uses the atomic
+ * withdraw_application_and_release_slot RPC (schema.sql section 23i) so the
+ * gig's applicationSlotsUsed counter and the deleted row can never drift
+ * apart — without it a withdrawal would permanently strand a slot as "used".
  */
 const withdrawApplication = async (applicationId, userId) => {
   const influencer = await getInfluencerByUserId(userId);
@@ -459,13 +427,12 @@ const withdrawApplication = async (applicationId, userId) => {
     throw new AppError('Only pending pitches can be withdrawn.', 400, 'BAD_REQUEST');
   }
 
-  const { error: deleteError } = await supabase
-    .from('applications')
-    .delete()
-    .eq('id', applicationId)
-    .eq('status', 'PENDING');
+  const { data: withdrawn, error: rpcError } = await supabaseAdmin.rpc('withdraw_application_and_release_slot', {
+    p_application_id: applicationId,
+    p_influencer_id: influencer.id,
+  });
 
-  if (deleteError) {
+  if (rpcError || !withdrawn?.length) {
     throw new AppError('Failed to withdraw pitch.', 500, 'DATABASE_ERROR');
   }
 };

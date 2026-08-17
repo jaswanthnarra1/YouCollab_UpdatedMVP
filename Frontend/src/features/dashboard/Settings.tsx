@@ -26,7 +26,6 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import { clerkErrorMessage } from "@/lib/clerkError";
-import { TRIAL_CREDITS, GIG_POST_COST, TIER_COST } from "@/lib/credits";
 
 function apiErrorMessage(err: unknown, fallback: string): string {
   const e = err as { response?: { data?: { error?: { message?: string } } } };
@@ -519,63 +518,55 @@ export default function Settings() {
                 <h3 className="text-[14px] font-semibold">Frequently Asked Questions</h3>
                 <Accordion type="single" collapsible className="w-full">
 
-                  {/* Credit Q&A — brand vs creator, driven by the shared credit constants */}
+                  {/* Campaign Credit / Application Slot Q&A — brand only; Creators are free */}
                   {user?.role === "BRAND" && (
                     <>
                       <AccordionItem value="credit-b1" className="border-border">
-                        <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">How do credits work for my brand?</AccordionTrigger>
+                        <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">How do Campaign Credits work?</AccordionTrigger>
                         <AccordionContent className="text-[12px] text-muted-foreground leading-relaxed">
-                          You get a one-time trial pack of <strong className="text-foreground">{TRIAL_CREDITS} credits</strong> when you join. Credits are only spent on two actions — posting a collab brief and hiring a creator. Browsing creators, receiving pitches, and messaging are always free.
+                          Every plan grants a number of <strong className="text-foreground">Campaign Credits</strong> per billing cycle. <strong className="text-foreground">1 Campaign Credit = 1 published Gig.</strong> Saving a draft, receiving pitches, hiring a creator, and messaging are all free — the only thing a credit pays for is publishing.
                         </AccordionContent>
                       </AccordionItem>
                       <AccordionItem value="credit-b2" className="border-border">
-                        <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">How many credits does posting a collab cost?</AccordionTrigger>
+                        <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">What are Application Slots, and how are they different from Campaign Credits?</AccordionTrigger>
                         <AccordionContent className="text-[12px] text-muted-foreground leading-relaxed">
-                          Posting a brief costs <strong className="text-foreground">{GIG_POST_COST} credits</strong>, charged the moment it goes live. If the post fails to publish for any reason, those credits are automatically refunded to your balance.
+                          Campaign Credits answer "how many campaigns can I publish?" Application Slots answer "how many Creator applications can my campaigns collectively receive?" They're separate pools — publishing spends both a credit and however many slots you allocate to that campaign.
                         </AccordionContent>
                       </AccordionItem>
                       <AccordionItem value="credit-b3" className="border-border">
-                        <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">How much does hiring a creator cost?</AccordionTrigger>
+                        <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">Do unused credits or slots carry over?</AccordionTrigger>
                         <AccordionContent className="text-[12px] text-muted-foreground leading-relaxed">
-                          Hiring (accepting a pitch) is priced by the creator's Instagram follower tier: <strong className="text-foreground">Nano</strong> (under 1,000 followers) costs <strong className="text-foreground">{TIER_COST.NANO} credits</strong>, and <strong className="text-foreground">Micro</strong> (1,000–10,000 followers) costs <strong className="text-foreground">{TIER_COST.MICRO} credits</strong>. Mid-tier creators (over 10,000 followers) are locked during the trial and can't be hired yet.
+                          Yes — both roll over. If you have 2 unused Campaign Credits and your plan renews with 5 more, you start the new cycle with 7. Nothing resets while it's unused.
                         </AccordionContent>
                       </AccordionItem>
                       <AccordionItem value="credit-b4" className="border-border">
-                        <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">What happens when I run out of credits?</AccordionTrigger>
+                        <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">What happens when I run out of Campaign Credits?</AccordionTrigger>
                         <AccordionContent className="text-[12px] text-muted-foreground leading-relaxed">
-                          Actions that cost credits are blocked once your balance is too low — you'll see an "insufficient credits" message when posting or hiring. Your existing briefs and past hires are unaffected. Paid credit packs to top up beyond the trial are coming soon.
+                          Publishing is blocked once your balance reaches zero — you'll see a message asking you to request an upgrade or top-up from the YouCollab team. Drafts, existing live campaigns, and past hires are unaffected, and you can still save new briefs as drafts.
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="credit-b5" className="border-border">
+                        <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">If I cancel a campaign right after publishing, do I get the credit back?</AccordionTrigger>
+                        <AccordionContent className="text-[12px] text-muted-foreground leading-relaxed">
+                          Yes — cancelling within 1 hour of publishing refunds the Campaign Credit. After that window, closing a campaign still returns any unused Application Slots to your pool, but the credit itself is not refunded.
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="credit-b6" className="border-border">
+                        <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">How do I change plans?</AccordionTrigger>
+                        <AccordionContent className="text-[12px] text-muted-foreground leading-relaxed">
+                          Plan changes are handled manually by the YouCollab team in this version — there's no self-service upgrade yet. Reach out and we'll adjust your plan directly.
                         </AccordionContent>
                       </AccordionItem>
                     </>
                   )}
 
                   {user?.role === "INFLUENCER" && (
-                    <>
-                      <AccordionItem value="credit-c1" className="border-border">
-                        <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">How do I earn credits?</AccordionTrigger>
-                        <AccordionContent className="text-[12px] text-muted-foreground leading-relaxed">
-                          You start at <strong className="text-foreground">0 credits</strong> and earn them when a brand hires you — that is, accepts your pitch on one of their briefs. Browsing gigs and sending pitches is always free; nothing is deducted from you.
-                        </AccordionContent>
-                      </AccordionItem>
-                      <AccordionItem value="credit-c2" className="border-border">
-                        <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">How many credits do I earn per hire?</AccordionTrigger>
-                        <AccordionContent className="text-[12px] text-muted-foreground leading-relaxed">
-                          You earn exactly what the brand spends to hire you, based on your Instagram follower tier: <strong className="text-foreground">Nano</strong> (under 1,000 followers) earns <strong className="text-foreground">{TIER_COST.NANO} credits</strong>, and <strong className="text-foreground">Micro</strong> (1,000–10,000 followers) earns <strong className="text-foreground">{TIER_COST.MICRO} credits</strong> per accepted collab.
-                        </AccordionContent>
-                      </AccordionItem>
-                      <AccordionItem value="credit-c3" className="border-border">
-                        <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">When are earned credits added to my balance?</AccordionTrigger>
-                        <AccordionContent className="text-[12px] text-muted-foreground leading-relaxed">
-                          Instantly. The moment a brand accepts your pitch, the brand's spend and your earning happen together in a single transaction, so your balance updates the same second you're hired.
-                        </AccordionContent>
-                      </AccordionItem>
-                      <AccordionItem value="credit-c4" className="border-border">
-                        <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">Why can larger creators not be hired yet?</AccordionTrigger>
-                        <AccordionContent className="text-[12px] text-muted-foreground leading-relaxed">
-                          Mid-tier creators (over 10,000 followers) are locked during the trial period — there's no paid pack yet for brands to unlock those hires. This is temporary and opens up as paid tiers launch, so growing past 10,000 followers won't lock you out permanently.
-                        </AccordionContent>
-                      </AccordionItem>
-                    </>
+                    <AccordionItem value="credit-c1" className="border-border">
+                      <AccordionTrigger className="text-[13px] hover:no-underline font-semibold py-3 text-left">Do I pay anything to use YouCollab?</AccordionTrigger>
+                      <AccordionContent className="text-[12px] text-muted-foreground leading-relaxed">
+                        No — creating a profile, browsing gigs, sending pitches, and messaging brands after you're hired are all free, for every follower range. There's no Creator credit balance, no subscription, and no fee taken from what a brand pays you.
+                      </AccordionContent>
+                    </AccordionItem>
                   )}
 
                   <AccordionItem value="item-1" className="border-border">

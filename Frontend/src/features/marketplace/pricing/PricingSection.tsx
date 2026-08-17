@@ -100,7 +100,7 @@ export function PricingSection() {
                     priceKey={`${plan.name}-${billing}`}
                     description={meta.description}
                     features={[
-                      `${plan.campaignLimit} Campaigns`,
+                      `${plan.campaignLimit} Campaign Credits`,
                       `${plan.applicationSlotLimit} Application Slots`,
                       meta.extraFeature,
                     ]}

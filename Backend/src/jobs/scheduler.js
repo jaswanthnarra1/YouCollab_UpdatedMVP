@@ -1,6 +1,7 @@
 const config = require('../config');
 const gigService = require('../services/gig.service');
 const instagramService = require('../services/instagram.service');
+const planService = require('../services/plan.service');
 const logger = require('../utils/logger');
 
 /**
@@ -24,6 +25,7 @@ const logger = require('../utils/logger');
 
 let timer = null;
 let igRefreshTimer = null;
+let billingRenewalTimer = null;
 
 const runExpirySweep = async () => {
   try {
@@ -55,6 +57,23 @@ const runIgTokenRefreshSweep = async () => {
   }
 };
 
+/**
+ * Rolls forward any brand whose 30-day billing cycle has elapsed (unused
+ * Campaign Credits/Application Slots + the plan's fresh grant — see
+ * plan.service.js renewElapsedBillingCycles). No payment collection here;
+ * V1 has no billing provider, this is purely the credit/slot bookkeeping.
+ */
+const runBillingRenewalSweep = async () => {
+  try {
+    const { renewed } = await planService.renewElapsedBillingCycles();
+    if (renewed > 0) {
+      console.log(`[scheduler] Renewed billing cycle for ${renewed} brand(s).`);
+    }
+  } catch (err) {
+    console.error('[scheduler] Billing renewal sweep failed:', err.message);
+  }
+};
+
 const start = () => {
   if (timer) return timer;
 
@@ -77,6 +96,13 @@ const start = () => {
 
   console.log(`[scheduler] Instagram token refresh sweep every ${config.INSTAGRAM.REFRESH_SWEEP_HOURS}h.`);
 
+  const billingEveryMs = config.BILLING.RENEWAL_SWEEP_HOURS * 60 * 60 * 1000;
+  runBillingRenewalSweep();
+  billingRenewalTimer = setInterval(runBillingRenewalSweep, billingEveryMs);
+  if (billingRenewalTimer.unref) billingRenewalTimer.unref();
+
+  console.log(`[scheduler] Billing renewal sweep every ${config.BILLING.RENEWAL_SWEEP_HOURS}h.`);
+
   return timer;
 };
 
@@ -85,6 +111,8 @@ const stop = () => {
   timer = null;
   if (igRefreshTimer) clearInterval(igRefreshTimer);
   igRefreshTimer = null;
+  if (billingRenewalTimer) clearInterval(billingRenewalTimer);
+  billingRenewalTimer = null;
 };
 
-module.exports = { start, stop, runExpirySweep, runIgTokenRefreshSweep };
+module.exports = { start, stop, runExpirySweep, runIgTokenRefreshSweep, runBillingRenewalSweep };

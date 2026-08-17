@@ -1,11 +1,14 @@
 /**
- * YouCollab — Plan & Subscription Routes
- * ======================================
+ * YouCollab — Plan Routes
+ * =======================
  * GET   /api/plans        → plan catalogue (public — same pricing page any
- *                            signed-out visitor sees; matches the plans
- *                            table's own anon-readable RLS policy)
- * GET   /api/plans/usage  → current brand's plan + live usage
- * PATCH /api/plans/assign → switch the current brand's plan
+ *                            signed-out visitor sees)
+ * GET   /api/plans/usage  → current brand's Campaign Credits / Application
+ *                            Slots / billing cycle + per-campaign breakdown
+ *
+ * V1 has no self-service plan change — see admin.routes.js
+ * PATCH /api/admin/brands/:brandId/plan for the only path that can change a
+ * brand's plan, credits, slots, or billing dates.
  */
 
 const express = require('express');
@@ -16,6 +19,5 @@ const router = express.Router();
 
 router.get('/', planController.list);
 router.get('/usage', authenticate, requireRole('BRAND'), planController.usage);
-router.patch('/assign', authenticate, requireRole('BRAND'), planController.assign);
 
 module.exports = router;
