@@ -227,6 +227,23 @@ export function Sidebar({ onNavigate, collapsed = false, onToggleCollapse }: Sid
             {!collapsed && <span>Admin: Brand Plans</span>}
           </Link>
         )}
+
+        {user.isAdmin && (
+          <Link
+            to="/admin/plan-requests"
+            title={collapsed ? "Admin: Plan Requests" : undefined}
+            className={`flex items-center gap-3 px-3 py-2 text-xs font-medium uppercase tracking-wider transition-colors rounded-md ${
+              collapsed ? "justify-center" : ""
+            } ${
+              location.pathname === "/admin/plan-requests"
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                : "text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/60"
+            }`}
+          >
+            <ShieldCheck className="h-4 w-4 shrink-0" />
+            {!collapsed && <span>Admin: Plan Requests</span>}
+          </Link>
+        )}
       </nav>
 
       {/* User Footer Profile */}

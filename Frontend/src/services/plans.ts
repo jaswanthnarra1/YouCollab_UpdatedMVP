@@ -1,7 +1,7 @@
 import { apiClient, unwrap } from "@/lib/api";
-import type { Plan, PlanUsage } from "@/types";
+import type { Plan, PlanChangeRequest, PlanUsage } from "@/types";
 
-export type { Plan, PlanUsage };
+export type { Plan, PlanUsage, PlanChangeRequest };
 
 export const plansService = {
   /** Plan catalogue — pricing is rendered from this, never from constants. */
@@ -9,11 +9,18 @@ export const plansService = {
     const { data } = await apiClient.get("/api/plans");
     return unwrap<Plan[]>(data) ?? [];
   },
-  /** Current brand's Campaign Credits / Application Slots / billing cycle. */
+  /** Current brand's Campaign Credits / Application Slots / billing cycle + latest plan-change request. */
   usage: async (): Promise<PlanUsage> => {
     const { data } = await apiClient.get("/api/plans/usage");
     return unwrap<PlanUsage>(data);
   },
-  // No self-service assign in V1 — plan changes are manual, made by an admin
-  // via /api/admin/brands/:brandId/plan. See services/admin.ts.
+  /**
+   * Request a plan change. Creates a PENDING request only — never applies
+   * it. An admin reviews and applies it via the admin plan-requests queue.
+   * No self-service assign in V1.
+   */
+  request: async (planName: "FREE" | "STARTER" | "GROWTH"): Promise<PlanChangeRequest> => {
+    const { data } = await apiClient.post("/api/plans/request", { planName });
+    return unwrap<PlanChangeRequest>(data);
+  },
 };

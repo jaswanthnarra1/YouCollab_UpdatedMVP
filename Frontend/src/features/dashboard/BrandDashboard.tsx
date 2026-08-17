@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { gigsService, type Gig } from "@/services/gigs";
 import { GigStatusBadge, resolveGigStatus, daysUntilExpiry } from "@/components/common/gig-status-badge";
 import { plansService } from "@/services/plans";
+import { PlanUpgradeDialog } from "./PlanUpgradeDialog";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   Plus,
@@ -399,10 +400,9 @@ export default function BrandDashboard() {
                       Application Slots{" "}
                       <span className="font-semibold text-foreground">{planUsage.applicationSlotsRemaining}</span>
                     </span>
-                    {/* V1: plan changes are manual — no self-service upgrade. */}
-                    <Link to="/contact" className="text-[11px] text-primary hover:underline">
-                      Request Plan Change
-                    </Link>
+                    {/* V1: plan changes are manual — no self-service upgrade.
+                        Opens the pricing/upgrade experience, not a contact page. */}
+                    <PlanUpgradeDialog />
                   </div>
                 </div>
                 {planUsage.campaigns.length > 0 && (

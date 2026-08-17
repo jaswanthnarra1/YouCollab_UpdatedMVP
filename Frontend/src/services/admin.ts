@@ -1,4 +1,5 @@
 import { apiClient, unwrap } from "@/lib/api";
+import type { PlanChangeRequest, PlanChangeRequestStatus } from "@/types";
 
 export interface AdminBrand {
   id: string;
@@ -25,5 +26,17 @@ export const adminService = {
   updateBrandPlan: async (brandId: string, payload: AdminUpdateBrandPlanPayload) => {
     const { data } = await apiClient.patch(`/api/admin/brands/${brandId}/plan`, payload);
     return unwrap(data);
+  },
+  listPlanRequests: async (status?: PlanChangeRequestStatus): Promise<PlanChangeRequest[]> => {
+    const { data } = await apiClient.get("/api/admin/plan-requests", { params: status ? { status } : undefined });
+    return unwrap<PlanChangeRequest[]>(data) ?? [];
+  },
+  approvePlanRequest: async (id: string): Promise<PlanChangeRequest> => {
+    const { data } = await apiClient.patch(`/api/admin/plan-requests/${id}/approve`);
+    return unwrap<PlanChangeRequest>(data);
+  },
+  rejectPlanRequest: async (id: string): Promise<PlanChangeRequest> => {
+    const { data } = await apiClient.patch(`/api/admin/plan-requests/${id}/reject`);
+    return unwrap<PlanChangeRequest>(data);
   },
 };

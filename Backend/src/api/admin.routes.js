@@ -22,4 +22,9 @@ router.post('/referrals/:id/winner', referralController.adminMarkWinner);
 router.get('/brands', adminController.listBrands);
 router.patch('/brands/:brandId/plan', validate(adminUpdateBrandPlanSchema), adminController.updateBrandPlan);
 
+// Brand-submitted plan-change request queue (see plan.routes.js POST /request).
+router.get('/plan-requests', adminController.listPlanRequests);
+router.patch('/plan-requests/:id/approve', adminController.approvePlanRequest);
+router.patch('/plan-requests/:id/reject', adminController.rejectPlanRequest);
+
 module.exports = router;

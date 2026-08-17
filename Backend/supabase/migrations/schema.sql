@@ -1362,3 +1362,38 @@ BEGIN
   RETURN QUERY SELECT (v_brand."applicationSlotsRemaining" - v_delta);
 END;
 $$ LANGUAGE plpgsql;
+
+-- ============================================
+-- 24. Manual plan-change request queue (Brand -> Admin)
+-- ============================================
+-- V1 has no self-service plan switch (PATCH /api/plans/assign was removed —
+-- see section 22/23). This is the "request" half: a Brand asks, an admin
+-- approves/rejects, only the approval path actually calls
+-- admin_adjust_brand_plan (section 23k) — the same, already-gated function
+-- the existing per-brand admin editor uses. No new plan-mutation path is
+-- introduced; this only adds a request record in front of the existing one.
+CREATE TABLE IF NOT EXISTS plan_change_requests (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "brandId"         UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  "currentPlanId"   UUID REFERENCES plans(id),
+  "requestedPlanId" UUID NOT NULL REFERENCES plans(id),
+  status            TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
+  "reviewedBy"      TEXT,           -- admin's Clerk user id, audit trail only
+  "reviewedAt"      TIMESTAMPTZ,
+  "createdAt"       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  "updatedAt"       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_plan_change_requests_brand ON plan_change_requests("brandId", "createdAt" DESC);
+CREATE INDEX IF NOT EXISTS idx_plan_change_requests_status ON plan_change_requests(status);
+
+-- At most one open request per brand at a time — this is what actually
+-- prevents duplicate/repeated "Upgrade to Growth" clicks from piling up
+-- requests, not just a frontend disabled state.
+CREATE UNIQUE INDEX IF NOT EXISTS plan_change_requests_one_pending_idx
+  ON plan_change_requests ("brandId") WHERE status = 'PENDING';
+
+DROP TRIGGER IF EXISTS update_plan_change_requests_updated_at ON plan_change_requests;
+CREATE TRIGGER update_plan_change_requests_updated_at
+  BEFORE UPDATE ON plan_change_requests
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

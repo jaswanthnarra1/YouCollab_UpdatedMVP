@@ -30,4 +30,18 @@ const usage = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data });
 });
 
-module.exports = { list, usage };
+/**
+ * Brand requests a plan change. Creates a request row only — never applies
+ * the change itself. See planService.requestPlanChange.
+ */
+const requestChange = asyncHandler(async (req, res) => {
+  const brandId = await getBrandId(req.user.id);
+  const data = await planService.requestPlanChange(brandId, req.body.planName);
+  res.status(201).json({
+    success: true,
+    data,
+    message: 'Upgrade request submitted. Our team will review it and update your plan manually.',
+  });
+});
+
+module.exports = { list, usage, requestChange };

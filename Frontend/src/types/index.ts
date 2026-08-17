@@ -187,6 +187,23 @@ export interface PlanUsageCampaign {
   applicationSlotsUsed: number;
 }
 
+export type PlanChangeRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+/** A Brand's request to switch plans — created by the Brand, applied only by an admin. */
+export interface PlanChangeRequest {
+  id: string;
+  brandId: string;
+  currentPlanId: string | null;
+  requestedPlanId: string;
+  status: PlanChangeRequestStatus;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** Populated only on admin-list responses. */
+  brand?: { id: string; businessName: string };
+}
+
 /**
  * V1 Campaign Credit / Application Slot model. `campaignCreditsRemaining` /
  * `applicationSlotsRemaining` are the brand's own live balances (the source
@@ -201,6 +218,8 @@ export interface PlanUsage {
   billingCycleStart: string | null;
   billingCycleEnd: string | null;
   campaigns: PlanUsageCampaign[];
+  /** Most recent plan-change request regardless of status, or null if none exists yet. */
+  latestRequest: PlanChangeRequest | null;
 }
 
 export interface CreateGigPayload {

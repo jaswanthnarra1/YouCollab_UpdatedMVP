@@ -57,6 +57,8 @@ const getBrandUsageSummary = async (brandId) => {
 
   if (error) throw new AppError('Failed to load plan usage.', 500, 'DATABASE_ERROR');
 
+  const latestRequest = await getMyLatestPlanChangeRequest(brandId);
+
   return {
     plan: {
       id: plan.id,
@@ -75,7 +77,138 @@ const getBrandUsageSummary = async (brandId) => {
       applicationSlotsAllotted: g.applicationSlots,
       applicationSlotsUsed: g.applicationSlotsUsed,
     })),
+    // Most recent plan-change request regardless of status, or null if the
+    // brand has never made one — lets the dashboard show a pending banner
+    // and block a duplicate submission without a second network call.
+    latestRequest,
   };
+};
+
+/**
+ * Brand submits a request to switch plans. Only ever *creates a request
+ * row* — the actual plan mutation happens exclusively in
+ * adminApprovePlanChangeRequest, which reuses the existing, already-gated
+ * admin_adjust_brand_plan path. A Brand can never apply this itself.
+ *
+ * The real duplicate-request guard is the partial unique index
+ * (plan_change_requests_one_pending_idx, schema.sql section 24) — this
+ * pre-check just returns a friendlier error than a raw constraint violation.
+ */
+const requestPlanChange = async (brandId, planName) => {
+  const requestedPlan = await getPlanByName(planName);
+
+  const { data: brand } = await supabase.from('brands').select('id, planId').eq('id', brandId).maybeSingle();
+  if (!brand) throw new AppError('Brand not found.', 404, 'NOT_FOUND');
+
+  if (brand.planId === requestedPlan.id) {
+    throw new AppError("You're already on this plan.", 400, 'BAD_REQUEST');
+  }
+
+  const { data: existingPending } = await supabase
+    .from('plan_change_requests')
+    .select('id')
+    .eq('brandId', brandId)
+    .eq('status', 'PENDING')
+    .maybeSingle();
+
+  if (existingPending) {
+    throw new AppError('You already have a pending plan change request.', 409, 'CONFLICT');
+  }
+
+  const { data: created, error } = await supabase
+    .from('plan_change_requests')
+    .insert({ brandId, currentPlanId: brand.planId, requestedPlanId: requestedPlan.id })
+    .select('*')
+    .single();
+
+  if (error) {
+    if (error.code === '23505') {
+      throw new AppError('You already have a pending plan change request.', 409, 'CONFLICT');
+    }
+    throw new AppError('Failed to submit plan change request.', 500, 'DATABASE_ERROR');
+  }
+
+  return created;
+};
+
+/** Most recent plan-change request for a brand, or null if it's never made one. */
+const getMyLatestPlanChangeRequest = async (brandId) => {
+  const { data } = await supabase
+    .from('plan_change_requests')
+    .select('*')
+    .eq('brandId', brandId)
+    .order('createdAt', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return data || null;
+};
+
+/**
+ * Admin: all plan-change requests (defaults to newest first, optionally
+ * filtered by status). Small-volume feature — a flat limited list is
+ * enough, no cursor pagination.
+ */
+const adminListPlanChangeRequests = async (filters = {}) => {
+  let query = supabase
+    .from('plan_change_requests')
+    .select('*, brand:brands(id, businessName)')
+    .order('createdAt', { ascending: false })
+    .limit(100);
+
+  if (filters.status) {
+    query = query.eq('status', filters.status);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new AppError('Failed to load plan change requests.', 500, 'DATABASE_ERROR');
+  return data || [];
+};
+
+/**
+ * Admin: approve a pending request. Conditioned on status='PENDING' so two
+ * admins racing the same request can't both approve it (mirrors
+ * referral.service.js's adminMarkUnderReview pattern). Applies the change
+ * by calling the existing adminUpdateBrandPlan — only the plan itself
+ * changes; Campaign Credits/Application Slots/billing dates are left as
+ * they are (unchanged by a plan switch under the existing V1 rules — the
+ * only thing that grants fresh credits/slots is the renewal sweep).
+ */
+const adminApprovePlanChangeRequest = async (id, adminClerkId) => {
+  const { data: request, error: updateError } = await supabase
+    .from('plan_change_requests')
+    .update({ status: 'APPROVED', reviewedBy: adminClerkId, reviewedAt: new Date().toISOString() })
+    .eq('id', id)
+    .eq('status', 'PENDING')
+    .select('*')
+    .maybeSingle();
+
+  if (updateError) throw new AppError('Failed to approve request.', 500, 'DATABASE_ERROR');
+  if (!request) throw new AppError('This request has already been reviewed.', 400, 'BAD_REQUEST');
+
+  const requestedPlan = await supabase.from('plans').select('name').eq('id', request.requestedPlanId).single();
+  await adminUpdateBrandPlan(request.brandId, {
+    planName: requestedPlan.data.name,
+    reason: `Plan change request ${id} approved`,
+  });
+
+  return request;
+};
+
+/** Admin: reject a pending request. No plan mutation happens. */
+const adminRejectPlanChangeRequest = async (id, adminClerkId) => {
+  const { data: request, error } = await supabase
+    .from('plan_change_requests')
+    .update({ status: 'REJECTED', reviewedBy: adminClerkId, reviewedAt: new Date().toISOString() })
+    .eq('id', id)
+    .eq('status', 'PENDING')
+    .select('*')
+    .maybeSingle();
+
+  if (error) throw new AppError('Failed to reject request.', 500, 'DATABASE_ERROR');
+  if (!request) throw new AppError('This request has already been reviewed.', 400, 'BAD_REQUEST');
+
+  return request;
 };
 
 /**
@@ -167,4 +300,9 @@ module.exports = {
   adminUpdateBrandPlan,
   adminListBrands,
   renewElapsedBillingCycles,
+  requestPlanChange,
+  getMyLatestPlanChangeRequest,
+  adminListPlanChangeRequests,
+  adminApprovePlanChangeRequest,
+  adminRejectPlanChangeRequest,
 };
