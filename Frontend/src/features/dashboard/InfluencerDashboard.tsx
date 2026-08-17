@@ -209,10 +209,11 @@ function InstagramCard() {
                     ))}
                   </ul>
                   <div className="border border-border rounded-sm p-3 bg-muted/40">
-                    <p className="text-[11px] font-semibold text-foreground">Important</p>
+                    <p className="text-[11px] font-semibold text-foreground">Instagram Professional account required</p>
                     <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
-                      Only Instagram Professional accounts (Business or Creator) are supported. Personal accounts
-                      cannot be connected because Meta no longer supports Personal Account API authentication.
+                      Connect a Business or Creator account to continue — personal accounts aren't supported.
+                      Don't have one yet? In the Instagram app: Settings → Account type and tools → Switch to
+                      professional account.
                     </p>
                   </div>
                 </div>

@@ -25,11 +25,13 @@ const META_TOKEN_URL = 'https://api.instagram.com/oauth/access_token';
 const META_LONG_TOKEN_URL = `${GRAPH_API_BASE}/access_token`;
 const META_REFRESH_URL = `${GRAPH_API_BASE}/refresh_access_token`;
 
-// Scopes for Instagram Business/Creator OAuth (do NOT mix with Facebook scopes here)
-const INSTAGRAM_SCOPES = [
-  'instagram_business_basic',
-  'instagram_business_manage_insights',
-].join(',');
+// Scopes for Instagram Business/Creator OAuth (do NOT mix with Facebook scopes
+// here). V1 scope is intentionally minimal — `instagram_business_basic` alone
+// covers everything this integration needs (username, follower count, account
+// type via graph.instagram.com/me). No insights/messaging/publishing/comments
+// scope is requested; adding one later means a fresh Meta App Review, not a
+// silent scope creep.
+const INSTAGRAM_SCOPES = ['instagram_business_basic'].join(',');
 
 // Only Professional (Business or Creator) accounts are supported — Meta no
 // longer supports Personal-account API access, and the product itself
@@ -235,7 +237,8 @@ const fetchIgProfile = async (accessToken) => {
 const assertProfessionalAccount = (profile) => {
   if (!SUPPORTED_ACCOUNT_TYPES.includes(profile.account_type)) {
     throw new AppError(
-      'Only Instagram Business or Creator accounts can be connected. Switch to a Professional account in your Instagram app settings and try again.',
+      'You need an Instagram Professional account (Business or Creator) to connect Instagram to You Collab. ' +
+      'In the Instagram app: Settings → Account type and tools → Switch to professional account.',
       400,
       'INSTAGRAM_PERSONAL_ACCOUNT_NOT_SUPPORTED'
     );
